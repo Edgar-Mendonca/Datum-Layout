@@ -284,3 +284,73 @@ fn resizing_keeps_reducers_and_an_oversized_branch_is_a_mismatch() {
     assert_eq!(b.parts.iter().find(|q| q.kind == "tee").unwrap().nps2, "4");
     assert!(connection_issues(&d.p, &cat, &b).iter().any(|i| i.kind == "mismatch" && i.text.contains("4\"") && i.text.contains("6\"")));
 }
+
+#[test]
+fn every_check_has_a_failing_and_a_passing_case() {
+    let cat = Catalogue::builtin();
+    let kinds = |p: &Project| { let b = build(p, &cat); crate::checks::run(p, &cat, &b).into_iter().map(|i| (i.kind, i.text)).collect::<Vec<_>>() };
+    // Open end: fails open, passes capped.
+    let mut p = line("4", vec![[0.0, 0.0, 2.0], [5.0, 0.0, 2.0]], vec![]);
+    assert_eq!(kinds(&p).iter().filter(|k| k.0 == "open").count(), 2);
+    p.lines[0].from = End::Point { term: Term::Cap };
+    p.lines[0].to = End::Point { term: Term::Blind };
+    assert!(kinds(&p).is_empty(), "{:?}", kinds(&p));
+    // A line without a number.
+    let mut q = p.clone();
+    q.lines[0].number.clear();
+    assert!(kinds(&q).iter().any(|k| k.0 == "number"));
+    // Class rule: a 16" ball valve is not in CS1 (ball valves to 12"); a gate valve is.
+    let mut r = line("16", vec![[0.0, 0.0, 3.0], [8.0, 0.0, 3.0]], vec![item(5, ItemKind::Ball, 0, 4.0)]);
+    r.lines[0].from = End::Point { term: Term::Blind };
+    r.lines[0].to = End::Point { term: Term::Blind };
+    assert!(kinds(&r).iter().any(|k| k.0 == "class" && k.1.contains("16\" ball")), "{:?}", kinds(&r));
+    r.lines[0].items[0].kind = ItemKind::Gate;
+    assert!(kinds(&r).is_empty(), "{:?}", kinds(&r));
+    // Rating mismatch at a nozzle: a class 300 nozzle on a class 150 line.
+    let mut d = Doc::new(Project::new());
+    let v = d.apply(Op::AddEquipment { kind: EquipKind::VerticalVessel, pos: [5.0, 5.0, 0.0] }, &cat).unwrap()[0];
+    d.apply(Op::Route { from: RouteEnd::Nozzle { equip: v, nozzle: "N2".into() }, via: vec![], to: RouteEnd::Point { p: [10.0, 9.0, 1.9] }, nps: None }, &cat).unwrap();
+    d.apply(Op::SetTerm { line: d.p.lines[0].id, start: false, term: Term::Blind }, &cat).unwrap();
+    assert!(kinds(&d.p).is_empty(), "{:?}", kinds(&d.p));
+    let mut e = d.p.equip(v).unwrap().clone();
+    e.nozzles[1].rating = 300;
+    d.apply(Op::SetEquipment(e), &cat).unwrap();
+    assert!(kinds(&d.p).iter().any(|k| k.0 == "mismatch" && k.1.contains("class 300 meets class 150") || k.1.contains("class 150 meets class 300")), "{:?}", kinds(&d.p));
+    // Clash with the ground: fails at 10 mm, passes at 1 m (see also "Find the clashes").
+    let mut g = line("2", vec![[0.0, 0.0, 0.03], [5.0, 0.0, 0.03]], vec![]);
+    g.lines[0].from = End::Point { term: Term::Cap };
+    g.lines[0].to = End::Point { term: Term::Cap };
+    assert!(kinds(&g).iter().any(|k| k.0 == "clash" && k.1.starts_with("Pipe–ground")));
+    for pt in &mut g.lines[0].pts { pt[2] = 1.0; }
+    assert!(kinds(&g).is_empty());
+    // Size mismatch: tested with an oversized branch (resizing test); pipe–pipe and
+    // pipe–equipment clashes: "Find the clashes" (examples).
+}
+
+#[test]
+fn the_take_off_counts_what_example_1_holds() {
+    let cat = Catalogue::builtin();
+    let p = crate::examples::get("pumps").unwrap();
+    let l = crate::lists::lists(&p, &cat);
+    let count = |g: &str, w: &str| l.mto.iter().filter(|r| r.group == g && r.what.contains(w)).map(|r| r.qty).sum::<f64>();
+    assert_eq!(count("Valves", "Gate"), 2.0);
+    assert_eq!(count("Valves", "Check"), 2.0);
+    assert_eq!(count("Valves", "Strainer"), 2.0);
+    assert_eq!(count("Fittings", "Tee"), 3.0);
+    assert_eq!(count("Fittings", "Reducer"), 2.0);
+    assert_eq!(count("Flanges", "blind"), 1.0);
+    assert_eq!(count("Fittings", "Cap"), 1.0);
+    // One gasket and one bolt set per flanged joint.
+    assert_eq!(count("Gaskets", ""), count("Bolts", ""));
+    let b = build(&p, &cat);
+    assert_eq!(count("Gaskets", "") as usize, b.parts.iter().filter(|q| q.kind == "gasket").count());
+    // Pipe length per line equals the generated pipes'.
+    for line in &p.lines {
+        let mine: f64 = b.parts.iter().filter(|q| q.line == line.id && q.kind == "pipe").map(|q| q.length).sum();
+        let listed: f64 = l.mto.iter().filter(|r| r.line == line.number && r.group == "Pipe").map(|r| r.qty).sum();
+        assert!((mine - listed).abs() < 0.002, "{}: {mine} vs {listed}", line.number);
+    }
+    assert_eq!(l.lines.len(), 5);
+    assert_eq!(l.equipment.iter().map(|e| e.nozzles.len()).sum::<usize>(), 7);
+    assert!(crate::lists::csv(&l, "mto").unwrap().lines().count() == l.mto.len() + 1);
+}

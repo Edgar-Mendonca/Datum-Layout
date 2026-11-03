@@ -31,6 +31,18 @@ jobs:
           npx -y playwright@1.63.0 install --with-deps chromium
           NODE_PATH=$(npm root -g) node tests_ui/run.cjs
 
+  # Datum Pipe's own engine reads and solves every example line; the Khronos validator checks the glTF.
+  exchange:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: scripts/verify.sh
+
   # Licences, security advisories and crate sources (deny.toml).
   deny:
     runs-on: ubuntu-latest

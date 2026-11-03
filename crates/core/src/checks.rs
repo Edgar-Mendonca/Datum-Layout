@@ -42,12 +42,16 @@ pub fn connections(b: &Built) -> HashMap<(usize, usize), (usize, usize)> {
     out
 }
 
-fn label(p: &Project, q: &Part) -> String {
-    let what = match q.kind {
+fn kind_name(kind: &str) -> &str {
+    match kind {
         "elbow90" => "90° elbow", "elbow45" => "45° elbow", "flange" => "flange", "gasket" => "gasket", "pipe" => "pipe", "tee" => "tee", "reducer" => "reducer",
         "cap" => "cap", "blind" => "blind flange", "gate" => "gate valve", "globe" => "globe valve", "check" => "check valve", "ball" => "ball valve", "strainer" => "strainer",
         "nozzle" => "nozzle", "equipment" => "", k => k,
-    };
+    }
+}
+
+fn label(p: &Project, q: &Part) -> String {
+    let what = kind_name(q.kind);
     if q.line != 0 {
         let n = p.line(q.line).map(|l| if l.number.is_empty() { "(no number)".to_string() } else { l.number.clone() }).unwrap_or_default();
         format!("{n} {what}")
@@ -104,7 +108,7 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
         }
         if !class.allows(q.kind, &q.nps) && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
             let pt = q.ports.first().map(|x| x.p).unwrap_or_default();
-            out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, label(p, q).rsplit(' ').next().unwrap_or(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0 });
+            out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, kind_name(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0 });
         }
     }
     for l in p.lines.iter().filter(|l| l.number.trim().is_empty()) {

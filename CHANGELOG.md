@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.1.3 — 2026-11-03
+The hand-over to Datum Pipe, proved.
+
+**Datum Pipe reads every line.** Every line of every example is exported as a piping component file and read by Datum Pipe's own engine, which then solves it: the same nodes, bends, tees, valves, flanges and reducers. The record is in docs/verification/0.1.3.md, and the check now runs on every change.
+
+**glTF checked.** Every example's 3D model passes the Khronos glTF validator with no errors and no warnings.
+
+**Checks.** Every check has a failing and a passing case in the tests. A component a class does not allow is now named properly ("a 16\" ball valve is not allowed by class CS1").
+
+**Lists.** The material take-off is tested against what example 1 holds: valves, tees, reducers, flanges, one gasket and one bolt set per flanged joint, and the pipe length of each line.
+
 ## 0.1.2 — 2026-11-03
 Dropping and moving fittings, and branches, made exact.
 
