@@ -137,6 +137,21 @@ pub fn follow_ends(p: &mut Project, cat: &Catalogue) {
     }
 }
 
+/// Where a component dropped near `at` would go on a line: (segment, distance along it, the
+/// point), or why it cannot go there. The window shows this while dragging; `Drop` uses it.
+pub fn snap(p: &Project, cat: &Catalogue, l: &Line, kind: ItemKind, at: P3, nps2: &str) -> Result<(usize, f64, P3), String> {
+    let (seg, s, _) = route::nearest(p, cat, l, at).ok_or("The line has no route to place it on.")?;
+    let nps = route::size_at(l, seg, s);
+    let mut it = Item { kind, seg, at: s, nps2: nps2.to_string(), ..Default::default() };
+    if kind == ItemKind::Reducer && it.nps2.is_empty() { it.nps2 = route::reducer_to(&it, &nps); }
+    if !it.nps2.is_empty() { valid_nps(&it.nps2)?; }
+    let len = route::item_len(cat, l, &it, &nps);
+    let place = route::free_place(p, cat, l, seg, s, len, 0.01, 0).ok_or_else(|| format!("No room for a {}\" {} ({:.0} mm) on this run: it needs a straight piece at least that long between fittings.", nps, kind.name().to_lowercase(), len * 1000.0))?;
+    let pts = route::path(p, cat, l);
+    let u = unit(sub(pts[seg + 1], pts[seg]));
+    Ok((seg, place, add(pts[seg], mul(u, place))))
+}
+
 /// How far a route leaves a nozzle before it turns: flange, reducer and elbow, to 50 mm.
 pub fn lead_for(cat: &Catalogue, nps: &str, rating: u32) -> f64 {
     let od = cat.od(nps);
@@ -300,15 +315,10 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
         }
         Op::Drop { line, kind, at, dir, nps2 } => {
             let l = p.line(line).ok_or("That line no longer exists.")?.clone();
-            let (seg, s, _) = route::nearest(p, cat, &l, at).ok_or("The line has no route to place it on.")?;
+            let (seg, s, _) = snap(p, cat, &l, kind, at, &nps2)?;
             let nps = route::size_at(&l, seg, s);
-            let mut it = Item { id: 0, uid: String::new(), kind, seg, at: s, nps2: nps2.clone(), dir, tag: String::new() };
+            let mut it = Item { id: p.id(), uid: String::new(), kind, seg, at: s, nps2, dir, tag: String::new() };
             if kind == ItemKind::Reducer && it.nps2.is_empty() { it.nps2 = route::reducer_to(&it, &nps); }
-            if !it.nps2.is_empty() { valid_nps(&it.nps2)?; }
-            let len = route::item_len(cat, &l, &it, &nps);
-            let at = route::free_place(p, cat, &l, seg, s, len, 0.01, 0).ok_or_else(|| format!("No room for a {nps}\" {} ({:.0} mm) on this run: it needs a straight piece at least that long between fittings.", kind.name().to_lowercase(), len * 1000.0))?;
-            it.at = at;
-            it.id = p.id();
             created.push(it.id);
             line_mut(p, line)?.items.push(it);
         }

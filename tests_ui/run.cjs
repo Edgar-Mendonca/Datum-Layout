@@ -120,6 +120,29 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the valve came with flanges, gaskets and bolts", s2.parts.filter(q => q.item === gate?.id).map(q => q.kind).sort().join() === "bolts,bolts,flange,flange,gasket,gasket,gate");
   check("no open ends after the drop", !st.issues.some(i => i.kind === "open"), JSON.stringify(st.issues));
 
+  // 5b. While dragging, the engine says where it would snap.
+  await p.evaluate(() => { window.__drag = { type: "item", kind: "globe" }; window.__calls.length = 0; });
+  const q1 = [0, 1, 2].map(j => pts[k][j] + (pts[k + 1][j] - pts[k][j]) * 0.2);
+  const s1 = await screenOf(q1);
+  await p.evaluate(([x, y]) => document.elementFromPoint(x, y).dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: new DataTransfer() })), [s1.x, s1.y]);
+  await settle(400);
+  check("dragging over a pipe asks the engine where it snaps", (await calls("snap")).length > 0);
+  await p.evaluate(() => { window.__drag = undefined; document.querySelector(".v3d").dispatchEvent(new DragEvent("dragleave", { bubbles: true })); });
+
+  // 5c. A tee dropped on the pipe starts a branch: route it to a free point.
+  await dropAt("item", "tee", q1);
+  check("dropping a tee starts routing its branch", (await p.textContent(".toolhint")).includes("Click to add a corner"));
+  st = await state();
+  const teeItem = st.p.lines[0].items.find(i => i.kind === "tee");
+  const bport = (await ask("scene")).ok.ports.find(x => x.kind === "branch" && x.item === teeItem?.id);
+  const far = await screenOf([bport.p[0] + bport.d[0] * 3, bport.p[1] + bport.d[1] * 3, bport.p[2] + bport.d[2] * 3]);
+  await p.mouse.move(far.x, far.y); await settle(150); await p.mouse.dblclick(far.x, far.y); await settle(700);
+  st = await state();
+  const br = st.p.lines.find(l => l.from.kind === "branch");
+  check("the branch line starts at the tee", !!br && br.from.item === teeItem.id, JSON.stringify(st.p.lines.map(l => l.from)));
+  check("the branch meets its tee with nothing open there", !st.issues.some(i => i.kind === "open" && i.line !== br?.id) && !st.issues.some(i => i.kind === "mismatch"), JSON.stringify(st.issues.map(i => i.text)));
+  await p.keyboard.press("Escape");
+
   // 6. Resize the line: every component re-sizes.
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);
   await p.click(".bbody tr.f"); await settle(300);

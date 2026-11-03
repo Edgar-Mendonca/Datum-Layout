@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.1 (2026-11-03) |
+| **Current version** | 0.1.2 (2026-11-03) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -82,6 +82,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.1 | After every edit `doc::follow_ends` moves each line end to its nozzle or tee and passes the move along the legs: each leg absorbs the part of the move along its own axis, unless that leaves it shorter than flange + two elbows (then it moves whole); a free far end moves too; when the move reaches an attached far end with something left, the line stays and is reported (no automatic jog). Components that no longer fit slide to the nearest free place on their run | Keeps the designer's corners; never silently draws a wrong route; a fully automatic re-route scrambled component positions in trials |
 | 0.1.1 | `Op::Reroute` routes orthogonally between the ports through the interior corners, dropping the lead corner next to each attached end (the new route makes its own) | One click fixes a skewed line after equipment turns |
 | 0.1.1 | **Publishing releases needs the repository's Actions token to have write access** (Settings › Actions › General › Workflow permissions › Read and write). Until then the release workflow builds the installer and keeps it as a workflow artifact (`DatumLayout-x.y.z`), but the GitHub Release step fails with 403 | Found on the first release run; a repository setting the session cannot change |
+| 0.1.2 | `doc::snap` (nearest segment → size there → length → `free_place`) is the one rule for both the drag preview and `Drop` | The marker can never show a place the drop would not use |
+| 0.1.2 | A route ends on the window's dblclick event, not on a click with `detail` 2 | Pointer events carry no click count (found by the new branch UI test) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
 ---
@@ -92,8 +94,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | --- | --- | --- |
 | 0.1.0 | Shell (renamed, steel, logo, publisher "Datum", updater, CI, release); plot with grid, coordinates and north; 3D view; engine (units, catalogue, parts, ports, six equipment types); placing, routing, Inspector; drag-and-drop fittings, resize, branches; checks, lists, CSV, PCF, glTF; examples | ✅ |
 | 0.1.1 | Lines follow moved equipment and tees (`doc::follow_ends`); Route Again (`Op::Reroute`); the square-to-nozzle check | ✅ |
-| 0.1.2 | Drag and drop, resize and branches refined and tested | 🔜 |
-| 0.1.3 | Checks, lists; PCF proved against Datum Pipe itself; glTF validated | ⬜ |
+| 0.1.2 | Exact snap preview while dragging (`doc::snap`, shell `snap`), slide a component with its arrow (`MoveItem`), tee → branch routing tested, double-click fix, resize and oversized-branch tests | ✅ |
+| 0.1.3 | Checks, lists; PCF proved against Datum Pipe itself; glTF validated | 🔜 |
 | 0.1.4 | Examples, print, ? cards, screenshots, README and site, final check | ⬜ |
 | 0.2 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | ⬜ |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |

@@ -237,3 +237,50 @@ fn a_line_left_skewed_by_a_rotation_routes_square_again() {
     assert!(b.issues.is_empty(), "{:?}", b.issues);
     assert!(connection_issues(&d.p, &cat, &b).is_empty(), "{:?}", connection_issues(&d.p, &cat, &b));
 }
+
+#[test]
+fn dropped_components_snap_clear_of_fittings_and_move_between_runs() {
+    let cat = Catalogue::builtin();
+    let mut d = Doc::new(line("6", vec![[0.0, 0.0, 3.0], [6.0, 0.0, 3.0], [6.0, 5.0, 3.0]], vec![]));
+    // Dropped right at the corner: it lands clear of the elbow, ports touching it at most.
+    let v = d.apply(Op::Drop { line: 1, kind: ItemKind::Gate, at: [5.95, 0.1, 3.0], dir: [0.0; 3], nps2: String::new() }, &cat).unwrap()[0];
+    let b = build(&d.p, &cat);
+    assert!(b.issues.is_empty(), "{:?}", b.issues);
+    joints_ok(&b);
+    assert!(connection_issues(&d.p, &cat, &b).iter().all(|i| i.kind == "open"));
+    // The snap preview says the same place the drop used.
+    let (seg, at, _) = crate::doc::snap(&d.p, &cat, d.p.line(1).unwrap(), ItemKind::Globe, [1.0, 0.0, 3.0], "").unwrap();
+    assert_eq!(seg, 0);
+    assert!(at > 0.3 && at < 2.0, "{at}");
+    // Move the valve onto the other run.
+    d.apply(Op::MoveItem { line: 1, item: v, at: [6.0, 3.0, 3.0] }, &cat).unwrap();
+    let it = d.p.lines[0].items.iter().find(|i| i.id == v).unwrap();
+    assert_eq!(it.seg, 1);
+    assert!((it.at - 3.0).abs() < 0.011, "{}", it.at);
+    assert!(build(&d.p, &cat).issues.is_empty());
+    // No room on a short run: a clear message, nothing changed.
+    let mut short = Doc::new(line("12", vec![[0.0, 0.0, 3.0], [0.6, 0.0, 3.0]], vec![]));
+    let before = short.p.clone();
+    let e = short.apply(Op::Drop { line: 1, kind: ItemKind::Globe, at: [0.3, 0.0, 3.0], dir: [0.0; 3], nps2: String::new() }, &cat).unwrap_err();
+    assert!(e.contains("No room for a 12\" globe valve"), "{e}");
+    assert_eq!(short.p, before);
+}
+
+#[test]
+fn resizing_keeps_reducers_and_an_oversized_branch_is_a_mismatch() {
+    let cat = Catalogue::builtin();
+    let mut d = Doc::new(line("6", vec![[0.0, 0.0, 3.0], [12.0, 0.0, 3.0]], vec![]));
+    d.apply(Op::Drop { line: 1, kind: ItemKind::Reducer, at: [6.0, 0.0, 3.0], dir: [0.0; 3], nps2: "4".into() }, &cat).unwrap();
+    d.apply(Op::Resize { line: 1, nps: "8".into() }, &cat).unwrap();
+    let b = build(&d.p, &cat);
+    let r = b.parts.iter().find(|q| q.kind == "reducer").unwrap();
+    assert_eq!((r.ports[0].nps.as_str(), r.ports[1].nps.as_str()), ("8", "4"));
+    assert!(b.issues.is_empty());
+    joints_ok(&b);
+    // A 6" branch on a 4" run part: the tee stays 4" and the joint is reported.
+    let tee = d.apply(Op::Drop { line: 1, kind: ItemKind::Tee, at: [10.0, 0.0, 3.0], dir: [0.0, 1.0, 0.0], nps2: String::new() }, &cat).unwrap()[0];
+    d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee }, via: vec![], to: RouteEnd::Point { p: [10.0, 5.0, 3.0] }, nps: Some("6".into()) }, &cat).unwrap();
+    let b = build(&d.p, &cat);
+    assert_eq!(b.parts.iter().find(|q| q.kind == "tee").unwrap().nps2, "4");
+    assert!(connection_issues(&d.p, &cat, &b).iter().any(|i| i.kind == "mismatch" && i.text.contains("4\"") && i.text.contains("6\"")));
+}

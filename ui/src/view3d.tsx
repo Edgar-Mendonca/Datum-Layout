@@ -7,7 +7,7 @@
 import { onMount, onCleanup, createEffect, on, Show } from "solid-js";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS } from "./api";
+import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke } from "./api";
 import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded } from "./store";
 import { C, setFit, setStdView, finishRoute } from "./cmds";
 import { fmt } from "./units";
@@ -201,6 +201,7 @@ export const View3D = () => {
   marker.visible = false; rubber.visible = false;
   toolG.add(rubber, marker);
   let cursor: V3 | null = null;
+  let snapSeq = 0;
 
   const setRubber = (pts: V3[]) => {
     rubber.geometry.dispose();
@@ -250,11 +251,18 @@ export const View3D = () => {
 
   // ------------------------------------------------------------ move arrows (gizmo)
   const gizmo = new THREE.Group(); toolG.add(gizmo);
-  let giz: { axis: V3; at: V3; kind: "equip" | "run" } | null = null;
+  let giz: { axis: V3; at: V3; kind: "equip" | "run" | "item" } | null = null;
   const buildGizmo = () => {
     gizmo.clear(); giz = null;
     const s = sel(), p = project(); if (!s || !p || mode() !== "select") return;
-    let at: V3 | null = null, axes: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]], kind: "equip" | "run" = "equip";
+    let at: V3 | null = null, axes: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]], kind: "equip" | "run" | "item" = "equip";
+    if (s.kind === "item") {
+      const l = p.lines.find(x => x.id === s.line), it = l?.items.find(i => i.id === s.id), pts = out()?.paths.find(x => x[0] === s.line)?.[1];
+      if (!it || !pts || it.seg + 1 >= pts.length) return;
+      const a = pts[it.seg], b = pts[it.seg + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1;
+      const u: V3 = [(b[0] - a[0]) / L, (b[1] - a[1]) / L, (b[2] - a[2]) / L];
+      at = [a[0] + u[0] * it.at, a[1] + u[1] * it.at, a[2] + u[2] * it.at]; axes = [u]; kind = "item";
+    }
     if (s.kind === "equip") { const e = p.equipment.find(x => x.id === s.id); if (!e) return; const parts = sceneData?.parts.filter(q => q.equip === e.id) ?? []; at = [e.pos[0], e.pos[1], parts.length ? Math.max(...parts.map(q => q.hi[2])) + 0.2 : e.pos[2] + 1]; }
     if (s.kind === "run") {
       const pts = out()?.paths.find(x => x[0] === s.id)?.[1]; if (!pts || s.seg + 1 >= pts.length) return;
@@ -265,7 +273,7 @@ export const View3D = () => {
     if (!at) return;
     const len = 1.2;
     for (const ax of axes) {
-      const col = ax[0] ? 0xc0392b : ax[1] ? 0x1f7a4d : 0x2f8cff;
+      const col = kind === "item" ? 0xb7791f : Math.abs(ax[0]) > 0.5 ? 0xc0392b : Math.abs(ax[1]) > 0.5 ? 0x1f7a4d : 0x2f8cff;
       for (const sg of [1, -1]) {
         const d = new THREE.Vector3(ax[0] * sg, ax[1] * sg, ax[2] * sg);
         const arr = new THREE.ArrowHelper(d, new THREE.Vector3(...at), len, col, 0.35, 0.22);
@@ -349,6 +357,7 @@ export const View3D = () => {
         const d: V3 = [axis[0] * delta, axis[1] * delta, axis[2] * delta], s = sel();
         if (s?.kind === "equip") { const eq = project()?.equipment.find(x => x.id === s.id); if (eq) act({ SetEquipment: { ...eq, pos: [eq.pos[0] + d[0], eq.pos[1] + d[1], eq.pos[2] + d[2]] } }); }
         if (s?.kind === "run") act({ MoveRun: { line: s.id, seg: s.seg, delta: d } });
+        if (s?.kind === "item" && giz) act({ MoveItem: { line: s.line, item: s.id, at: [giz.at[0] + d[0], giz.at[1] + d[1], giz.at[2] + d[2]] } });
       }
       draw(); return;
     }
@@ -376,10 +385,13 @@ export const View3D = () => {
     }
     if (pt && pt.kind === "nozzle") return finishRoute({ kind: "nozzle", equip: pt.equip, nozzle: pt.tag });
     const q = cursor ?? guided(e as PointerEvent); if (!q) return;
-    if (e.detail >= 2) return finishRoute({ kind: "point", p: q });
+    const last = r.via[r.via.length - 1];
+    if (last && Math.hypot(q[0] - last[0], q[1] - last[1], q[2] - last[2]) < 1e-6) return;
     setRoute({ ...r, via: [...r.via, q] });
   };
   const onDbl = (e: MouseEvent) => {
+    // A double-click ends the route at the point clicked (its clicks already added that corner).
+    if (mode() === "route") { const r = route(); if (r?.start && r.via.length) finishRoute({ kind: "point", p: r.via[r.via.length - 1] }, true); return; }
     if (mode() !== "select") return;
     const hit = pickPart(e); if (!hit) return fit();
     const [q] = hit;
@@ -411,17 +423,18 @@ export const View3D = () => {
     if (d.type === "item") {
       const hit = pickPart(e);
       if (hit && hit[0].line) {
-        // Show where it will snap: the nearest point on that line's path (the engine finds the free place).
-        const pts = out()?.paths.find(x => x[0] === hit[0].line)?.[1] ?? [];
-        let best: V3 = hit[1], bd = Infinity;
-        for (let i = 0; i + 1 < pts.length; i++) {
-          const a = new THREE.Vector3(...pts[i]), b = new THREE.Vector3(...pts[i + 1]), p = new THREE.Vector3(...hit[1]);
-          const ab = b.clone().sub(a), t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / Math.max(ab.lengthSq(), 1e-12))), x = a.clone().add(ab.multiplyScalar(t));
-          if (x.distanceTo(p) < bd) { bd = x.distanceTo(p); best = [x.x, x.y, x.z]; }
-        }
-        marker.visible = true; marker.position.set(...best);
+        // Ask the engine where it would snap (the free place on that run), or why it cannot.
+        const line = hit[0].line, n = ++snapSeq;
+        invoke<V3>("snap", { line, kind: d.kind, at: hit[1] }).then(pt => {
+          if (n !== snapSeq) return;
+          marker.visible = true; marker.position.set(...pt); (marker.material as THREE.MeshBasicMaterial).color.set(0x2f8cff);
+          host.title = `Drop on ${project()?.lines.find(l => l.id === line)?.number ?? "the line"} (${inch(hit[0].nps)})`; draw();
+        }).catch(err => {
+          if (n !== snapSeq) return;
+          marker.visible = true; marker.position.set(...hit[1]); (marker.material as THREE.MeshBasicMaterial).color.set(0xd64545);
+          host.title = String(err); draw();
+        });
         if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-        host.title = `Drop on ${project()?.lines.find(l => l.id === hit[0].line)?.number ?? "the line"} (${inch(hit[0].nps)})`;
       } else { marker.visible = false; if (e.dataTransfer) e.dataTransfer.dropEffect = "none"; host.title = ""; }
     } else {
       const p = onPlane(e, project()?.plot.ground ?? 0);
@@ -430,7 +443,7 @@ export const View3D = () => {
     draw();
   };
   const onDrop = (e: DragEvent) => {
-    const d = dragInfo(); (window as any).__drag = undefined; marker.visible = false; host.title = ""; draw();
+    const d = dragInfo(); (window as any).__drag = undefined; snapSeq++; marker.visible = false; host.title = ""; draw();
     if (!d) return;
     e.preventDefault();
     if (d.type === "item") {
@@ -443,7 +456,7 @@ export const View3D = () => {
       act({ AddEquipment: { kind: d.kind, pos: [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0] } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[0] }); });
     }
   };
-  const onDragLeave = () => { marker.visible = false; host.title = ""; draw(); };
+  const onDragLeave = () => { snapSeq++; marker.visible = false; host.title = ""; draw(); };
 
   onMount(() => {
     host.prepend(renderer.domElement);

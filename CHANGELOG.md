@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.1.2 — 2026-11-03
+Dropping and moving fittings, and branches, made exact.
+
+**See where it snaps.** While you drag a valve or fitting over a pipe, the marker shows exactly where it will land (the nearest free straight length between elbows, flanges and other components), or turns red and says why it cannot go there.
+
+**Slide a component along its run.** Select a valve, strainer, tee or reducer and drag its amber arrow; it moves to the nearest free place, or onto another run of the line.
+
+**Branches.** Dropping a tee starts routing its branch at once; double-click (or right-click) ends the branch at a free point, or click a nozzle. Fixed: a double-click did not end a route.
+
+**Resizing.** A line's reducers keep the size after them when the line is resized, and a branch larger than its run is reported as a mismatch at the tee.
+
 ## 0.1.1 — 2026-11-03
 Lines now follow the equipment they connect to.
 

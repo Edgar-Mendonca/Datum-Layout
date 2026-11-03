@@ -34,6 +34,12 @@ fn main() {
             "apply" => serde_json::from_value::<Op>(a["op"].clone()).map_err(|e| e.to_string()).and_then(|op| d.apply(op, &cat)).map(|c| out(&d, &cat, c)),
             "history" => { if a["redo"].as_bool() == Some(true) { d.redo() } else { d.undo() }; Ok(out(&d, &cat, vec![])) }
             "scene" => Ok(json!(scene::scene(&d.p, &cat, &route::build(&d.p, &cat), opts["lod"].as_u64().unwrap_or(1) as u32))),
+            "snap" => (|| -> Result<Value, String> {
+                let l = d.p.line(a["line"].as_u64().unwrap_or(0) as u32).ok_or("no line")?;
+                let kind = serde_json::from_value(a["kind"].clone()).map_err(|e| e.to_string())?;
+                let at = serde_json::from_value(a["at"].clone()).map_err(|e| e.to_string())?;
+                datum_core::doc::snap(&d.p, &cat, l, kind, at, "").map(|x| json!(x.2))
+            })(),
             "check" => Ok(json!(checks::run(&d.p, &cat, &route::build(&d.p, &cat)))),
             "lists" => Ok(json!(lists::lists(&d.p, &cat))),
             "examples_list" => Ok(json!(examples::list())),

@@ -202,6 +202,16 @@ async fn check(st: State<'_, St>) -> R<Vec<Issue>> {
     tauri::async_runtime::spawn_blocking(move || guard(|| { let b = route::build(&p, &cat); Ok(checks::run(&p, &cat, &b)) })).await.map_err(|e| e.to_string())?
 }
 
+/// Where a component dragged over a line would snap: the point, or why it cannot go there.
+#[tauri::command]
+fn snap(st: State<St>, line: u32, kind: datum_core::model::ItemKind, at: model::P3) -> R<model::P3> {
+    guard(|| {
+        let a = st.lock();
+        let l = a.doc.p.line(line).ok_or("That line no longer exists.")?;
+        datum_core::doc::snap(&a.doc.p, &a.cat, l, kind, at, "").map(|x| x.2)
+    })
+}
+
 #[tauri::command]
 fn lists(st: State<St>) -> R<lists::Lists> {
     guard(|| { let a = st.lock(); Ok(lists::lists(&a.doc.p, &a.cat)) })
@@ -557,7 +567,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            state, apply, history, scene, check, lists, examples_list, new_project, catalogue, add_pack, remove_pack, unit_table, export_pcf, export_gltf, export_csv,
+            state, apply, history, scene, snap, check, lists, examples_list, new_project, catalogue, add_pack, remove_pack, unit_table, export_pcf, export_gltf, export_csv,
             open, save, save_file, options, set_options, autosave, recovery, recover, recent, startup_file, open_url, version, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())
