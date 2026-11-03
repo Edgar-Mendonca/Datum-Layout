@@ -290,6 +290,14 @@ fn line(p: &Project, cat: &Catalogue, l: &Line, b: &mut Built) {
     }
     let lens: Vec<f64> = (0..n).map(|i| dist(pts[i], pts[i + 1])).collect();
     let dirs: Vec<P3> = (0..n).map(|i| unit(sub(pts[i + 1], pts[i]))).collect();
+    // The route must leave each nozzle or tee square to it (it may not after the equipment moved).
+    for (e, at, d) in [(&l.from, pts[0], dirs[0]), (&l.to, pts[n], mul(dirs[n - 1], -1.0))] {
+        if let Some(port) = end_port(p, cat, e) {
+            if dot(port.d, d) < 1.0 - 1e-6 {
+                b.issues.push(issue("routing", format!("Line {}: the route no longer leaves its {} square; route it again (or move the next corner).", name(l), if matches!(e, End::Nozzle { .. }) { "nozzle" } else { "tee" }), at, l.id, 0));
+            }
+        }
+    }
     // Sizes: what each item sees, and the size at each vertex and at the end.
     let mut items: Vec<&Item> = l.items.iter().filter(|i| i.seg < n).collect();
     items.sort_by(|a, b| (a.seg, a.at).partial_cmp(&(b.seg, b.at)).unwrap_or(std::cmp::Ordering::Equal));

@@ -41,6 +41,9 @@ pub enum Op {
     /// Sets a line's size: every component on it re-sizes.
     Resize { line: u32, nps: String },
     SetTerm { line: u32, start: bool, term: Term },
+    /// Routes a line square again between its ends, through its corners away from the ends;
+    /// components keep their run where it still exists.
+    Reroute { line: u32 },
     Delete { ids: Vec<u32> },
     Batch(Vec<Op>),
 }
@@ -74,6 +77,7 @@ impl Doc {
         let mut created = vec![];
         apply(&mut p, op, cat, &mut created)?;
         p.normalize();
+        follow_ends(&mut p, cat);
         if p != self.p {
             self.undo.push(std::mem::replace(&mut self.p, p));
             if self.undo.len() > UNDO { self.undo.remove(0); }
@@ -82,6 +86,84 @@ impl Doc {
         }
         Ok(created)
     }
+}
+
+/// Lines follow what they connect to: when a nozzle or a tee's branch end has moved, the move
+/// passes along the route leg by leg, each leg absorbing the part along its own axis (it
+/// stretches), until nothing is left, so the route stays square and its corners stay put
+/// wherever they can. Tee branches depend on other lines, so this runs until nothing moves.
+pub fn follow_ends(p: &mut Project, cat: &Catalogue) {
+    let mut changed = std::collections::HashSet::new();
+    for _ in 0..4 {
+        let mut moved = false;
+        for i in 0..p.lines.len() {
+            for start in [true, false] {
+                let l = &p.lines[i];
+                let e = if start { &l.from } else { &l.to };
+                let Some(port) = route::end_port(p, cat, e) else { continue };
+                let n = l.pts.len();
+                if n < 2 { continue; }
+                let k = if start { 0 } else { n - 1 };
+                let delta = sub(port.p, l.pts[k]);
+                if norm(delta) < 1e-9 { continue; }
+                let mut pts = l.pts.clone();
+                if !start { pts.reverse(); }
+                let far = if start { &l.to } else { &l.from };
+                let min_len = { let f = cat.fitting(&l.nps); let fl = cat.flange(&l.nps, l.rating).map_or(0.0, |x| x.wn_length); fl + 2.0 * f.map_or(0.0, |x| x.elbow_lr) };
+                let left = pass_along(&mut pts, delta, matches!(far, End::Point { .. }), min_len);
+                if !start { pts.reverse(); }
+                // The move reached the far end and that end is attached: the legs cannot take it
+                // without a new jog, so the line stays as it was and its skewed end is reported
+                // (route it again).
+                if norm(left) > 1e-9 { continue; }
+                p.lines[i].pts = pts;
+                changed.insert(i);
+                moved = true;
+            }
+        }
+        if !moved { break; }
+    }
+    // Components that no longer fit where they were slide to the nearest free place on their run.
+    for i in changed {
+        let l = p.lines[i].clone();
+        let placed: std::collections::HashSet<u32> = route::build_line(p, cat, &l).iter().map(|q| q.item).collect();
+        for it in l.items.iter().filter(|it| !placed.contains(&it.id)) {
+            let nps = route::size_at(&l, it.seg, it.at);
+            let len = route::item_len(cat, &l, it, &nps);
+            if let Some(at) = route::free_place(p, cat, &p.lines[i], it.seg, it.at, len, 0.01, it.id) {
+                if let Some(x) = p.lines[i].items.iter_mut().find(|x| x.id == it.id) { x.at = at; }
+            }
+        }
+    }
+}
+
+/// How far a route leaves a nozzle before it turns: flange, reducer and elbow, to 50 mm.
+pub fn lead_for(cat: &Catalogue, nps: &str, rating: u32) -> f64 {
+    let od = cat.od(nps);
+    let lr = cat.fitting(nps).map(|f| f.elbow_lr).unwrap_or(od * 1.5);
+    let fl = cat.flange(nps, rating).map(|f| f.wn_length).unwrap_or(od * 0.5);
+    let h = cat.fitting(nps).map(|f| f.reducer_h).unwrap_or(od);
+    ((lr + fl + h + 0.05) / 0.05).ceil() * 0.05
+}
+
+/// Moves pts[0] by `delta` and passes the move along the legs (see `follow_ends`); gives what
+/// was left over at the far end (zero when the legs absorbed it all).
+fn pass_along(pts: &mut [P3], delta: P3, move_last: bool, min_len: f64) -> P3 {
+    let mut d = delta;
+    let n = pts.len();
+    for k in 0..n {
+        if norm(d) < 1e-12 { break; }
+        // The leg after this point (its direction before the move) absorbs the part along it.
+        let axis = if k + 1 < n { unit(sub(pts[k + 1], pts[k])) } else { [0.0; 3] };
+        if k + 1 == n && !move_last { return d; }
+        // A leg absorbs the move along it unless that leaves it shorter than its fittings need;
+        // then it moves whole and passes the move on.
+        let keep = k + 1 < n && norm(axis) > 0.0 && dot(sub(sub(pts[k + 1], pts[k]), d), axis) < min_len.min(dot(sub(pts[k + 1], pts[k]), axis)) - 1e-9;
+        pts[k] = add(pts[k], d);
+        if norm(axis) > 0.0 && !keep { d = sub(d, mul(axis, dot(d, axis))); }
+    }
+    // A free far end moved with the rest: nothing is left over.
+    if move_last { [0.0; 3] } else { d }
 }
 
 fn line_mut(p: &mut Project, id: u32) -> Result<&mut Line, String> {
@@ -184,13 +266,7 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             valid_nps(&nps)?;
             let class = p.settings.class.clone();
             // Leave each nozzle far enough for its flange, a reducer and an elbow.
-            let lead = |d: Option<P3>| d.map(|_| {
-                let od = cat.od(&nps);
-                let lr = cat.fitting(&nps).map(|f| f.elbow_lr).unwrap_or(od * 1.5);
-                let fl = cat.flange(&nps, p.settings.rating).map(|f| f.wn_length).unwrap_or(od * 0.5);
-                let h = cat.fitting(&nps).map(|f| f.reducer_h).unwrap_or(od);
-                ((lr + fl + h + 0.05) / 0.05).ceil() * 0.05
-            }).unwrap_or(0.0);
+            let lead = |d: Option<P3>| d.map(|_| lead_for(cat, &nps, p.settings.rating)).unwrap_or(0.0);
             let l0 = lead(fd).max(lead(td));
             let pts = route::orthogonal((fp, fd), &via, (tp, td), l0);
             if pts.len() < 2 { return Err("The route has no length.".into()); }
@@ -268,6 +344,32 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             if !matches!(e, End::Point { .. }) { return Err("Only a free end can have a cap or a blind flange.".into()); }
             *e = End::Point { term };
         }
+        Op::Reroute { line } => {
+            let l = p.line(line).ok_or("That line no longer exists.")?.clone();
+            let (a, b) = (route::end_port(p, cat, &l.from), route::end_port(p, cat, &l.to));
+            let n = l.pts.len();
+            // Corners next to an attached end are its old lead; the new route makes its own.
+            let lo = if a.is_some() { 2 } else { 1 };
+            let hi = if b.is_some() { n.saturating_sub(2) } else { n.saturating_sub(1) };
+            let via: Vec<P3> = if lo < hi { l.pts[lo..hi].to_vec() } else { vec![] };
+            let s0 = a.map(|x| (x.p, Some(x.d))).unwrap_or((l.pts[0], None));
+            let s1 = b.map(|x| (x.p, Some(x.d))).unwrap_or((l.pts[n - 1], None));
+            let pts = route::orthogonal(s0, &via, s1, lead_for(cat, &l.nps, l.rating));
+            if pts.len() < 2 { return Err("The line's ends are at the same point.".into()); }
+            let lm = line_mut(p, line)?;
+            let segs = pts.len() - 1;
+            lm.pts = pts;
+            for it in &mut lm.items { it.seg = it.seg.min(segs - 1); }
+            let fresh = lm.clone();
+            let placed: std::collections::HashSet<u32> = route::build_line(p, cat, &fresh).iter().map(|q| q.item).collect();
+            for it in fresh.items.iter().filter(|it| !placed.contains(&it.id)) {
+                let nps = route::size_at(&fresh, it.seg, it.at);
+                let len = route::item_len(cat, &fresh, it, &nps);
+                // The nearest free place on any run.
+                let best = (0..segs).filter_map(|s| route::free_place(p, cat, &fresh, s, if s == it.seg { it.at } else { 0.0 }, len, 0.01, it.id).map(|at| (s, at))).min_by_key(|(s, _)| s.abs_diff(it.seg));
+                if let Some((s, at)) = best { if let Some(x) = line_mut(p, line)?.items.iter_mut().find(|x| x.id == it.id) { x.seg = s; x.at = at; } }
+            }
+        }
         Op::Delete { ids } => {
             let ids: std::collections::HashSet<u32> = ids.into_iter().collect();
             let free = |e: &mut End, pred: &dyn Fn(&End) -> bool| if pred(e) { *e = End::Point { term: Term::Open } };
@@ -317,6 +419,12 @@ mod tests {
         assert!(d.p.lines.is_empty());
         d.redo();
         assert_eq!(d.p.lines.len(), 1);
+        // Moving the pump keeps its line square: the route follows the nozzle.
+        let mut e = d.p.equip(pid).unwrap().clone();
+        e.pos = [6.3, 4.2, 0.0];
+        d.apply(Op::SetEquipment(e), &cat).unwrap();
+        let b = route::build(&d.p, &cat);
+        assert!(b.issues.is_empty(), "{:?}", b.issues);
         // Deleting the pump frees the line's end.
         d.apply(Op::Delete { ids: vec![pid] }, &cat).unwrap();
         assert!(matches!(d.p.lines[0].from, End::Point { .. }));

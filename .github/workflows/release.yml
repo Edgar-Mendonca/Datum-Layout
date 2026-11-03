@@ -45,6 +45,11 @@ jobs:
           mkdir -p out
           cp target/release/bundle/nsis/*-setup.exe "out/DatumLayout-$V-setup.exe"
           cd out && sha256sum "DatumLayout-$V-setup.exe" > SHA256SUMS.txt && cat SHA256SUMS.txt && ls -la
+      # Kept with the run too, so the installer is never lost if publishing the release fails.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DatumLayout-${{ env.V }}
+          path: out/
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.V }}

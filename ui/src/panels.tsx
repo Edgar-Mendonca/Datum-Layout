@@ -131,7 +131,8 @@ const LineInsp = (p: { l: Line }) => {
     </tbody></table>
     <h4>Components</h4>
     <For each={p.l.items} fallback={<p class="muted">None yet: drag valves and fittings from the catalogue onto the pipe.</p>}>{it => <button class="ti" onClick={() => setSel({ kind: "item", id: it.id, line: p.l.id })}>{ITEMS.find(x => x[0] === it.kind)?.[1]}<small>run {it.seg + 1} · {fmt("len", it.at)}</small></button>}</For>
-    <Show when={issues().length}><h4>Problems</h4><For each={issues()}>{i => <div class="warnline" onClick={() => C.goto(i)}><Icon n="warn" />{i.text}</div>}</For></Show>
+    <Show when={issues().length}><h4>Problems</h4><For each={issues()}>{i => <div class="warnline" onClick={() => C.goto(i)}><Icon n="warn" />{i.text}</div>}</For>
+      <Show when={issues().some(i => i.kind === "routing")}><p><button class="btn sm pri" onClick={C.reroute}>Route again</button> <span class="muted">square between its ends, through its corners</span></p></Show></Show>
     <p class="ibtns"><button class="btn sm" onClick={() => C.exportPcf(p.l.id)}>Export for Datum Pipe</button><button class="btn sm" onClick={() => C.del()}>Delete the line</button></p>
   </>);
 };

@@ -84,6 +84,7 @@ export const C = {
   step: (up: boolean) => { const l = selLine(); if (!l) return toast("Select a line first."); const i = NPS.indexOf(l.nps) + (up ? 1 : -1); if (i >= 0 && i < NPS.length) C.resize(NPS[i]); },
   radius: (r: "long" | "short") => { const l = selLine(); if (l) act({ SetLine: { ...l, radius: r } }); },
   term: (start: boolean, term: "open" | "cap" | "blind") => { const l = selLine(); if (l) act({ SetTerm: { line: l.id, start, term } }); },
+  reroute: () => { const l = selLine(); if (!l) return toast("Select a line first."); act({ Reroute: { line: l.id } }).then(o => o && toast(`${l.number || "The line"} routed square again.`, true)); },
   elevation: (dz: number) => { setElev(Math.round((elev() + dz) * 1000) / 1000); },
 
   // ---------- checks and lists ----------
@@ -130,7 +131,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Rotate the equipment 90°", () => C.rotate(90)], ["Route a line", C.route, "R"],
   ["Add a gate valve to the selected line", () => C.dropOnSelected("gate")], ["Add a globe valve", () => C.dropOnSelected("globe")], ["Add a check valve", () => C.dropOnSelected("check")], ["Add a ball valve", () => C.dropOnSelected("ball")],
   ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a reducer", () => C.dropOnSelected("reducer")],
-  ["Make the line one size larger", () => C.step(true)], ["Make the line one size smaller", () => C.step(false)],
+  ["Route the selected line again", () => C.reroute()], ["Make the line one size larger", () => C.step(true)], ["Make the line one size smaller", () => C.step(false)],
   ["Check clashes and errors", C.check, "F5"], ["Export the plant for Datum Pipe (.pcf)", () => C.exportPcf()], ["Export the selected line for Datum Pipe", () => { const l = selLine(); if (l) C.exportPcf(l.id); else toast("Select a line first."); }],
   ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")],
   ["SI units", () => C.units("SI")], ["US units", () => C.units("US")], ["Add an area", C.addArea], ["Plot settings", C.selectPlot],

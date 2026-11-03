@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.1.1 — 2026-11-03
+Lines now follow the equipment they connect to.
+
+**Move equipment, keep the lines.** When you move a vessel, pump or exchanger, each line on its nozzles follows: the move passes along the line's runs, each run stretching along its own direction, so the route stays square and its corners stay where they can. A run too short for its fittings moves whole instead. Branches follow their tees, and components slide along their run when it gets shorter.
+
+**Route Again.** Turning equipment, or a move no run can take, leaves a line skewed: it is reported ("route it again"), and Piping › Route Again (or the button in the Inspector) routes it square between its ends through its corners, keeping its components on their runs.
+
+**A new check.** A line that no longer leaves its nozzle or tee square to it is reported, even when it has no turn.
+
 ## 0.1.0 — 2026-11-03
 The first release: lay out a plant in 3D, route its pipes, check them and hand each line to Datum Pipe.
 

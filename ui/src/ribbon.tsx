@@ -119,7 +119,7 @@ export const Ribbon = () => {
         <G l="From Datum Schema"><Planned big i="import" l="Plant Package" v="0.2" /></G>
       </Show>
       <Show when={tab() === "piping"}>
-        <G l="Route" h="route"><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Click a nozzle or a point, then the corners; end on a nozzle or double-click (R)" /><S><ElevBox /><B i="up" l="Up one grid step" run={() => C.elevation(p()?.plot.grid ?? 1)} /><B i="down" l="Down one grid step" run={() => C.elevation(-(p()?.plot.grid ?? 1))} /></S></G>
+        <G l="Route" h="route"><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Click a nozzle or a point, then the corners; end on a nozzle or double-click (R)" /><S><ElevBox /><B i="up" l="Up one grid step" run={() => C.elevation(p()?.plot.grid ?? 1)} /><B i="down" l="Down one grid step" run={() => C.elevation(-(p()?.plot.grid ?? 1))} /></S><S><B i="route" l="Route Again" run={C.reroute} off={!selLine()} title="Route the selected line square again between its ends (after equipment moved or turned)" /></S></G>
         <G l="New Lines" h="spec"><S>
           <label class="rsel">Size<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, nps: e.currentTarget.value } })}><For each={NPS}>{s => <option value={s} selected={p()?.settings.nps === s}>{inch(s)}</option>}</For></select></label>
           <label class="rsel">Class<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, class: e.currentTarget.value } })}><option selected>{p()?.settings.class ?? "CS1"}</option></select></label>

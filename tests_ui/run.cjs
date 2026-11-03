@@ -134,6 +134,20 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("undo brings back the 4\" line", (await state()).p.lines[0].nps === "4");
   await p.keyboard.press("Control+y"); await settle(500);
 
+  // 7b. Turn the tank in example 1: its suction line is reported skewed; Route Again squares it.
+  await open("pumps");
+  await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(300);
+  await p.click(".bbody tr.f:has-text(\"T-101\")"); await settle(300);
+  await p.click('.tabs > button:has-text("Equipment")'); await p.click('.rb:has-text("Rotate −90°")'); await settle(600);
+  st = await state();
+  check("turning the tank reports its line to route again", st.issues.some(i => i.text.includes("route it again")), JSON.stringify(st.issues.map(i => i.text)));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);
+  await p.click(".bbody tr.f:has-text(\"8\\\"-P-1001\")"); await settle(300);
+  await p.click('.insp button:has-text("Route again")'); await settle(600);
+  st = await state();
+  const sid = st.p.lines.find(l => l.number.includes("1001")).id;
+  check("Route again squares the suction line", !st.issues.some(i => i.line === sid), JSON.stringify(st.issues.map(i => i.text)));
+
   // 8. Example 1: opens clean; the check finds nothing; the lists fill.
   await open("pumps");
   await p.keyboard.press("F5"); await settle(1200);

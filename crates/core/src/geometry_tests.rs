@@ -25,7 +25,7 @@ fn joints_ok(b: &Built) {
     for (&(i, j), &(a, c)) in &connections(b) {
         let (x, y) = (&b.parts[i].ports[j], &b.parts[a].ports[c]);
         assert!(dist(x.p, y.p) <= 1e-5, "ports apart");
-        assert!(dot(x.d, y.d) < -1.0 + 1e-9, "{} and {} meet at an angle", b.parts[i].kind, b.parts[a].kind);
+        assert!(dot(x.d, y.d) < -1.0 + 1e-9, "{} and {} meet at an angle: {:?} {:?} {:?} line {} {}", b.parts[i].kind, b.parts[a].kind, x.p, x.d, y.d, b.parts[i].line, b.parts[a].line);
     }
 }
 
@@ -183,4 +183,57 @@ fn a_tee_starts_a_branch_that_meets_it_port_to_port() {
     // Only the free ends are open.
     let open = connection_issues(&d.p, &cat, &b).into_iter().filter(|i| i.kind == "open").count();
     assert_eq!(open, 3);
+}
+
+#[test]
+fn moving_equipment_drags_its_lines_along_and_keeps_them_square() {
+    let cat = Catalogue::builtin();
+    for id in ["pumps", "exchanger", "rack"] {
+        let n = crate::examples::get(id).unwrap().equipment.len();
+        for k in 0..n {
+            for delta in [[0.3, 0.0, 0.0], [0.0, -0.4, 0.0], [0.5, 0.5, 0.0], [-0.6, 0.0, 0.0]] {
+                let mut d = Doc::new(crate::examples::get(id).unwrap());
+                let e = d.p.equipment[k].clone();
+                let mut moved = e.clone();
+                moved.pos = crate::parts::add(e.pos, delta);
+                d.apply(Op::SetEquipment(moved), &cat).unwrap();
+                let b = build(&d.p, &cat);
+                // Nothing comes apart: every joint meets square, nothing is open or mismatched.
+                let conn: Vec<_> = connection_issues(&d.p, &cat, &b).into_iter().map(|i| i.text).collect();
+                assert!(conn.is_empty(), "{id}: moving {} by {delta:?}: {conn:?}", e.tag);
+                if b.issues.is_empty() { joints_ok(&b); }
+                // A move the legs cannot take is reported (a tight turn, or a skewed end to route
+                // again), never silently drawn wrong.
+                assert!(b.issues.iter().all(|i| i.text.contains("too tight") || i.text.contains("a turn of") || i.text.contains("does not fit") || i.text.contains("route it again")), "{id}: {} {delta:?}: {:?}", e.tag, b.issues);
+            }
+        }
+    }
+    // Moves the legs can take leave nothing to report.
+    for (id, tag, delta) in [("pumps", "T-101", [-0.6, 0.0, 0.0]), ("pumps", "T-101", [0.0, 0.5, 0.0]), ("rack", "V-301", [0.3, 0.0, 0.0]), ("rack", "V-302", [0.6, 0.0, 0.0]), ("exchanger", "E-201", [0.5, 0.5, 0.0])] {
+        let mut d = Doc::new(crate::examples::get(id).unwrap());
+        let mut e = d.p.equipment.iter().find(|e| e.tag == tag).unwrap().clone();
+        e.pos = crate::parts::add(e.pos, delta);
+        d.apply(Op::SetEquipment(e), &cat).unwrap();
+        let b = build(&d.p, &cat);
+        assert!(b.issues.is_empty(), "{id} {tag}: {:?}", b.issues);
+        joints_ok(&b);
+    }
+}
+
+#[test]
+fn a_line_left_skewed_by_a_rotation_routes_square_again() {
+    let cat = Catalogue::builtin();
+    let mut d = Doc::new(crate::examples::get("pumps").unwrap());
+    let mut e = d.p.equipment.iter().find(|e| e.tag == "T-101").unwrap().clone();
+    e.rot = -90.0;
+    d.apply(Op::SetEquipment(e), &cat).unwrap();
+    assert!(build(&d.p, &cat).issues.iter().any(|i| i.text.contains("route it again")));
+    let line = d.p.lines.iter().find(|l| l.number.contains("1001")).unwrap().id;
+    d.apply(Op::Reroute { line }, &cat).unwrap();
+    // Its tee moved with it, so the branch routes again too.
+    let branch = d.p.lines.iter().find(|l| l.number.contains("1002")).unwrap().id;
+    if build(&d.p, &cat).issues.iter().any(|i| i.line == branch) { d.apply(Op::Reroute { line: branch }, &cat).unwrap(); }
+    let b = build(&d.p, &cat);
+    assert!(b.issues.is_empty(), "{:?}", b.issues);
+    assert!(connection_issues(&d.p, &cat, &b).is_empty(), "{:?}", connection_issues(&d.p, &cat, &b));
 }

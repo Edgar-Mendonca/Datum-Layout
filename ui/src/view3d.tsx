@@ -299,7 +299,7 @@ export const View3D = () => {
     const c = b.getCenter(new THREE.Vector3()), r = Math.max(1, b.getSize(new THREE.Vector3()).length() / 2);
     const d = (dir ?? camera.position.clone().sub(controls.target)).normalize();
     const fov = Math.min(camera.fov, 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)));
-    const dist = r / Math.sin(THREE.MathUtils.degToRad(fov / 2)) * 0.95;
+    const dist = r / Math.sin(THREE.MathUtils.degToRad(fov / 2)) * 0.8;
     camera.position.copy(c.clone().add(d.multiplyScalar(dist)));
     camera.near = Math.max(0.02, dist / 2000); camera.far = dist * 50; camera.updateProjectionMatrix();
     controls.target.copy(c); controls.update(); draw();
