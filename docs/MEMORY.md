@@ -99,7 +99,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.2 | Exact snap preview while dragging (`doc::snap`, shell `snap`), slide a component with its arrow (`MoveItem`), tee → branch routing tested, double-click fix, resize and oversized-branch tests | ✅ |
 | 0.1.3 | PCF read and solved by Datum Pipe's own engine (`scripts/verify.sh`, CI job "exchange", docs/verification/0.1.3.md); glTF through the Khronos validator; each check's failing and passing case; take-off test | ✅ |
 | 0.1.4 | Examples, print, ? cards, screenshots, README and site, final check | ✅ |
-| 0.2 From Schema | 🔜 Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | ⬜ |
+| 0.2 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | 🔜 |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
 | 0.5 CAD exchange | Optional engine on first use; STEP import and export | ⬜ |
