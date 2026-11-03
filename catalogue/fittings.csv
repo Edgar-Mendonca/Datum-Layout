@@ -1,0 +1,22 @@
+nps,elbow_lr_in,elbow_sr_in,tee_c_in,reducer_h_in,cap_e_in,source
+1/2,1.5,,1.0,1.5,1.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+3/4,1.125,,1.12,1.5,1.25,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+1,1.5,1,1.5,2.0,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+1-1/4,1.875,1.25,1.88,2.0,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+1-1/2,2.25,1.5,2.25,2.5,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+2,3,2,2.5,3.0,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+2-1/2,3.75,2.5,3.0,3.5,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+3,4.5,3,3.38,3.5,2.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+3-1/2,5.25,3.5,3.75,4.0,2.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+4,6,4,4.12,4.0,2.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+5,7.5,5,4.88,5.0,3.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+6,9,6,5.62,5.5,3.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+8,12,8,7.0,6.0,4.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+10,15,10,8.5,7.0,5.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+12,18,12,10.0,8.0,6.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+14,21,14,11.0,13.0,6.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+16,24,16,12.0,14.0,7.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+18,27,18,13.5,15.0,8.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+20,30,20,15.0,20.0,9.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+22,33,22,16.5,20.0,10.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+24,36,24,17.0,20.0,10.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues

@@ -1,0 +1,12 @@
+[package]
+name = "datum-core"
+version = "0.1.0"
+license = "MIT"
+edition = "2021"
+description = "Datum Layout engine: the plant model and its edits, the generated parts catalogue, parametric equipment, pipe routing, clash and spec checks, lists, and PCF and glTF exports."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+# Collision and distance queries for the clash check (Apache-2.0), https://parry.rs
+parry3d-f64 = "0.31"

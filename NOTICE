@@ -1,0 +1,27 @@
+Datum Layout
+Copyright (c) 2026 Edgar Mendonca. MIT licence.
+
+The window bundles SolidJS (MIT), three.js (MIT, https://threejs.org) for the 3D view, and the IBM
+Plex fonts (SIL Open Font Licence 1.1). The desktop shell uses Tauri (MIT or Apache-2.0) and the
+Rust crates listed in Cargo.lock, each under MIT, Apache-2.0, BSD, ISC, Zlib, MPL-2.0 or Unicode
+licences (checked by cargo deny, deny.toml). The clash check uses parry3d (Apache-2.0,
+https://parry.rs) and the glam-based maths it brings (MIT or Apache-2.0).
+
+The unit table (crates/core/src/units.rs) is copied from Datum Pipe, which copied it from Datum
+Calc (both MIT, same author), with factors from NIST SP 811 (2008).
+
+Every part is generated from a shape rule in code and a dimension table in catalogue/. Pipe
+outside diameters and wall thicknesses are the published nominal dimensions of wrought steel pipe
+(ASME B36.10M), as listed in Datum Pipe's library. Fitting, flange and valve dimensions are typical
+values from manufacturers' public catalogues; every row names its source (catalogue/SOURCES.md).
+No standard's tables or text, and no other program's parts library, are reproduced. ASME and
+B36.10M are trademarks of the American Society of Mechanical Engineers; Datum Layout is not
+affiliated with or endorsed by it.
+
+The piping component file reader in crates/core/src/pcf.rs (module `reader`, used by the tests)
+is copied from Datum Pipe (MIT, same author).
+
+Product and file-format names are trademarks of their owners and are used only to describe file compatibility.
+
+The family workflow, ribbon, File page, updater and printing are taken from Datum Plan, by way of
+Datum Pipe (both MIT, same author).

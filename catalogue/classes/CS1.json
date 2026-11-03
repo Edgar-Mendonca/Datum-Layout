@@ -1,0 +1,20 @@
+{
+  "name": "CS1",
+  "description": "Carbon steel, butt-weld fittings, raised-face weld-neck flanges in class 150 or 300",
+  "material": "Carbon steel",
+  "ratings": [150, 300],
+  "sizes": ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1/2", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24"],
+  "schedules": [["1/2", "80"], ["2", "40"], ["8", "STD"]],
+  "elbow": "long",
+  "components": [
+    { "kind": "pipe" },
+    { "kind": "elbow90" }, { "kind": "elbow45" },
+    { "kind": "tee" }, { "kind": "reducer" }, { "kind": "cap" }, { "kind": "strainer" },
+    { "kind": "flange" }, { "kind": "blind" }, { "kind": "gasket" }, { "kind": "bolts" },
+    { "kind": "gate", "min": "2", "max": "24" },
+    { "kind": "globe", "min": "1/2", "max": "12" },
+    { "kind": "check", "min": "2", "max": "24" },
+    { "kind": "ball", "min": "1/2", "max": "12" }
+  ],
+  "source": "Datum Layout example class; check against your company's piping class before use"
+}

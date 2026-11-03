@@ -1,0 +1,37 @@
+{
+  "id": "layout",
+  "name": "Datum Layout",
+  "accent": "#3A5A78",
+  "logo": "docs/brand/datum-layout-icon.svg",
+  "tagline": "3D plant layout and piping: place equipment, route lines, check and hand over.",
+  "for": "Piping and layout designers, mechanical and process engineers, and students learning plant design.",
+  "about": [
+    "Datum Layout lays out one plant in 3D. You place equipment from its datasheet sizes, route pipes between nozzles, and the elbows, tees, flanges and valves appear and size themselves from the line's size and pipe class. Every part is generated from a dimension table and a shape rule, so nothing is downloaded and every dimension has a source.",
+    "Then it checks the model for clashes, open ends and spec problems, lists every line, the equipment with its nozzles and the material take-off, and hands each line to Datum Pipe as a piping component file for its isometric and stress analysis."
+  ],
+  "steps": [
+    { "title": "Place the equipment", "text": "Drag vessels, drums, tanks, columns, pumps and exchangers onto the plot and set their sizes and nozzles from the datasheet." },
+    { "title": "Route the lines", "text": "Click from nozzle to nozzle: spec elbows, reducers and flanges appear by themselves. Drag valves and tees onto a pipe and they snap, size themselves and split it." },
+    { "title": "Check and hand over", "text": "Find clashes, open ends and class problems, export the line list and material take-off, and send each line to Datum Pipe." }
+  ],
+  "highlights": [
+    "Six parametric equipment types with nozzles: vertical vessel, horizontal drum, storage tank, column, centrifugal pump with motor and baseplate, shell-and-tube exchanger",
+    "Routing with orthogonal guides: long- or short-radius elbows at every turn, reducers where sizes change, weld-neck flanges, gaskets and bolt sets at flanged nozzles",
+    "Drag and drop valves, strainers, flange pairs, tees and reducers that snap onto the pipe by their ports; a tee starts a branch",
+    "Change a line's size and every component re-sizes; move a run and the elbows follow; undo everything",
+    "Clash check (pipe–pipe, pipe–equipment, pipe–ground) with a clearance, plus open ends, mismatches, class rules and missing line numbers",
+    "Line list, equipment and nozzle list, and material take-off per line, all to CSV",
+    "PCF export that Datum Pipe reads unchanged, and glTF 2.0 for any 3D viewer",
+    "A catalogue of generated parts (½\" to 24\") with every row's source, and plug-in packs for company pipe classes"
+  ],
+  "screenshots": [],
+  "roadmap": [
+    { "v": "0.1", "title": "Spec-driven piping in 3D", "when": "Next", "items": ["Plot, six equipment types, routing with automatic elbows, reducers and flanges", "Drag-and-drop fittings that snap and split", "Clash and spec checks, lists, PCF for Datum Pipe, glTF"] },
+    { "v": "0.2", "title": "From Schema", "when": "Soon", "items": ["Import Datum Schema's plant package: equipment with datasheet values and nozzles, lines with from/to, size, class and component order", "Place equipment and route its lines from the package", "A 3D-against-P&ID check: missing or extra components, wrong order, wrong size, unconnected lines", "More pipe classes as plug-in packs"] },
+    { "v": "0.3", "title": "Steel and supports", "when": "Later", "items": ["Pipe racks, platforms, ladders and stairs as parametric steel", "Pipe supports (rest, guide, anchor, shoe) placed on lines and sent to Datum Pipe with the PCF"] },
+    { "v": "0.4", "title": "Drawings and quantities", "when": "Later", "items": ["Plot plan and general arrangement drawings with dimensions", "Full material take-off", "IFC export"] },
+    { "v": "0.5", "title": "CAD exchange", "when": "Later", "items": ["An optional engine downloaded on first use: STEP import of vendor equipment models as catalogue parts, STEP export of the model"] },
+    { "v": "0.6", "title": "Big models and teams", "when": "Later", "items": ["Thousands of lines with levels of detail and areas loaded on demand", "A project database with history; several users with claimed areas"] },
+    { "v": "1.0", "title": "Validated", "when": "Goal", "items": ["The catalogue checked against its sources", "A user guide", "A signed installer"] }
+  ]
+}
