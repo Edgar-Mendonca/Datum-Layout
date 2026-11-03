@@ -6,7 +6,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
-    # One run on a change to this file registers the workflow (tag pushes are blocked from Claude sessions).
+    # One run on a push to the working branch registers the workflow (tag pushes are blocked from
+    # Claude sessions); removed again right after.
+    branches: ["claude/hopeful-edison-d99owj"]
     paths: [".github/workflows/release.yml"]
   workflow_dispatch:
 
