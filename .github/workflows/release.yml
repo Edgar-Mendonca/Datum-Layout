@@ -6,6 +6,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    # One run on a change to this file registers the workflow (tag pushes are blocked from Claude sessions).
+    paths: [".github/workflows/release.yml"]
   workflow_dispatch:
 
 permissions:
