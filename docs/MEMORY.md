@@ -78,6 +78,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.0 | The product-name guard keeps the names only as SHA-256 hashes in `tests_ui/run.cjs` | FAMILY §13: the names may not appear in any file |
 | 0.1.0 | UI tests run the window against the real engine (`examples/bridge.rs` over stdin/stdout) instead of a fixed fixture | Routing, dropping, resizing and checking are tested for real, not mocked |
 | 0.1.0 | Plants over 1,500 parts draw at low detail; labels thin out past 60 equipment items or 40 lines | Measured: 2,376 parts at low detail = 181k triangles, 123 ms a frame in Chromium's software renderer (no graphics card) in the test; a graphics card is far faster |
+| 0.1.0 | `release.yml` ran once on a push to the working branch to be registered (as Datum Calc did), and that trigger was removed at once; later releases use workflow_dispatch | A workflow needs one run before GitHub lists it; tag pushes are blocked from the session |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
 ---
