@@ -23,5 +23,8 @@ About 5,000 lines of Rust and 3,000 of TypeScript, in one run.
 | 0.1.3 | Checks, lists, PCF proved against Datum Pipe itself, glTF validated |
 | 0.1.4 | Examples, print, help, screenshots, README and site, final check |
 
+## Outcome
+All five releases built as planned; what was cut is in `docs/MEMORY.md` (Session log, Summary).
+
 ## Questions
 None: the run is unattended. Anything unclear was decided simply and recorded in `docs/MEMORY.md` (Decisions).

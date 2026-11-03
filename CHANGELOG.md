@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.1.4 — 2026-11-03
+Datum Layout 0.1 is complete: the examples, printing, help and pictures, checked end to end.
+
+**Examples.** File › Examples opens the pump suction and discharge, the exchanger hook-up and the small pipe rack run with no clashes and no errors, and "Find the clashes" with exactly its three planted problems. Every line of every example is read and solved by Datum Pipe.
+
+**Print.** File › Print (Ctrl+P) puts the 3D view as it is on screen on its own page with a title block, then the line list, the equipment list with nozzles and the material take-off, on any paper, with a header and footer; Save as PDF in the print window makes a PDF.
+
+**Help.** Every ribbon group and panel has its ? card; Help › Getting Started walks through placing equipment, routing lines and handing over; the glossary explains the plant-design words; Help › Sources lists where every catalogue table comes from.
+
+**Pictures.** New screenshots of the pump example, a valve being dropped onto the header, the clash list and the line list.
+
 ## 0.1.3 — 2026-11-03
 The hand-over to Datum Pipe, proved.
 

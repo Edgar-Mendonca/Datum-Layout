@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.3 (2026-11-03) |
+| **Current version** | 0.1.4 (2026-11-03) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -98,8 +98,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.1 | Lines follow moved equipment and tees (`doc::follow_ends`); Route Again (`Op::Reroute`); the square-to-nozzle check | ✅ |
 | 0.1.2 | Exact snap preview while dragging (`doc::snap`, shell `snap`), slide a component with its arrow (`MoveItem`), tee → branch routing tested, double-click fix, resize and oversized-branch tests | ✅ |
 | 0.1.3 | PCF read and solved by Datum Pipe's own engine (`scripts/verify.sh`, CI job "exchange", docs/verification/0.1.3.md); glTF through the Khronos validator; each check's failing and passing case; take-off test | ✅ |
-| 0.1.4 | Examples, print, ? cards, screenshots, README and site, final check | 🔜 |
-| 0.2 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | ⬜ |
+| 0.1.4 | Examples, print, ? cards, screenshots, README and site, final check | ✅ |
+| 0.2 From Schema | 🔜 Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | ⬜ |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
 | 0.5 CAD exchange | Optional engine on first use; STEP import and export | ⬜ |
@@ -114,7 +114,16 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - Read the hub (CLAUDE, MEMORY, FAMILY, BRAND, status 2026-11-01, brain) and the reference apps (Plan's shell and updater, Pipe's shell, 3D view, library, PCF reader and units, Schema's object model, Mesh).
 - Built the engine (catalogue with sources, parts, equipment, model, edits, routing, checks with parry3d, lists, PCF, glTF, examples, hardening): 25 engine tests (each several cases), clippy clean, `cargo deny` clean.
 - Built the window from Pipe's shell: catalogue panel, 3D view, Inspector, bottom tabs, ribbon, File page, print, help. UI tests (30 checks) drive the real engine through a bridge.
-- Released 0.1.0.
+- Released 0.1.0, then 0.1.1 (lines follow moved equipment; Route Again), 0.1.2 (exact snap preview; slide components; branch and double-click fixes), 0.1.3 (PCF read and solved by Datum Pipe's own engine; glTF validated; every check with a failing and passing case; take-off test), 0.1.4 (print and help checks, screenshots, site.json, final check).
+- Releases: the release workflow had to run once on a push to be registered; publishing the GitHub Release failed intermittently with 403 "Resource not accessible by integration" (0.1.0 and 0.1.2 first time; 0.1.1 and 0.1.3 published at once); the failed publish steps were re-run, and 0.1.4 was published last so it is "latest".
+
+**Summary of the run**
+- *Released:* 0.1.0, 0.1.1, 0.1.2, 0.1.3, 0.1.4 (Windows installer + SHA256SUMS.txt each; see the Releases page for which published).
+- *What works:* the plot (grid, coordinates, plant north, areas); the six parametric equipment types with nozzles, placed by drag and drop, moved with arrows, edited in the Inspector; routing with orthogonal guides (spec elbows LR/SR at 90°/45°, reducers at nozzles of another size, weld-neck flange + gasket + bolt set at flanged nozzles; tight turns and odd angles reported, not drawn); valves, strainers, flange pairs, tees and reducers that snap onto pipes by the engine's rule (exact preview while dragging) and split them; branches from tees; resizing; moving runs; lines following moved equipment; Route Again; undo/redo; the clash check (pipe–pipe, pipe–equipment, pipe–ground, 25 mm) and the connection, class and number checks; line list, equipment list, take-off, CSV; PCF per line or all (read and solved by Datum Pipe's own engine); glTF (Khronos validator clean); print; ? cards, getting started, glossary, sources; three examples + "Find the clashes"; plug-in packs (folders).
+- *Tests:* 31 engine tests (geometry against the tables, ports, gaps, lengths, turns, resizing, branches, moving equipment, every check, take-off, exchange with Pipe's reader, glTF, hardening with random edits, damaged files and a 2,376-part speed gate at about 60 ms); 37 UI checks driving the real engine; `scripts/verify.sh` with Datum Pipe's real engine; clippy and cargo deny clean.
+- *Cut (brief's cut order):* eccentric reducers; the walk view. glTF and 45° elbows were kept. Also not done: zip plug-in packs (folders only), valve weights in the PCF, automatic jogs when a move cannot be taken by the runs (reported; Route Again).
+- *Speed:* 2,376 parts draw as 181k triangles (low detail above 1,500 parts); 123 ms a frame in Chromium's software renderer with no graphics card in the test machine; not yet measured on a real PC.
+- *2-minute demo:* (1) File › Examples › Pump suction and discharge. (2) Drag a Gate valve from the catalogue onto the 6" header between the two tees: the marker shows where it snaps; drop it. (3) Click the header in the Lines tab, Piping › One size larger: the valve, tees, cap, elbow and blind all become 8". (4) F5 (Check): no clashes. (5) Click 4"-P-1003-CS1 in the Lines tab, Home › To Datum Pipe: save the .pcf; in Datum Pipe, File › Import a piping component file.
 
 ---
 
@@ -126,6 +135,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - Dimension tables are typical catalogue values; they are checked against their sources before 1.0.
 - Datum Pipe's PCF reader has no 22" bore (reads it as 20") and no cap (reads a short pipe): noted for Datum Pipe's chat.
 - Not yet run on a real Windows PC by the user; the 3D view was checked in Chromium's software renderer.
+- Hub task: add Datum Layout to `apps.json` (id layout, accent #3A5A78), copy `docs/brand/datum-layout-icon.svg` to the hub's `brand/`, and the rest of the hub's list (AppGlyph, phrases, nine-app hero, FAMILY §1, Datum Home's list, brain).
 
 ---
 

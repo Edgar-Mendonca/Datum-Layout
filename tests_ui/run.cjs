@@ -60,6 +60,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const screenOf = pt => p.evaluate(q => window.__screen(q), pt);
   const allText = async () => p.evaluate(() => document.body.innerText);
   const seen = [];
+  const shot = async name => { await p.evaluate(() => document.getElementById("toast")?.remove()); await settle(250); await p.screenshot({ path: `${shots}/${name}.png` }); };
 
   // 1. File page: the examples, the steel sidebar, the update card.
   const tiles = await p.$$eval(".home .tile b", els => els.map(e => e.textContent));
@@ -177,7 +178,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("example 1: the check finds no clashes and no errors", (await p.textContent(".bbody")).includes("No clashes"), await p.textContent(".bbody"));
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(400);
   check("example 1: the line list has five lines", (await p.$$(".bbody tr.f")).length === 5);
-  if (shots) { await p.click(".bbody tr.f >> nth=0"); await settle(400); await p.click(".tabs > button:has-text(\"View\")"); await p.screenshot({ path: `${shots}/line-list.png` }); }
+  if (shots) { await p.click(".bbody tr.f >> nth=0"); await settle(400); await p.click(".tabs > button:has-text(\"Lists\")"); await shot("line-list"); }
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(400);
   check("example 1: the equipment list shows every nozzle", (await p.textContent(".bbody")).includes("P-101A") && (await p.$$(".bbody tr.f")).length >= 7);
   await p.click("label:has-text(\"Material take-off\") >> nth=0").catch(() => {});
@@ -192,17 +193,26 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the model exports as glTF", (await calls("save_file")).slice(-1)[0]?.data.startsWith("data:model/gltf-binary;base64,Z2xURg"));
   if (shots) {
     await open("pumps");
+    await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);
+    await p.click(".bbody tr.f:has-text(\"4\\\"-P-1003\")"); await settle(500);
     await p.keyboard.press("1"); await settle(300); await p.click(".tabs > button:has-text(\"Home\")");
-    await p.screenshot({ path: `${shots}/pumps-3d.png` });
+    await shot("pumps-3d");
     // Dropping a valve onto the discharge header: the snap marker shows where it goes.
     const s3 = await state(); const hdr = s3.paths.find(x => x[0] === s3.p.lines.find(l => l.number.includes("1005")).id)[1];
     await p.evaluate(() => { window.__drag = { type: "item", kind: "gate" }; });
     const at = await screenOf([hdr[0][0], 10.5, hdr[0][2]]);
     await p.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); el.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: new DataTransfer() })); }, [at.x, at.y]);
-    await p.click(".tabs > button:has-text(\"Fittings\")"); await settle(300);
-    await p.screenshot({ path: `${shots}/drop-valve.png` });
+    await p.click(".tabs > button:has-text(\"Fittings\")"); await settle(600);
+    await shot("drop-valve");
     await p.evaluate(() => { window.__drag = undefined; });
   }
+
+  // 9b. Print: the 3D view on its own page, then the lists.
+  await p.keyboard.press("Control+p"); await settle(1500);
+  const pages = await p.$$(".pprev .pwrap");
+  check("print previews the view and the lists", pages.length >= 2 && !!(await p.$(".pview img")) && (await p.textContent(".pprev")).includes("Line list"), String(pages.length));
+  seen.push(await allText());
+  await p.keyboard.press("Escape"); await settle(300);
 
   // 10. Find the clashes: exactly three, each clickable.
   await open("clashes");
@@ -210,7 +220,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const rows = await p.$$(".bbody tr.f");
   check("Find the clashes: three clashes listed", rows.length === 3, String(rows.length));
   if (rows.length) { await rows[0].click(); await settle(500); check("clicking a clash selects it", !!(await p.evaluate(() => document.querySelector(".insp header b")?.textContent))); }
-  if (shots) await p.screenshot({ path: `${shots}/clashes.png` });
+  if (shots) await shot("clashes");
   seen.push(await allText());
 
   // 11. Speed: a large plant (24 copies of example 1, over 2,000 parts) orbits smoothly.
@@ -226,8 +236,13 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   // 12. Help: every card, the getting started page and the glossary; no product names anywhere.
   await p.click('.tabs > button:has-text("Help")');
   for (const btn of ["Getting Started", "Glossary", "Shortcuts", "Sources"]) { await p.click(`.ribbon .rb:has-text("${btn}")`); await settle(300); seen.push(await allText()); await p.keyboard.press("Escape"); await settle(100); }
-  const helpTexts = await p.evaluate(async () => { const out = []; for (const b of document.querySelectorAll(".help")) { b.click(); await new Promise(r => setTimeout(r, 30)); out.push(document.querySelector(".dlg")?.innerText ?? ""); document.querySelector(".dlg .x")?.click(); await new Promise(r => setTimeout(r, 10)); } return out; });
+  const helpTexts = [];
+  for (const tb of ["Home", "Equipment", "Piping", "Fittings", "Check", "Lists", "View", "Help"]) {
+    await p.click(`.tabs > button:has-text("${tb}")`); await settle(100);
+    helpTexts.push(...await p.evaluate(async () => { const out = []; for (const b of document.querySelectorAll(".help")) { b.click(); await new Promise(r => setTimeout(r, 30)); out.push(document.querySelector(".dlg")?.innerText ?? ""); document.querySelector(".dlg .x")?.click(); await new Promise(r => setTimeout(r, 10)); } return out; }));
+  }
   seen.push(...helpTexts);
+  check("every ribbon group and panel has a ? card", helpTexts.length >= 12 && helpTexts.every(x => x.length > 40), String(helpTexts.length));
   const hits = seen.flatMap(named);
   check("no commercial product name appears in the window", hits.length === 0, JSON.stringify([...new Set(hits)]));
   check("the window never named Datum Pipe's moss or Plan's blue", !(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--blue"))).includes("4D7C0F"));
