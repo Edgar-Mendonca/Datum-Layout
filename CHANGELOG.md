@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.1.6 — 2026-11-08
+Work with many items at once: select several, then move, copy, turn, mirror or delete them together.
+
+**Select several.** Ctrl+click equipment and lines in the view to add or remove them; Home › Select All (Ctrl+A) picks everything. The Inspector lists the selection and the status bar counts it.
+
+**Move together.** Drag the selection's arrows: every picked item moves by the same amount, and lines connected to items left behind follow their nozzles.
+
+**Copy, turn and mirror.** Home › Arrange › Copy (Ctrl+D) places a copy beside the selection: lines between copied equipment connect to the copies and get new numbers, the equipment new tags. Turn ±90° turns the selection about its centre; Mirror east–west and north–south make the opposite hand, nozzles and all.
+
+**Delete together.** Delete removes every picked item in one step; Undo brings them back.
+
 ## 0.1.5 — 2026-11-08
 The catalogue grows: flanges to class 2500, valves in every class, eight example pipe classes, and a measure tool.
 

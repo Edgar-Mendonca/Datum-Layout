@@ -12,7 +12,7 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "./styles.css";
 import { invoke, listen, Out, Options, Shown, Typed } from "./api";
-import { out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
+import { picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
 import { C } from "./cmds";
 import { TitleBar, Ribbon, palette } from "./ribbon";
 import { Backstage, update, checkUpdate } from "./backstage";
@@ -30,7 +30,7 @@ const Status = () => (
     <span class="grow" />
     <span class="muted">Working elevation {fmt("coord", elev())}</span>
     <span class="muted">{project()?.units === "US" ? "US units" : "SI units"}</span>
-    <span class="muted">{sel() ? sel()!.kind : ""}</span>
+    <span class="muted">{picked().length ? `${picked().length} selected` : sel() ? sel()!.kind : ""}</span>
   </footer>
 );
 
@@ -68,6 +68,8 @@ const App = () => {
     else if (e.key === "F5") { e.preventDefault(); C.check(); }
     else if (e.key === "Escape" && backstage() && out()) setBackstage(null);
     else if (e.key === "Escape" && mode() !== "select") C.cancelTool();
+    else if (ctrl && k === "a" && !typing && !backstage()) { e.preventDefault(); C.selectAll(); }
+    else if (ctrl && k === "d" && !typing && !backstage()) { e.preventDefault(); C.copyGroup(); }
     else if (typing || ctrl || backstage()) return;
     else if (e.key === "Delete") { e.preventDefault(); C.del(); }
     else if (e.key === "PageUp") { e.preventDefault(); C.elevation(grid); }

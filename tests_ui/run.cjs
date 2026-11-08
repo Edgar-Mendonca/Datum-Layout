@@ -167,6 +167,20 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.keyboard.press("Escape"); await settle(150);
   check("the catalogue lists the example pipe classes", (await p.$$(".catclass")).length === 8);
 
+  // 7c. Groups: Ctrl+A, copy beside, mirror; every copy stays connected.
+  await open("pumps");
+  await p.keyboard.press("Control+a"); await settle(300);
+  check("Ctrl+A selects every item", (await p.textContent(".insp")).includes("8 items selected"), await p.textContent(".insp header"));
+  await p.keyboard.press("Control+d"); await settle(900);
+  st = await state();
+  check("Ctrl+D copies the plant beside itself", st.p.equipment.length === 6 && st.p.lines.length === 10);
+  check("the copy is connected and clean", !st.issues.length, JSON.stringify(st.issues.map(i => i.text)));
+  await p.click('.tabs > button:has-text("Home")'); await p.click('.rb:has-text("Mirror east–west")'); await settle(900);
+  st = await state();
+  check("mirroring the copy keeps it clean", !st.issues.length, JSON.stringify(st.issues.map(i => i.text)));
+  await p.keyboard.press("Control+z"); await p.keyboard.press("Control+z"); await settle(600);
+  check("undo takes the copy away again", (await state()).p.equipment.length === 3);
+
   // 7b. Turn the tank in example 1: its suction line is reported skewed; Route Again squares it.
   await open("pumps");
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(300);

@@ -1,6 +1,6 @@
 // Commands: what the ribbon, menus, keys and Tell Me run.
 import { Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
-import { out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
+import { picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
 import * as D from "./dialogs";
 import { RouteFrom } from "./store";
 
@@ -35,12 +35,48 @@ export const C = {
   undo: async () => { const o = await call<Out>("history", { redo: false }); if (o) setOut(o); },
   redo: async () => { const o = await call<Out>("history", { redo: true }); if (o) setOut(o); },
 
+  // ---------- groups ----------
+  /** Adds an item (equipment or line id) to the group, or takes it out; the single selection joins first. */
+  pick: (id: number) => {
+    let g = picked();
+    const s = sel();
+    if (!g.length && s && (s.kind === "equip" || s.kind === "line" || s.kind === "nozzle")) g = [s.id];
+    setPicked(g.includes(id) ? g.filter(x => x !== id) : [...g, id]);
+    setSel(null);
+  },
+  selectAll: () => { const p = project(); if (p) { setSel(null); setPicked([...p.equipment.map(e => e.id), ...p.lines.map(l => l.id)]); } },
+  /** The group, or the single selected equipment or line. */
+  targets: (): number[] => { const g = picked(); if (g.length) return g; const s = sel(); return s && (s.kind === "equip" || s.kind === "line" || s.kind === "nozzle") ? [s.id] : []; },
+  /** The middle of the targets on the plan (for turning and mirroring). */
+  centre: (ids: number[]): [number, number, number] => {
+    const p = project(); if (!p) return [0, 0, 0];
+    const pts: number[][] = [...p.equipment.filter(e => ids.includes(e.id)).map(e => e.pos), ...p.lines.filter(l => ids.includes(l.id)).flatMap(l => out()?.paths.find(x => x[0] === l.id)?.[1] ?? l.pts)];
+    if (!pts.length) return [0, 0, 0];
+    const lo = [0, 1].map(k => Math.min(...pts.map(q => q[k]))), hi = [0, 1].map(k => Math.max(...pts.map(q => q[k])));
+    const g = project()?.plot.grid ?? 1;
+    return [Math.round((lo[0] + hi[0]) / 2 / g) * g, Math.round((lo[1] + hi[1]) / 2 / g) * g, 0];
+  },
+  groupOp: (name: string, make: (ids: number[]) => object) => {
+    const ids = C.targets(); if (!ids.length) return toast("Select equipment or lines (Ctrl+click adds more), then " + name + ".");
+    act(make(ids)).then(o => { if (o && o.created.length) { setSel(null); setPicked(o.created); } });
+  },
+  copyGroup: () => C.groupOp("copy", ids => {
+    const p = project()!, pts: number[][] = [...p.equipment.filter(e => ids.includes(e.id)).map(e => e.pos), ...p.lines.filter(l => ids.includes(l.id)).flatMap(l => l.pts)];
+    const w = pts.length ? Math.max(...pts.map(q => q[0])) - Math.min(...pts.map(q => q[0])) : 0;
+    const g = p.plot.grid || 1;
+    return { CopyGroup: { ids, delta: [Math.ceil((w + 3) / g) * g, 0, 0] } };
+  }),
+  rotateGroup: (deg: number) => C.groupOp("turn them", ids => ({ RotateGroup: { ids, about: C.centre(ids), deg } })),
+  mirrorGroup: (eastWest: boolean) => C.groupOp("mirror them", ids => ({ MirrorGroup: { ids, about: C.centre(ids), east_west: eastWest } })),
+  deleteGroup: (): void => { const ids = C.targets(); if (!ids.length) { C.del(); return; } act({ Delete: { ids } }).then(o => { if (o) { setPicked([]); setSel(null); } }); },
+
   // ---------- equipment ----------
   /** Click on the plot to place an item of this kind. */
   place: (kind: EquipKind) => { setRoute(null); setPlacing(kind); setMode("place"); },
-  del: () => {
+  del: (): void => {
+    if (picked().length) { C.deleteGroup(); return; }
     const s = sel(); if (!s) return toast("Select equipment, a line or a component first.");
-    if (s.kind === "nozzle") { const e = selEquip(); if (e) return act({ SetEquipment: { ...e, nozzles: e.nozzles.filter(n => n.tag !== s.tag) } }).then(o => o && setSel({ kind: "equip", id: e.id })); }
+    if (s.kind === "nozzle") { const e = selEquip(); if (e) { act({ SetEquipment: { ...e, nozzles: e.nozzles.filter(n => n.tag !== s.tag) } }).then(o => o && setSel({ kind: "equip", id: e.id })); return; } }
     if (s.kind === "run") return toast("A run is part of its line: select the line to delete it, or move the run.");
     if (s.kind === "plot") return;
     act({ Delete: { ids: [s.id] } }).then(o => o && setSel(null));
@@ -129,7 +165,8 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Undo", C.undo, "Ctrl+Z"], ["Redo", C.redo, "Ctrl+Y"], ["Delete", C.del, "Del"],
   ["Place a vertical vessel", () => C.place("vertical_vessel")], ["Place a horizontal drum", () => C.place("horizontal_drum")], ["Place a storage tank", () => C.place("tank")],
   ["Place a column", () => C.place("column")], ["Place a centrifugal pump", () => C.place("pump")], ["Place a shell-and-tube exchanger", () => C.place("exchanger")],
-  ["Rotate the equipment 90°", () => C.rotate(90)], ["Route a line", C.route, "R"],
+  ["Rotate the equipment 90°", () => C.rotate(90)], ["Select everything", () => C.selectAll(), "Ctrl+A"], ["Copy the selection", () => C.copyGroup(), "Ctrl+D"],
+  ["Turn the selection 90°", () => C.rotateGroup(90)], ["Turn the selection −90°", () => C.rotateGroup(-90)], ["Mirror the selection east–west", () => C.mirrorGroup(false)], ["Mirror the selection north–south", () => C.mirrorGroup(true)], ["Route a line", C.route, "R"],
   ["Add a gate valve to the selected line", () => C.dropOnSelected("gate")], ["Add a globe valve", () => C.dropOnSelected("globe")], ["Add a check valve", () => C.dropOnSelected("check")], ["Add a ball valve", () => C.dropOnSelected("ball")],
   ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a reducer", () => C.dropOnSelected("reducer")],
   ["Route the selected line again", () => C.reroute()], ["Make the line one size larger", () => C.step(true)], ["Make the line one size smaller", () => C.step(false)],

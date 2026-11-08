@@ -29,6 +29,8 @@ export const setOut = (o: Out | null | undefined) => {
         : s.kind === "area" ? p.areas.some(a => a.id === s.id) : true;
       if (!ok) setSel(null);
     }
+    const ids = new Set([...p.equipment.map(e => e.id), ...p.lines.map(l => l.id)]);
+    if (picked().some(i => !ids.has(i))) setPicked(picked().filter(i => ids.has(i)));
   });
   if (checked()) setCheckStale(true);
   refreshScene();
@@ -55,6 +57,8 @@ export type Sel =
   | { kind: "equip"; id: number } | { kind: "nozzle"; id: number; tag: string } | { kind: "line"; id: number }
   | { kind: "run"; id: number; seg: number } | { kind: "item"; id: number; line: number } | { kind: "area"; id: number } | { kind: "plot"; id: 0 };
 export const [sel, setSel] = createSignal<Sel | null>(null);
+/** A group of equipment and line ids picked with Ctrl+click (or Ctrl+A); empty when none. */
+export const [picked, setPicked] = createSignal<number[]>([]);
 export const selLine = (): Line | undefined => { const s = sel(), p = project(); if (!s || !p) return; const id = s.kind === "item" ? s.line : s.kind === "line" || s.kind === "run" ? s.id : -1; return p.lines.find(l => l.id === id); };
 export const selEquip = (): Equipment | undefined => { const s = sel(), p = project(); if (!s || !p || (s.kind !== "equip" && s.kind !== "nozzle")) return; return p.equipment.find(e => e.id === s.id); };
 export const selItem = (): Item | undefined => { const s = sel(); if (s?.kind !== "item") return; return selLine()?.items.find(i => i.id === s.id); };
@@ -84,7 +88,7 @@ export const call = async <T = any>(cmd: string, args?: object): Promise<T | und
 export const [loaded, setLoaded] = createSignal(0);
 export const loadOut = async (cmd: string, args?: object) => {
   const o = await call<Out | null>(cmd, args);
-  if (o) batch(() => { setLoaded(n => n + 1); setSel(null); setChecked(null); setCheckStale(false); setMode("select"); setRoute(null); setOut(o); setBackstage(null); });
+  if (o) batch(() => { setLoaded(n => n + 1); setPicked([]); setSel(null); setChecked(null); setCheckStale(false); setMode("select"); setRoute(null); setOut(o); setBackstage(null); });
   return o;
 };
 

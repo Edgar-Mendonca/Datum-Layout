@@ -354,3 +354,40 @@ fn the_take_off_counts_what_example_1_holds() {
     assert_eq!(l.equipment.iter().map(|e| e.nozzles.len()).sum::<usize>(), 7);
     assert!(crate::lists::csv(&l, "mto").unwrap().lines().count() == l.mto.len() + 1);
 }
+
+#[test]
+fn groups_move_copy_rotate_and_mirror_cleanly() {
+    let cat = Catalogue::builtin();
+    let clean = |d: &Doc| { let b = build(&d.p, &cat); assert!(b.issues.is_empty(), "{:?}", b.issues); assert!(connection_issues(&d.p, &cat, &b).is_empty(), "{:?}", connection_issues(&d.p, &cat, &b)); joints_ok(&b); };
+    let base = crate::examples::get("pumps").unwrap();
+    let all: Vec<u32> = base.equipment.iter().map(|e| e.id).chain(base.lines.iter().map(|l| l.id)).collect();
+    // Move the whole plant.
+    let mut d = Doc::new(base.clone());
+    d.apply(Op::MoveGroup { ids: all.clone(), delta: [3.0, -2.0, 0.5] }, &cat).unwrap();
+    clean(&d);
+    // Copy it: twice as many items, all connected among the copies.
+    let mut d = Doc::new(base.clone());
+    let made = d.apply(Op::CopyGroup { ids: all.clone(), delta: [0.0, 20.0, 0.0] }, &cat).unwrap();
+    assert_eq!(made.len(), all.len());
+    assert_eq!(d.p.equipment.len(), 6);
+    assert_eq!(d.p.lines.len(), 10);
+    clean(&d);
+    // Turn it a quarter and a half turn.
+    for deg in [90.0, 180.0, -90.0] {
+        let mut d = Doc::new(base.clone());
+        d.apply(Op::RotateGroup { ids: all.clone(), about: [10.0, 10.0, 0.0], deg }, &cat).unwrap();
+        clean(&d);
+    }
+    // Mirror it both ways: the pumps' nozzles and every line come out the other hand, still clean.
+    for ew in [false, true] {
+        let mut d = Doc::new(base.clone());
+        d.apply(Op::MirrorGroup { ids: all.clone(), about: [15.0, 10.0, 0.0], east_west: ew }, &cat).unwrap();
+        clean(&d);
+    }
+    // Moving only the pumps: the lines connected to them follow.
+    let mut d = Doc::new(base.clone());
+    let pumps: Vec<u32> = d.p.equipment.iter().filter(|e| e.tag.starts_with('P')).map(|e| e.id).collect();
+    d.apply(Op::MoveGroup { ids: pumps, delta: [0.5, 0.0, 0.0] }, &cat).unwrap();
+    let b = build(&d.p, &cat);
+    assert!(connection_issues(&d.p, &cat, &b).is_empty());
+}

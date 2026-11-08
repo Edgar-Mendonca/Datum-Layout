@@ -3,7 +3,7 @@
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
 import { CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
-import { call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
+import { picked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help } from "./help";
 import { Icon } from "./ui";
@@ -198,7 +198,13 @@ export const Inspector = () => {
     <aside class="insp">
       <header>Inspector <b>{title()}</b><Help k="inspector" /></header>
       <div class="ibody">
-        <Show when={project()}>
+        <Show when={project() && picked().length}>
+          <p class="iwhat"><b>{picked().length} items selected</b></p>
+          <p class="muted">{project()!.equipment.filter(e => picked().includes(e.id)).map(e => e.tag).concat(project()!.lines.filter(l => picked().includes(l.id)).map(l => l.number || "(line)")).join(", ")}</p>
+          <p class="muted">Drag the arrows to move them together; lines connected to them follow. Ctrl+click adds or removes an item.</p>
+          <p class="ibtns"><button class="btn sm" onClick={C.copyGroup}>Copy</button><button class="btn sm" onClick={() => C.rotateGroup(90)}>Turn 90°</button><button class="btn sm" onClick={() => C.mirrorGroup(false)}>Mirror E–W</button><button class="btn sm" onClick={() => C.mirrorGroup(true)}>Mirror N–S</button><button class="btn sm" onClick={C.deleteGroup}>Delete</button></p>
+        </Show>
+        <Show when={project() && !picked().length}>
           <Show when={selEquip()} keyed>{e => <EquipInsp e={e} />}</Show>
           <Show when={(sel()?.kind === "line" || sel()?.kind === "run") && selLine()} keyed>{l => <LineInsp l={l} />}</Show>
           <Show when={sel()?.kind === "item" && selLine()} keyed>{l => <ItemInsp l={l} id={(sel() as any).id} />}</Show>

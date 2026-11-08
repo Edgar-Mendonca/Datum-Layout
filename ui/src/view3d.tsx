@@ -8,7 +8,7 @@ import { onMount, onCleanup, createEffect, on, Show } from "solid-js";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke } from "./api";
-import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure } from "./store";
+import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked } from "./store";
 import { C, setFit, setStdView, finishRoute } from "./cmds";
 import { fmt } from "./units";
 
@@ -139,6 +139,8 @@ export const View3D = () => {
 
   /** Which parts the selection covers. */
   const selected = (q: PartRef) => {
+    const g = picked();
+    if (g.length) return g.includes(q.equip) || g.includes(q.line);
     const s = sel(); if (!s) return false;
     if (s.kind === "equip") return q.equip === s.id;
     if (s.kind === "nozzle") return q.equip === s.id && q.kind === "nozzle";
@@ -256,20 +258,28 @@ export const View3D = () => {
 
   // ------------------------------------------------------------ move arrows (gizmo)
   const gizmo = new THREE.Group(); toolG.add(gizmo);
-  let giz: { axis: V3; at: V3; kind: "equip" | "run" | "item" } | null = null;
+  let giz: { axis: V3; at: V3; kind: "equip" | "run" | "item" | "group" } | null = null;
   const buildGizmo = () => {
     gizmo.clear(); giz = null;
-    const s = sel(), p = project(); if (!s || !p || mode() !== "select") return;
-    let at: V3 | null = null, axes: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]], kind: "equip" | "run" | "item" = "equip";
-    if (s.kind === "item") {
+    const s = sel(), p = project(); if (!p || mode() !== "select") return;
+    let at: V3 | null = null, axes: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]], kind: "equip" | "run" | "item" | "group" = "equip";
+    const g = picked();
+    if (g.length) {
+      // The group's arrows sit above the middle of everything picked.
+      const parts = sceneData?.parts.filter(q => g.includes(q.equip) || g.includes(q.line)) ?? [];
+      if (!parts.length) return;
+      const lo = [0, 1, 2].map(k => Math.min(...parts.map(q => q.lo[k]))), hi = [0, 1, 2].map(k => Math.max(...parts.map(q => q.hi[k])));
+      at = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, hi[2] + 0.3]; kind = "group";
+    } else if (!s) return;
+    else if (s.kind === "item") {
       const l = p.lines.find(x => x.id === s.line), it = l?.items.find(i => i.id === s.id), pts = out()?.paths.find(x => x[0] === s.line)?.[1];
       if (!it || !pts || it.seg + 1 >= pts.length) return;
       const a = pts[it.seg], b = pts[it.seg + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1;
       const u: V3 = [(b[0] - a[0]) / L, (b[1] - a[1]) / L, (b[2] - a[2]) / L];
       at = [a[0] + u[0] * it.at, a[1] + u[1] * it.at, a[2] + u[2] * it.at]; axes = [u]; kind = "item";
     }
-    if (s.kind === "equip") { const e = p.equipment.find(x => x.id === s.id); if (!e) return; const parts = sceneData?.parts.filter(q => q.equip === e.id) ?? []; at = [e.pos[0], e.pos[1], parts.length ? Math.max(...parts.map(q => q.hi[2])) + 0.2 : e.pos[2] + 1]; }
-    if (s.kind === "run") {
+    if (!g.length && s?.kind === "equip") { const e = p.equipment.find(x => x.id === s.id); if (!e) return; const parts = sceneData?.parts.filter(q => q.equip === e.id) ?? []; at = [e.pos[0], e.pos[1], parts.length ? Math.max(...parts.map(q => q.hi[2])) + 0.2 : e.pos[2] + 1]; }
+    if (!g.length && s?.kind === "run") {
       const pts = out()?.paths.find(x => x[0] === s.id)?.[1]; if (!pts || s.seg + 1 >= pts.length) return;
       const a = pts[s.seg], b = pts[s.seg + 1]; at = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]; kind = "run";
       const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], k = u.map(Math.abs).indexOf(Math.max(...u.map(Math.abs)));
@@ -360,6 +370,7 @@ export const View3D = () => {
       const { axis, delta } = dragAxis; dragAxis = null; controls.enabled = true; gizmo.position.set(0, 0, 0); host.title = "";
       if (Math.abs(delta) > 1e-9) {
         const d: V3 = [axis[0] * delta, axis[1] * delta, axis[2] * delta], s = sel();
+        if (giz?.kind === "group") { act({ MoveGroup: { ids: picked(), delta: d } }); draw(); return; }
         if (s?.kind === "equip") { const eq = project()?.equipment.find(x => x.id === s.id); if (eq) act({ SetEquipment: { ...eq, pos: [eq.pos[0] + d[0], eq.pos[1] + d[1], eq.pos[2] + d[2]] } }); }
         if (s?.kind === "run") act({ MoveRun: { line: s.id, seg: s.seg, delta: d } });
         if (s?.kind === "item" && giz) act({ MoveItem: { line: s.line, item: s.id, at: [giz.at[0] + d[0], giz.at[1] + d[1], giz.at[2] + d[2]] } });
@@ -379,8 +390,11 @@ export const View3D = () => {
     }
     if (mode() === "place") { const k = placing(); const p = onPlane(e, project()?.plot.ground ?? 0); if (k && p) { const s = project()?.plot.grid ?? 1; act({ AddEquipment: { kind: k, pos: [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0] } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[0] }); }); } setMode("select"); setPlacing(null); return; }
     const hit = pickPart(e);
-    if (!hit) { setSel(null); return; }
+    if (!hit) { setSel(null); setPicked([]); return; }
     const [q] = hit;
+    // Ctrl+click builds a group of equipment and lines.
+    if (e.ctrlKey || e.metaKey) { C.pick(q.line || q.equip); return; }
+    setPicked([]);
     if (q.line === 0) setSel(q.kind === "nozzle" && e.altKey ? { kind: "equip", id: q.equip } : { kind: "equip", id: q.equip });
     else if (q.item) setSel({ kind: "item", id: q.item, line: q.line });
     else if (q.kind === "pipe" && sel()?.kind === "line" && sel()!.id === q.line) setSel({ kind: "run", id: q.line, seg: q.seg });
@@ -509,7 +523,7 @@ export const View3D = () => {
   let firstScene = true;
   createEffect(on(scene, () => { buildParts(); if (firstScene && scene()) { firstScene = false; fit(); } }, { defer: true }));
   createEffect(on(() => [project()?.plot, project()?.areas, themeTick(), sel()?.kind === "area" ? sel() : null], () => { liveTags = new Set([...liveTags].filter(k => k.startsWith("eq") || k.startsWith("ln"))); buildPlot(); buildLabels(); draw(); }, { defer: true }));
-  createEffect(on(sel, paintSelection, { defer: true }));
+  createEffect(on([sel, picked], paintSelection, { defer: true }));
   createEffect(on(() => opts().labels, () => { buildLabels(); draw(); }, { defer: true }));
   createEffect(on(mode, () => { buildPorts(); buildGizmo(); if (mode() !== "route") { setRubber([]); marker.visible = false; } host.style.cursor = mode() === "select" ? "" : "crosshair"; if (mode() !== "measure") setMeasure([]); }, { defer: true }));
   createEffect(on(measure, () => {

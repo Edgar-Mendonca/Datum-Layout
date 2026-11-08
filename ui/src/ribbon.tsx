@@ -2,7 +2,7 @@
 // Check · Lists · View · Help, and the contextual Format tab for a selected line or equipment).
 // Copied from Datum Plan's ribbon by way of Datum Pipe.
 import { For, Show, JSX, createSignal, createMemo, onMount } from "solid-js";
-import { call, out, project, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, sel, opts, setOpts, selLine, selEquip, mode, elev, setElev, setBottom, checked, act } from "./store";
+import { picked, call, out, project, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, sel, opts, setOpts, selLine, selEquip, mode, elev, setElev, setBottom, checked, act } from "./store";
 import { C, ALL_CMDS } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
@@ -107,7 +107,8 @@ export const Ribbon = () => {
       <Show when={tab() === "home"}>
         <G l="Plant" h="examples"><B big i="new" l="New Plant" run={() => C.newProject(null)} /><B big i="open" l="Examples" dd={exampleMenu} /></G>
         <G l="Place" h="equipment"><B big i="vvessel" l="Equipment" dd={e => openMenu(e, EQUIP.map(([k, l]) => ({ label: l, run: () => C.place(k) })))} /><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Route a line from a nozzle or point (R)" /></G>
-        <G l="Edit" h="edit"><S><B i="undo" l="Undo" run={C.undo} off={!out()?.undo} /><B i="redo" l="Redo" run={C.redo} off={!out()?.redo} /><B i="del" l="Delete" run={C.del} off={!sel()} /></S></G>
+        <G l="Edit" h="edit"><S><B i="undo" l="Undo" run={C.undo} off={!out()?.undo} /><B i="redo" l="Redo" run={C.redo} off={!out()?.redo} /><B i="del" l="Delete" run={C.del} off={!sel() && !picked().length} /></S></G>
+        <G l="Arrange" h="group"><B big i="copy" l="Copy" run={C.copyGroup} title="Copy the selection beside it (Ctrl+D)" /><S><B i="rotate" l="Turn 90°" run={() => C.rotateGroup(90)} /><B i="rotate" l="Turn −90°" run={() => C.rotateGroup(-90)} /><B i="selectall" l="Select All" run={C.selectAll} /></S><S><B i="mirror" l="Mirror east–west" run={() => C.mirrorGroup(false)} /><B i="mirror" l="Mirror north–south" run={() => C.mirrorGroup(true)} /></S></G>
         <G l="Units" h="units"><S><B i="units" l="SI: m, mm, bar, °C" on={p()?.units === "SI"} run={() => C.units("SI")} /><B i="units" l="US: ft, in, psi, °F" on={p()?.units === "US"} run={() => C.units("US")} /></S></G>
         <G l="Check" h="checks"><B big i="clash" l="Check" run={C.check} title="Find clashes, open ends, mismatches and class problems (F5)" /><B big i="measure" l="Measure" on={mode() === "measure"} run={C.measure} title="Measure a distance between two points (M)" /></G>
         <G l="Hand Over" h="pcf"><B big i="pipe" l="To Datum Pipe" run={() => { const l = selLine(); C.exportPcf(l?.id); }} title="Export the selected line (or every line) as a piping component file for Datum Pipe" /></G>

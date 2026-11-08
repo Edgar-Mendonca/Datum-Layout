@@ -45,6 +45,16 @@ pub enum Op {
     /// components keep their run where it still exists.
     Reroute { line: u32 },
     Delete { ids: Vec<u32> },
+    /// Moves equipment and lines together by `delta`; lines connected to them follow.
+    MoveGroup { ids: Vec<u32>, delta: P3 },
+    /// Copies equipment and lines (with their components) by `delta`: lines between copied
+    /// equipment connect to the copies; ends to anything not copied become free ends.
+    CopyGroup { ids: Vec<u32>, delta: P3 },
+    /// Turns equipment and lines about a vertical axis through `about` by `deg` degrees.
+    RotateGroup { ids: Vec<u32>, about: P3, deg: f64 },
+    /// Mirrors equipment and lines in a vertical plane through `about`: across north–south
+    /// (east becomes west) when `east_west` is false, across east–west otherwise.
+    MirrorGroup { ids: Vec<u32>, about: P3, east_west: bool },
     Batch(Vec<Op>),
 }
 
@@ -150,6 +160,26 @@ pub fn snap(p: &Project, cat: &Catalogue, l: &Line, kind: ItemKind, at: P3, nps2
     let pts = route::path(p, cat, l);
     let u = unit(sub(pts[seg + 1], pts[seg]));
     Ok((seg, place, add(pts[seg], mul(u, place))))
+}
+
+/// Applies a placement change to the equipment and lines in `ids`: `pt` maps points, `dir` maps
+/// directions, `rot` maps an equipment rotation; `mirror` also mirrors nozzles in their own y.
+fn group(p: &mut Project, ids: &[u32], pt: impl Fn(P3) -> P3, dir: impl Fn(P3) -> P3, rot: impl Fn(f64) -> f64, mirror: bool) -> Result<(), String> {
+    let set: std::collections::HashSet<u32> = ids.iter().copied().collect();
+    let mut any = false;
+    for e in p.equipment.iter_mut().filter(|e| set.contains(&e.id)) {
+        e.pos = pt(e.pos);
+        e.rot = (rot(e.rot) % 360.0 + 360.0) % 360.0;
+        if mirror { for n in &mut e.nozzles { n.pos[1] = -n.pos[1]; n.dir[1] = -n.dir[1]; } }
+        any = true;
+    }
+    for l in p.lines.iter_mut().filter(|l| set.contains(&l.id)) {
+        for q in &mut l.pts { *q = pt(*q); }
+        for it in &mut l.items { it.dir = dir(it.dir); }
+        any = true;
+    }
+    if !any { return Err("Select equipment or lines first.".into()); }
+    Ok(())
 }
 
 /// How far a route leaves a nozzle before it turns: flange, reducer and elbow, to 50 mm.
@@ -378,6 +408,58 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
                 // The nearest free place on any run.
                 let best = (0..segs).filter_map(|s| route::free_place(p, cat, &fresh, s, if s == it.seg { it.at } else { 0.0 }, len, 0.01, it.id).map(|at| (s, at))).min_by_key(|(s, _)| s.abs_diff(it.seg));
                 if let Some((s, at)) = best { if let Some(x) = line_mut(p, line)?.items.iter_mut().find(|x| x.id == it.id) { x.seg = s; x.at = at; } }
+            }
+        }
+        Op::MoveGroup { ids, delta } => {
+            group(p, &ids, |q| add(q, delta), |v| v, |r| r, false)?;
+        }
+        Op::RotateGroup { ids, about, deg } => {
+            let r = |v: P3| crate::parts::rot_z(v, deg);
+            group(p, &ids, |q| add(about, r(sub(q, about))), r, |rot| rot + deg, false)?;
+        }
+        Op::MirrorGroup { ids, about, east_west } => {
+            // Across a north–south plane x' = 2c − x (or y' = 2c − y). Every equipment body is
+            // symmetric about its own x axis, so a mirrored item is the item turned to 180° − θ
+            // (or −θ) with its nozzles mirrored in their own y.
+            let k = if east_west { 1 } else { 0 };
+            let m = move |v: P3| { let mut w = v; w[k] = -w[k]; w };
+            group(p, &ids, |q| { let mut w = q; w[k] = 2.0 * about[k] - q[k]; w }, m, move |rot| if east_west { -rot } else { 180.0 - rot }, true)?;
+        }
+        Op::CopyGroup { ids, delta } => {
+            let set: std::collections::HashSet<u32> = ids.iter().copied().collect();
+            let mut emap = std::collections::HashMap::new();
+            let mut lmap = std::collections::HashMap::new();
+            let mut imap = std::collections::HashMap::new();
+            let eqs: Vec<Equipment> = p.equipment.iter().filter(|e| set.contains(&e.id)).cloned().collect();
+            let lines: Vec<Line> = p.lines.iter().filter(|l| set.contains(&l.id)).cloned().collect();
+            if eqs.is_empty() && lines.is_empty() { return Err("Select equipment or lines to copy.".into()); }
+            for mut e in eqs {
+                let id = p.id();
+                emap.insert(e.id, id);
+                e.id = id;
+                e.uid.clear();
+                e.tag = next_tag(p, e.kind);
+                e.pos = add(e.pos, delta);
+                created.push(id);
+                p.equipment.push(e);
+            }
+            for l in &lines { lmap.insert(l.id, p.id()); for it in &l.items { imap.insert(it.id, p.id()); } }
+            for mut l in lines {
+                l.id = lmap[&l.id];
+                l.uid.clear();
+                l.number = next_number(p, &l.nps, &l.fluid, &l.class);
+                for q in &mut l.pts { *q = add(*q, delta); }
+                for it in &mut l.items { it.id = imap[&it.id]; it.uid.clear(); }
+                for e in [&mut l.from, &mut l.to] {
+                    *e = match e.clone() {
+                        End::Nozzle { equip, nozzle } if emap.contains_key(&equip) => End::Nozzle { equip: emap[&equip], nozzle },
+                        End::Branch { line, item } if lmap.contains_key(&line) && imap.contains_key(&item) => End::Branch { line: lmap[&line], item: imap[&item] },
+                        End::Point { term } => End::Point { term },
+                        _ => End::Point { term: Term::Open },
+                    };
+                }
+                created.push(l.id);
+                p.lines.push(l);
             }
         }
         Op::Delete { ids } => {

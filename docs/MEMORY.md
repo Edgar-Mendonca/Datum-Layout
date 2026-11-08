@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.5 (2026-11-08) |
+| **Current version** | 0.1.6 (2026-11-08) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -88,6 +88,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.3 | Datum Pipe's real engine is run against Layout's files in a fresh clone (CI job "exchange"), in addition to the reader copied into the unit tests | The brief: "Layout's export must open in Pipe unchanged"; a clone tests what Pipe does today without linking its code |
 | 0.1.5 | The catalogue tables were gathered by an outside assistant from the brief `docs/briefs/CATALOGUE-PACK.md`, then read by the app's own checker, compared with the earlier tables and sanity-checked (sizes and classes growing, duplicates, sources) before merging; disagreements were settled against more than one source (the ¾" long-radius elbow kept at 1⅛") | Quick to gather, but every number is still traceable to a named catalogue page |
 | 0.1.5 | Ratings are any of 150, 300, 600, 900, 1500, 2500 (`catalogue::RATINGS`); a valve size missing from the table is interpolated by nominal size between its neighbours of the same kind and class, never a rough guess | Several classes have no 3½" or 22" row; interpolation keeps lengths realistic |
+| 0.1.6 | Group edits are engine ops on id lists (`MoveGroup`, `CopyGroup`, `RotateGroup`, `MirrorGroup`, `Delete`); a mirror is a turn to 180° − θ (or −θ) plus nozzles mirrored in their own y, because every equipment body is symmetric about its own x axis; a copy reconnects ends among the copies and frees the others (Point Open) | One rule for every group edit; nothing mirrored that cannot be built |
+| 0.1.6 | UI: `picked` (Ctrl+click) is separate from `sel` (the single Inspector item); commands act on `picked` when it is not empty, else on `sel` | Every single-item command keeps working unchanged |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -103,6 +105,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.3 | PCF read and solved by Datum Pipe's own engine (`scripts/verify.sh`, CI job "exchange", docs/verification/0.1.3.md); glTF through the Khronos validator; each check's failing and passing case; take-off test | ✅ |
 | 0.1.4 | Examples, print, ? cards, screenshots, README and site, final check | ✅ |
 | 0.1.5 | Catalogue merged from the outside helper's tables (flanges 150–2500 with `blind_thick_in`, valves in all classes, fittings); missing valve sizes interpolated (`valve_length`); all six ratings in the model and window; eight example classes; measure tool | ✅ |
+| 0.1.6 | Multi-select (Ctrl+click, Select All), group move, copy (Ctrl+D), turn ±90°, mirror east–west / north–south and delete (`Op::MoveGroup`, `CopyGroup`, `RotateGroup`, `MirrorGroup`) | ✅ |
 | 0.2 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | 🔜 |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -136,6 +139,11 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - Wrote `docs/briefs/CATALOGUE-PACK.md`, a brief for an outside helper to build the parts tables in the app's exact formats (Part A: tables read today; Part B: new part types; Part C: checks and a report).
 - Reviewed the first two files: flanges.csv (115 rows, classes 150–2500, all accepted, classes 150/300 match the built-in table to 0.01") and valves.csv (433 rows, all accepted; real swing-check lengths replace the built-in ones, which were globe lengths; class 300 1¼"/1½" check, 16" globe and mm-converted rounding sent back for checking). Not merged yet: the set is merged together when complete.
 - Discussed and parked a shared Datum Library (Decisions).
+
+### 2026-11-08: Session 3 (0.1.5 to 0.2)
+- The user handed over 0.1.5 to 0.2.0 to be done unattended, in the order of `docs/PLAN-0.2.md` (industry gap analysis): the catalogue, then working with many items, routing edits, views, imports, lists and checks, then the class editor.
+- 0.1.5: merged the outside helper's flanges, valves and fittings (see Decisions); eight example classes; all six ratings; measure tool.
+- 0.1.6: multi-select and group move, copy, turn, mirror and delete; engine test `groups_move_copy_rotate_and_mirror_cleanly`; UI checks for Ctrl+A, Ctrl+D, mirror and undo.
 
 ## 5. Known limits
 
