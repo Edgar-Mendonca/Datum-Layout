@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.1.7 — 2026-11-08
+Shape routes without routing them again, and choose what the view shows.
+
+**Move a corner.** Select a line: its corners show as amber dots. Click one and drag its arrows; the runs on both sides stay square and the elbows follow. A corner next to a nozzle or tee slides along the run that leaves it.
+
+**Jogs.** Select a run and choose Piping › Add Jog (J), or right-click a pipe › Add a jog here: the run steps up a metre (sideways on a vertical run) with four elbows, to pass over or round something. Drag the new middle run to place it. Remove Jog straightens it again, and components come back where they were.
+
+**Colour by.** View › Colour by: part kind, or every line's parts by line number, pipe class, fluid or size, with a key in the corner of the view.
+
+**Hide and isolate.** Hide (H) the selection, Isolate (I) to show only the selection, Show All (Shift+H). Hidden items still count in the checks, lists and exports.
+
+**Section box.** View › Section Box draws only what is inside a box round the selection (or the whole plant); set each face in its panel.
+
 ## 0.1.6 — 2026-11-08
 Work with many items at once: select several, then move, copy, turn, mirror or delete them together.
 

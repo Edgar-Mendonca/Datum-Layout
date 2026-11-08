@@ -4,13 +4,13 @@
 // views and fit; the routing tool (orthogonal guides at the working elevation, ports to start and
 // end on); components dropped from the catalogue with a snap marker; arrows to move equipment
 // and runs along an axis. The engine owns all geometry: this file only draws what it sends.
-import { onMount, onCleanup, createEffect, on, Show } from "solid-js";
+import { onMount, onCleanup, createEffect, on, Show, For, createSignal } from "solid-js";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke } from "./api";
-import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked } from "./store";
+import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line } from "./api";
+import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection } from "./store";
 import { C, setFit, setStdView, finishRoute } from "./cmds";
-import { fmt } from "./units";
+import { fmt, toU, fromU, unit } from "./units";
 
 /** Plant (east, north, up) → three.js (x, y up, z towards the viewer = south). */
 const W = (p: V3) => new THREE.Vector3(p[0], p[2], -p[1]);
@@ -22,6 +22,10 @@ const COLOURS: Record<string, string> = {
   flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", strainer: "#9C6B3A",
 };
 const SELECTED = new THREE.Color("#2F8CFF"), PROBLEM = new THREE.Color("#D64545");
+/** Colours for "colour by": distinct, readable on light and dark, none close to the selection blue or the problem red. */
+const PALETTE = ["#D9822B", "#3A9D5D", "#8E5CB5", "#1FA2A0", "#B8A02A", "#D35D9B", "#6B7F2A", "#A0522D", "#5A6ACF", "#2E8B57", "#C97B9F", "#7F8C3D"];
+/** What a line part is grouped by. */
+const keyOf = (by: string, l: Line, q: PartRef) => by === "line" ? l.number || "(no number)" : by === "class" ? l.class : by === "fluid" ? l.fluid || "(none)" : inch(q.nps || l.nps);
 
 /** The part under a triangle (parts are in triangle order). */
 const partAt = (parts: PartRef[], tri: number) => { let lo = 0, hi = parts.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (parts[m].t0 <= tri) lo = m; else hi = m - 1; } return parts[lo]; };
@@ -45,7 +49,15 @@ export const View3D = () => {
   sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
   const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(30, 60, 20); sc.add(sun);
   const sun2 = new THREE.DirectionalLight(0xffffff, 0.5); sun2.position.set(-30, 20, -40); sc.add(sun2);
-  let mesh: THREE.Mesh | null = null, colours: Float32Array | null = null, sceneData: Scene | null = null;
+  let mesh: THREE.Mesh | null = null, insMesh: THREE.Mesh | null = null, colours: Float32Array | null = null, sceneData: Scene | null = null, idx0: Uint32Array | null = null;
+  const [legend, setLegend] = createSignal<[string, string][]>([]);
+  /** Whether a part is drawn (hidden and isolated items are not). */
+  const shown = (q: PartRef) => { const id = q.line || q.equip, iso = isolated(); return iso ? iso.includes(id) : !hidden().includes(id); };
+  // The section box: six clipping planes (three.js axes: plant east = x, north = −z, up = y).
+  const clip = [0, 1, 2, 3, 4, 5].map(() => new THREE.Plane());
+  const boxHelper = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color("#2F8CFF"));
+  boxHelper.visible = false;
+  const inSection = (p: V3) => { const s = section(); return !s || [0, 1, 2].every(k => p[k] >= s.lo[k] - 1e-6 && p[k] <= s.hi[k] + 1e-6); };
   let base: Float32Array | null = null;
   const ray = new THREE.Raycaster();
   let dirty = true;
@@ -121,17 +133,32 @@ export const View3D = () => {
     geo.computeBoundingSphere();
     // Each part's colour by kind; kept so a selection can be undone.
     const c = new THREE.Color();
-    for (const q of s.parts) { c.set(COLOURS[q.kind] ?? "#4F6F8F"); for (let t = q.t0 * 3; t < q.t1 * 3; t++) { const v = idx[t]; colours[v * 3] = c.r; colours[v * 3 + 1] = c.g; colours[v * 3 + 2] = c.b; } }
+    const by = colourBy(), lines = new Map((project()?.lines ?? []).map(l => [l.id, l] as [number, Line]));
+    const keys = new Map<string, string>();
+    if (by !== "kind") {
+      const all = [...new Set(s.parts.filter(q => q.line && lines.has(q.line) && q.kind !== "gasket" && q.kind !== "bolts").map(q => keyOf(by, lines.get(q.line)!, q)))];
+      const nps = (k: string) => NPS.findIndex(n => inch(n) === k);
+      all.sort((a, b) => by === "size" ? nps(a) - nps(b) : a.localeCompare(b, undefined, { numeric: true }));
+      all.forEach((k, i) => keys.set(k, PALETTE[i % PALETTE.length]));
+    }
+    setLegend([...keys.entries()]);
+    for (const q of s.parts) {
+      const l = q.line ? lines.get(q.line) : undefined;
+      c.set(by !== "kind" && l && q.kind !== "gasket" && q.kind !== "bolts" ? keys.get(keyOf(by, l, q)) ?? "#4F6F8F" : COLOURS[q.kind] ?? "#4F6F8F");
+      for (let t = q.t0 * 3; t < q.t1 * 3; t++) { const v = idx[t]; colours[v * 3] = c.r; colours[v * 3 + 1] = c.g; colours[v * 3 + 2] = c.b; } }
     base = colours.slice();
-    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.25, roughness: 0.55 }));
+    idx0 = idx.slice();
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.25, roughness: 0.55, clippingPlanes: clip, clipShadows: true }));
     partsG.add(mesh);
     if (s.ins_idx.length > 4) {
       const ig = new THREE.BufferGeometry();
       ig.setAttribute("position", new THREE.BufferAttribute(f32(s.ins_pos), 3)); ig.setAttribute("normal", new THREE.BufferAttribute(f32(s.ins_nor), 3)); ig.setIndex(new THREE.BufferAttribute(u32(s.ins_idx), 1));
-      const ins = new THREE.Mesh(ig, new THREE.MeshStandardMaterial({ color: 0xd8dee6, transparent: true, opacity: 0.35, depthWrite: false }));
+      const ins = new THREE.Mesh(ig, new THREE.MeshStandardMaterial({ color: 0xd8dee6, transparent: true, opacity: 0.35, depthWrite: false, clippingPlanes: clip }));
       ins.raycast = () => {};
-      partsG.add(ins);
-    }
+      partsG.add(ins); insMesh = ins;
+    } else insMesh = null;
+    applyShown(false);
+    applySection();
     paintSelection();
     buildLabels();
     buildPorts();
@@ -146,6 +173,7 @@ export const View3D = () => {
     if (s.kind === "nozzle") return q.equip === s.id && q.kind === "nozzle";
     if (s.kind === "line") return q.line === s.id;
     if (s.kind === "run") return q.line === s.id && q.seg === s.seg && q.kind === "pipe";
+    if (s.kind === "corner") return q.line === s.id && q.kind.startsWith("elbow") && q.seg === s.v - 1;
     if (s.kind === "item") return q.line === s.line && q.item === s.id;
     return false;
   };
@@ -165,17 +193,42 @@ export const View3D = () => {
     draw();
   };
 
+  /** Hidden parts: their triangles collapse to a point (the buffer and the triangle order stay). */
+  const applyShown = (redraw = true) => {
+    if (!mesh || !idx0 || !sceneData) return;
+    const idx = mesh.geometry.index!.array as Uint32Array;
+    idx.set(idx0);
+    const all = !hidden().length && !isolated();
+    if (!all) for (const q of sceneData.parts) if (!shown(q)) { const v = idx0[q.t0 * 3]; idx.fill(v, q.t0 * 3, q.t1 * 3); }
+    mesh.geometry.index!.needsUpdate = true;
+    if (insMesh) insMesh.visible = all;
+    if (redraw) { buildLabels(); buildGizmo(); draw(); }
+  };
+  const applySection = () => {
+    const s = section();
+    renderer.localClippingEnabled = !!s;
+    if (s) {
+      clip[0].set(new THREE.Vector3(1, 0, 0), -s.lo[0]); clip[1].set(new THREE.Vector3(-1, 0, 0), s.hi[0]);
+      clip[2].set(new THREE.Vector3(0, 0, -1), -s.lo[1]); clip[3].set(new THREE.Vector3(0, 0, 1), s.hi[1]);
+      clip[4].set(new THREE.Vector3(0, 1, 0), -s.lo[2]); clip[5].set(new THREE.Vector3(0, -1, 0), s.hi[2]);
+      boxHelper.box.set(new THREE.Vector3(...s.lo), new THREE.Vector3(...s.hi));
+    } else for (const c of clip) c.set(new THREE.Vector3(0, 1, 0), 1e9);
+    boxHelper.visible = !!s;
+    draw();
+  };
+
   const buildLabels = () => {
     liveTags = new Set([...liveTags].filter(k => !k.startsWith("eq") && !k.startsWith("ln")));
     const p = project();
     if (p && opts().labels) {
-      for (const e of p.equipment.length <= 60 ? p.equipment : []) {
+      const vis = (id: number) => { const iso = isolated(); return iso ? iso.includes(id) : !hidden().includes(id); };
+      for (const e of (p.equipment.length <= 60 ? p.equipment : []).filter(e => vis(e.id))) {
         const parts = sceneData?.parts.filter(q => q.equip === e.id && q.kind === "equipment") ?? [];
         const top = parts.length ? Math.max(...parts.map(q => q.hi[2])) : e.pos[2] + 2;
         tag(`eq${e.id}`, [e.pos[0], e.pos[1], top + 0.4], e.tag, "nlabel tagl");
       }
       for (const [id, pts] of (out()?.paths ?? []).length <= 40 ? out()?.paths ?? [] : []) {
-        const l = p.lines.find(x => x.id === id); if (!l || pts.length < 2) continue;
+        const l = p.lines.find(x => x.id === id); if (!l || pts.length < 2 || !vis(id)) continue;
         // On the longest run, in its middle.
         let k = 0, best = -1; for (let i = 0; i + 1 < pts.length; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]); if (d > best) { best = d; k = i; } }
         tag(`ln${id}`, [(pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2, (pts[k][2] + pts[k + 1][2]) / 2 + 0.3], l.number || "(no number)", "nlabel linel");
@@ -229,7 +282,7 @@ export const View3D = () => {
   const pickPart = (e: { clientX: number; clientY: number }): [PartRef, V3] | null => {
     if (!mesh || !sceneData) return null;
     ray.setFromCamera(ndc(e), camera);
-    const hit = ray.intersectObject(mesh, false)[0];
+    const hit = ray.intersectObject(mesh, false).find(h => inSection(E(h.point)));
     if (!hit || hit.faceIndex == null) return null;
     return [partAt(sceneData.parts, hit.faceIndex), E(hit.point)];
   };
@@ -257,12 +310,24 @@ export const View3D = () => {
   };
 
   // ------------------------------------------------------------ move arrows (gizmo)
-  const gizmo = new THREE.Group(); toolG.add(gizmo);
-  let giz: { axis: V3; at: V3; kind: "equip" | "run" | "item" | "group" } | null = null;
+  const gizmo = new THREE.Group(), corners = new THREE.Group(); toolG.add(gizmo, corners, boxHelper);
+  let giz: { axis: V3; at: V3; kind: "equip" | "run" | "item" | "group" | "corner" } | null = null;
   const buildGizmo = () => {
-    gizmo.clear(); giz = null;
+    gizmo.clear(); corners.clear(); giz = null;
     const s = sel(), p = project(); if (!p || mode() !== "select") return;
-    let at: V3 | null = null, axes: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]], kind: "equip" | "run" | "item" | "group" = "equip";
+    let at: V3 | null = null, axes: V3[] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]], kind: "equip" | "run" | "item" | "group" | "corner" = "equip";
+    // A selected line shows its corners as dots to pick and drag.
+    if (!picked().length && s && (s.kind === "line" || s.kind === "run" || s.kind === "corner")) {
+      const pts = out()?.paths.find(x => x[0] === s.id)?.[1] ?? [];
+      const r = 0.1;
+      for (let v = 1; v + 1 < pts.length; v++) {
+        const on = s.kind === "corner" && s.v === v;
+        const m = new THREE.Mesh(new THREE.SphereGeometry(r * (on ? 1.4 : 1), 14, 10), new THREE.MeshBasicMaterial({ color: on ? 0x2f8cff : 0xb7791f, depthTest: false }));
+        m.position.set(...pts[v]); m.renderOrder = 4; m.userData = { corner: v, line: s.id };
+        corners.add(m);
+      }
+      if (s.kind === "corner" && pts[s.v]) { at = pts[s.v]; kind = "corner"; }
+    }
     const g = picked();
     if (g.length) {
       // The group's arrows sit above the middle of everything picked.
@@ -314,7 +379,7 @@ export const View3D = () => {
   const bounds = (): THREE.Box3 => {
     const b = new THREE.Box3();
     const p = project();
-    if (sceneData?.parts.length) for (const q of sceneData.parts) { if (q.t1 > q.t0) { b.expandByPoint(W(q.lo)); b.expandByPoint(W(q.hi)); } }
+    if (sceneData?.parts.length) for (const q of sceneData.parts) { if (q.t1 > q.t0 && shown(q)) { b.expandByPoint(W(q.lo)); b.expandByPoint(W(q.hi)); } }
     if (b.isEmpty() && p) { b.expandByPoint(W([p.plot.e[0], p.plot.n[0], 0])); b.expandByPoint(W([p.plot.e[1], p.plot.n[1], 3])); }
     return b;
   };
@@ -370,6 +435,7 @@ export const View3D = () => {
       const { axis, delta } = dragAxis; dragAxis = null; controls.enabled = true; gizmo.position.set(0, 0, 0); host.title = "";
       if (Math.abs(delta) > 1e-9) {
         const d: V3 = [axis[0] * delta, axis[1] * delta, axis[2] * delta], s = sel();
+        if (giz?.kind === "corner" && s?.kind === "corner") { act({ MoveCorner: { line: s.id, corner: s.v, delta: d } }); draw(); return; }
         if (giz?.kind === "group") { act({ MoveGroup: { ids: picked(), delta: d } }); draw(); return; }
         if (s?.kind === "equip") { const eq = project()?.equipment.find(x => x.id === s.id); if (eq) act({ SetEquipment: { ...eq, pos: [eq.pos[0] + d[0], eq.pos[1] + d[1], eq.pos[2] + d[2]] } }); }
         if (s?.kind === "run") act({ MoveRun: { line: s.id, seg: s.seg, delta: d } });
@@ -389,6 +455,11 @@ export const View3D = () => {
       return;
     }
     if (mode() === "place") { const k = placing(); const p = onPlane(e, project()?.plot.ground ?? 0); if (k && p) { const s = project()?.plot.grid ?? 1; act({ AddEquipment: { kind: k, pos: [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0] } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[0] }); }); } setMode("select"); setPlacing(null); return; }
+    if (corners.children.length) {
+      ray.setFromCamera(ndc(e), camera);
+      const c = ray.intersectObjects(corners.children, false)[0];
+      if (c) { setSel({ kind: "corner", id: c.object.userData.line, v: c.object.userData.corner }); return; }
+    }
     const hit = pickPart(e);
     if (!hit) { setSel(null); setPicked([]); return; }
     const [q] = hit;
@@ -397,7 +468,7 @@ export const View3D = () => {
     setPicked([]);
     if (q.line === 0) setSel(q.kind === "nozzle" && e.altKey ? { kind: "equip", id: q.equip } : { kind: "equip", id: q.equip });
     else if (q.item) setSel({ kind: "item", id: q.item, line: q.line });
-    else if (q.kind === "pipe" && sel()?.kind === "line" && sel()!.id === q.line) setSel({ kind: "run", id: q.line, seg: q.seg });
+    else if (q.kind === "pipe" && (sel()?.kind === "line" || sel()?.kind === "run" || sel()?.kind === "corner") && (sel() as { id: number }).id === q.line) setSel({ kind: "run", id: q.line, seg: q.seg });
     else if (q.kind === "pipe" && e.shiftKey) setSel({ kind: "run", id: q.line, seg: q.seg });
     else setSel({ kind: "line", id: q.line });
   };
@@ -433,6 +504,8 @@ export const View3D = () => {
       openMenu(e, [
         { label: "Select the line", run: () => setSel({ kind: "line", id: q.line }) },
         { label: "Select this run", run: () => setSel({ kind: "run", id: q.line, seg: q.seg }), off: q.kind !== "pipe" },
+        { label: "Add a jog here", off: q.kind !== "pipe", run: () => { const pts = out()?.paths.find(x => x[0] === q.line)?.[1]; const a = pts?.[q.seg]; setSel({ kind: "run", id: q.line, seg: q.seg }); C.jog(a ? Math.hypot(at[0] - a[0], at[1] - a[1], at[2] - a[2]) : undefined); } },
+        { label: "Take out this jog", off: q.kind !== "pipe", run: () => { setSel({ kind: "run", id: q.line, seg: q.seg }); C.removeJog(); } },
         "-",
         { label: "Add a component here", sub: ITEMS.map(([k, l]) => ({ label: l, run: () => C.drop(q.line, k, at) })) },
         { label: "Export this line for Datum Pipe (.pcf)", run: () => C.exportPcf(q.line) },
@@ -524,6 +597,9 @@ export const View3D = () => {
   createEffect(on(scene, () => { buildParts(); if (firstScene && scene()) { firstScene = false; fit(); } }, { defer: true }));
   createEffect(on(() => [project()?.plot, project()?.areas, themeTick(), sel()?.kind === "area" ? sel() : null], () => { liveTags = new Set([...liveTags].filter(k => k.startsWith("eq") || k.startsWith("ln"))); buildPlot(); buildLabels(); draw(); }, { defer: true }));
   createEffect(on([sel, picked], paintSelection, { defer: true }));
+  createEffect(on(colourBy, () => buildParts(), { defer: true }));
+  createEffect(on([hidden, isolated], () => applyShown(), { defer: true }));
+  createEffect(on(section, applySection, { defer: true }));
   createEffect(on(() => opts().labels, () => { buildLabels(); draw(); }, { defer: true }));
   createEffect(on(mode, () => { buildPorts(); buildGizmo(); if (mode() !== "route") { setRubber([]); marker.visible = false; } host.style.cursor = mode() === "select" ? "" : "crosshair"; if (mode() !== "measure") setMeasure([]); }, { defer: true }));
   createEffect(on(measure, () => {
@@ -551,7 +627,13 @@ export const View3D = () => {
       <Show when={mode() === "route"}><div class="toolhint">{route()?.start ? "Click to add a corner (orthogonal to the last point) · click a nozzle to end there · double-click or right-click to end at a free point · Esc to cancel" : "Click a nozzle, a tee's branch end or a point on the plot to start the line"}<span class="muted"> · Elevation {fmt("coord", elev())} · Shift: use the working elevation</span></div></Show>
       <Show when={mode() === "measure"}><div class="toolhint">{measure().length === 2 ? (() => { const [a, b] = measure(); const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; return <span><b>{fmt("len", Math.hypot(d[0], d[1], d[2]))}</b> · ΔE {fmt("len", d[0])} · ΔN {fmt("len", d[1])} · ΔEL {fmt("len", d[2])} · horizontal {fmt("len", Math.hypot(d[0], d[1]))}</span>; })() : measure().length === 1 ? "Click the second point" : "Measure: click a point on a part or on the plot"}<span class="muted"> · Esc to finish</span></div></Show>
       <Show when={mode() === "place"}><div class="toolhint">Click on the plot to place the {placing()?.replace("_", " ")} · Esc to cancel</div></Show>
-      <Show when={selLine() && sel()?.kind === "line"}><div class="toolhint sub">Click a straight run of the line to move it along an axis · drag components from the catalogue onto the pipe</div></Show>
+      <Show when={selLine() && sel()?.kind === "line"}><div class="toolhint sub">Click a straight run to move it · click an amber corner dot to move the corner · Piping › Add Jog steps a run over an obstacle · drag components from the catalogue onto the pipe</div></Show>
+      <Show when={sel()?.kind === "corner"}><div class="toolhint sub">Corner {(sel() as { v: number }).v + 1}: drag its arrows to move it; the runs on both sides stay square · Esc or click elsewhere to finish</div></Show>
+      <Show when={legend().length}><div class="legend"><b>{({ line: "Line", class: "Pipe class", fluid: "Fluid", size: "Size" } as Record<string, string>)[colourBy()]}</b><For each={legend().slice(0, 16)}>{([k, c]) => <span><i style={{ background: c }} />{k}</span>}</For>{legend().length > 16 && <span class="muted">+{legend().length - 16} more</span>}</div></Show>
+      <Show when={section()}><div class="secbox"><b>Section box</b>
+        <For each={[["E", 0], ["N", 1], ["EL", 2]] as [string, number][]}>{([n, k]) => <label>{n}<input type="number" step="0.5" value={+toU("coord", section()!.lo[k]).toFixed(2)} onChange={e => { const v = fromU("coord", +e.currentTarget.value), s = section()!; if (Number.isFinite(v) && v < s.hi[k]) { const lo = [...s.lo] as V3; lo[k] = v; setSection({ lo, hi: s.hi }); } }} />to<input type="number" step="0.5" value={+toU("coord", section()!.hi[k]).toFixed(2)} onChange={e => { const v = fromU("coord", +e.currentTarget.value), s = section()!; if (Number.isFinite(v) && v > s.lo[k]) { const hi = [...s.hi] as V3; hi[k] = v; setSection({ lo: s.lo, hi }); } }} /><span class="unit">{unit("coord")}</span></label>}</For>
+        <button class="btn" onClick={() => setSection(null)}>Turn off</button></div></Show>
+      <Show when={hidden().length || isolated()}><div class="hidnote">{isolated() ? `Showing ${isolated()!.length} item${isolated()!.length === 1 ? "" : "s"} only` : `${hidden().length} hidden`} · <a onClick={() => C.showAll()}>Show all</a></div></Show>
     </div>
   );
 };

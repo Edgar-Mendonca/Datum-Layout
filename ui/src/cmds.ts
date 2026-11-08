@@ -1,6 +1,6 @@
 // Commands: what the ribbon, menus, keys and Tell Me run.
 import { Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
-import { picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
+import { hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
 import * as D from "./dialogs";
 import { RouteFrom } from "./store";
 
@@ -69,6 +69,40 @@ export const C = {
   rotateGroup: (deg: number) => C.groupOp("turn them", ids => ({ RotateGroup: { ids, about: C.centre(ids), deg } })),
   mirrorGroup: (eastWest: boolean) => C.groupOp("mirror them", ids => ({ MirrorGroup: { ids, about: C.centre(ids), east_west: eastWest } })),
   deleteGroup: (): void => { const ids = C.targets(); if (!ids.length) { C.del(); return; } act({ Delete: { ids } }).then(o => { if (o) { setPicked([]); setSel(null); } }); },
+
+  // ---------- corners and jogs ----------
+  /** The selected straight run: its line, index and end points. */
+  runOf: () => {
+    const s = sel(); if (s?.kind !== "run") return null;
+    const pts = out()?.paths.find(x => x[0] === s.id)?.[1]; if (!pts || s.seg + 1 >= pts.length) return null;
+    return { line: s.id, seg: s.seg, a: pts[s.seg], b: pts[s.seg + 1] };
+  },
+  /** Adds a jog to the selected run, centred `at` metres along it (its middle by default): up a metre on a level run, east on a vertical one. */
+  jog: (at?: number) => {
+    const r = C.runOf(); if (!r) return toast("Select one straight run of a line (click the line, then the run), then add a jog.");
+    const L = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1], r.b[2] - r.a[2]);
+    const vertical = Math.abs(r.b[2] - r.a[2]) > L * 0.5;
+    const half = Math.min(L * 0.2, 1.5), c = Math.min(Math.max(at ?? L / 2, half + 0.05 * L), L * 0.95 - half);
+    act({ Jog: { line: r.line, seg: r.seg, s0: c - half, s1: c + half, delta: vertical ? [1, 0, 0] : [0, 0, 1] } })
+      .then(o => { if (o) { setSel({ kind: "run", id: r.line, seg: r.seg + 2 }); toast("Jog added: drag its middle run with the arrows to place it.", true); } });
+  },
+  removeJog: () => {
+    const s = sel(); if (s?.kind !== "run") return toast("Select the middle run of a jog, then take the jog out.");
+    act({ RemoveJog: { line: s.id, seg: s.seg } }).then(o => o && setSel({ kind: "line", id: s.id }));
+  },
+
+  // ---------- what the view shows ----------
+  hide: () => { const ids = C.targets(); if (!ids.length) return toast("Select equipment or lines to hide (Ctrl+click adds more)."); setHidden([...new Set([...hidden(), ...ids])]); setSel(null); setPicked([]); },
+  isolate: () => { const ids = C.targets(); if (!ids.length) return toast("Select equipment or lines to show on their own."); setHidden([]); setIsolated(ids); setTimeout(fitHook, 30); },
+  showAll: () => { setHidden([]); setIsolated(null); },
+  /** A section box around the selection (or the whole plant), or off again. */
+  sectionBox: () => {
+    if (section()) return setSection(null);
+    const ids = C.targets(), parts = (scene()?.parts ?? []).filter(q => q.t1 > q.t0 && (!ids.length || ids.includes(q.line || q.equip)));
+    if (!parts.length) return toast("Nothing to put a section box round.");
+    const m = 0.5;
+    setSection({ lo: [0, 1, 2].map(k => Math.min(...parts.map(q => q.lo[k])) - m) as V3, hi: [0, 1, 2].map(k => Math.max(...parts.map(q => q.hi[k])) + m) as V3 });
+  },
 
   // ---------- equipment ----------
   /** Click on the plot to place an item of this kind. */
@@ -173,6 +207,8 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Check clashes and errors", C.check, "F5"], ["Export the plant for Datum Pipe (.pcf)", () => C.exportPcf()], ["Export the selected line for Datum Pipe", () => { const l = selLine(); if (l) C.exportPcf(l.id); else toast("Select a line first."); }],
   ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")],
   ["SI units", () => C.units("SI")], ["US units", () => C.units("US")], ["Add an area", C.addArea], ["Plot settings", C.selectPlot],
+  ["Add a jog to the selected run", () => C.jog(), "J"], ["Take the jog out", () => C.removeJog()],
+  ["Hide the selection", () => C.hide(), "H"], ["Show only the selection (isolate)", () => C.isolate(), "I"], ["Show everything", () => C.showAll(), "Shift+H"], ["Section box", () => C.sectionBox()],
   ["Measure a distance", () => C.measure(), "M"], ["Fit the plant", C.fit, "F"], ["Isometric view", () => C.std("iso"), "1"], ["Plan view", () => C.std("plan"), "2"], ["Front view (from the south)", () => C.std("front"), "3"], ["Side view (from the east)", () => C.std("side"), "4"],
   ["Options", () => setBackstage("options")], ["Check for updates", () => setBackstage("about")], ["Roadmap", () => setBackstage("roadmap")],
   ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started", () => D.gettingStarted()], ["Glossary", () => D.glossary()],

@@ -2,7 +2,7 @@
 // Check · Lists · View · Help, and the contextual Format tab for a selected line or equipment).
 // Copied from Datum Plan's ribbon by way of Datum Pipe.
 import { For, Show, JSX, createSignal, createMemo, onMount } from "solid-js";
-import { picked, call, out, project, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, sel, opts, setOpts, selLine, selEquip, mode, elev, setElev, setBottom, checked, act } from "./store";
+import { colourBy, setColourBy, ColourBy, section, hidden, isolated, picked, call, out, project, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, sel, opts, setOpts, selLine, selEquip, mode, elev, setElev, setBottom, checked, act } from "./store";
 import { C, ALL_CMDS } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
@@ -127,6 +127,7 @@ export const Ribbon = () => {
           <label class="rsel">Class<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, class: e.currentTarget.value } })}><For each={catalogue()?.cat.classes ?? []}>{c => <option value={c.name} selected={p()?.settings.class === c.name}>{c.name}</option>}</For></select></label>
           <label class="rsel">Rating<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, rating: +e.currentTarget.value } })}><For each={RATINGS}>{r => <option value={r} selected={p()?.settings.rating === r}>Class {r}</option>}</For></select></label>
         </S></G>
+        <G l="Corners" h="corners"><B big i="jog" l="Add Jog" run={() => C.jog()} off={sel()?.kind !== "run"} title="Step the selected run up (or sideways) with four elbows, to pass over or round something (J)" /><S><B i="straight" l="Remove Jog" run={C.removeJog} off={sel()?.kind !== "run"} title="Straighten the jog whose middle run is selected" /><div class="rnote">Select a line to drag its corners</div></S></G>
         <G l="Line Size" h="resize"><B big i="resize" l="Size" dd={sizeMenu} off={!selLine()} title="Change the selected line's size: every component re-sizes" /><S><B i="up" l="One size larger" run={() => C.step(true)} off={!selLine()} /><B i="down" l="One size smaller" run={() => C.step(false)} off={!selLine()} /></S></G>
         <G l="Elbows" h="elbows"><S><B i="elbow" l="Long radius" on={selLine()?.radius === "long"} run={() => C.radius("long")} off={!selLine()} /><B i="elbow" l="Short radius" on={selLine()?.radius === "short"} run={() => C.radius("short")} off={!selLine()} /></S></G>
         <G l="Supports"><Planned big i="support" l="Pipe Supports" v="0.3" /></G>
@@ -151,7 +152,10 @@ export const Ribbon = () => {
       <Show when={tab() === "view"}>
         <G l="Zoom" h="view"><B big i="fit" l="Fit" run={C.fit} /><B big i="measure" l="Measure" on={mode() === "measure"} run={C.measure} title="Measure a distance between two points (M)" /></G>
         <G l="Standard Views" h="view"><B big i="cube" l="Isometric" run={() => C.std("iso")} /><S><B i="plan" l="Plan (from above)" run={() => C.std("plan")} /><B i="front" l="Front (from south)" run={() => C.std("front")} /><B i="side" l="Side (from east)" run={() => C.std("side")} /></S></G>
-        <G l="Show" h="view"><S><label class="chk"><input type="checkbox" checked={opts().labels} onChange={e => setOpts({ ...opts(), labels: e.currentTarget.checked })} />Tags and line numbers</label></S></G>
+        <G l="Show" h="show"><S><label class="chk"><input type="checkbox" checked={opts().labels} onChange={e => setOpts({ ...opts(), labels: e.currentTarget.checked })} />Tags and line numbers</label>
+          <label class="rsel">Colour by<select class="colourby" onChange={e => setColourBy(e.currentTarget.value as ColourBy)}><For each={[["kind", "Part kind"], ["line", "Line"], ["class", "Pipe class"], ["fluid", "Fluid"], ["size", "Size"]] as [ColourBy, string][]}>{([k, l]) => <option value={k} selected={colourBy() === k}>{l}</option>}</For></select></label></S>
+          <S><B i="hide" l="Hide" run={C.hide} off={!sel() && !picked().length} title="Hide the selection (H)" /><B i="isolate" l="Isolate" run={C.isolate} off={!sel() && !picked().length} title="Show only the selection (I)" /><B i="showall" l="Show All" run={C.showAll} off={!hidden().length && !isolated()} title="Show everything again (Shift+H)" /></S>
+          <B big i="section" l="Section Box" on={!!section()} run={C.sectionBox} title="Draw only what is inside a box round the selection or the whole plant" /></G>
         <G l="Plot" h="plot"><B big i="grid" l="Plot" run={C.selectPlot} title="Grid, extent, north and ground in the Inspector" /><B big i="area" l="Add Area" run={C.addArea} /></G>
         <G l="Walk"><Planned big i="walk" l="Walk Through" v="a later release" /></G>
       </Show>

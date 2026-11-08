@@ -33,6 +33,16 @@ pub enum Op {
     SetLine(Line),
     /// Moves one straight run square to itself; the runs on either side stretch and the elbows follow.
     MoveRun { line: u32, seg: usize, delta: P3 },
+    /// Moves one corner (index into the line's path): the runs on both sides stay parallel to
+    /// themselves, so the route stays square. A corner next to a nozzle or tee only slides along
+    /// the run that leaves it.
+    MoveCorner { line: u32, corner: usize, delta: P3 },
+    /// Offsets the part of run `seg` between `s0` and `s1` (metres from its start) by `delta`
+    /// (square to the run): four new corners make a jog, e.g. to pass over or round an obstacle.
+    Jog { line: u32, seg: usize, s0: f64, s1: f64, delta: P3 },
+    /// Takes a jog out again: run `seg` moves back in line by the shorter of its two legs, and
+    /// corners left in a straight line are removed.
+    RemoveJog { line: u32, seg: usize },
     /// A component dropped near `at`: it snaps onto the nearest free place on the line, takes the
     /// line's size and class, and splits the pipe.
     Drop { line: u32, kind: ItemKind, at: P3, dir: P3, nps2: String },
@@ -211,6 +221,33 @@ fn pass_along(pts: &mut [P3], delta: P3, move_last: bool, min_len: f64) -> P3 {
     if move_last { [0.0; 3] } else { d }
 }
 
+/// Removes zero-length runs and corners in a straight line; components keep their place.
+pub fn tidy(l: &mut Line) {
+    let pts = &l.pts;
+    if pts.len() < 3 { return; }
+    let mut np = vec![pts[0]];
+    let mut map = vec![(0usize, 0.0f64); pts.len() - 1];
+    for i in 0..pts.len() - 1 {
+        let last = *np.last().unwrap_or(&pts[i]);
+        let b = pts[i + 1];
+        let k = np.len();
+        if norm(sub(b, last)) < 1e-6 {
+            map[i] = if k >= 2 { (k - 2, norm(sub(last, np[k - 2]))) } else { (0, 0.0) };
+        } else if k >= 2 && dot(unit(sub(b, last)), unit(sub(last, np[k - 2]))) > 1.0 - 1e-9 {
+            map[i] = (k - 2, norm(sub(last, np[k - 2])));
+            np[k - 1] = b;
+        } else {
+            map[i] = (k - 1, 0.0);
+            np.push(b);
+        }
+    }
+    if np.len() < 2 { return; }
+    for it in l.items.iter_mut() {
+        if let Some(&(s, off)) = map.get(it.seg) { it.seg = s; it.at += off; }
+    }
+    l.pts = np;
+}
+
 fn line_mut(p: &mut Project, id: u32) -> Result<&mut Line, String> {
     p.lines.iter_mut().find(|l| l.id == id).ok_or_else(|| "That line no longer exists.".to_string())
 }
@@ -342,6 +379,77 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             l.pts[seg] = add(l.pts[seg], d);
             l.pts[seg + 1] = add(l.pts[seg + 1], d);
             // A free end moved with its run gets a new leg only if it is not the run itself.
+        }
+        Op::MoveCorner { line, corner, delta } => {
+            let pts = route::path(p, cat, p.line(line).ok_or("That line no longer exists.")?);
+            let l = line_mut(p, line)?;
+            l.pts = pts;
+            let n = l.pts.len() - 1;
+            if corner == 0 || corner >= n { return Err("Line ends move with their nozzle or tee; pick a corner between two runs.".into()); }
+            let fixed = |e: &End| !matches!(e, End::Point { .. });
+            let (u1, u2) = (unit(sub(l.pts[corner], l.pts[corner - 1])), unit(sub(l.pts[corner + 1], l.pts[corner])));
+            let mut d = delta;
+            // The corner before or after may be a nozzle or tee: then only slide along that run.
+            if corner == 1 && fixed(&l.from) { d = mul(u1, dot(d, u1)); }
+            if corner + 1 == n && fixed(&l.to) { d = mul(u2, dot(d, u2)); }
+            if norm(d) < 1e-9 { return Err("This corner is held by the nozzles or tees at both ends; add a jog to the run instead.".into()); }
+            let perp = |u: P3| sub(d, mul(u, dot(d, u)));
+            l.pts[corner - 1] = add(l.pts[corner - 1], perp(u1));
+            l.pts[corner] = add(l.pts[corner], d);
+            l.pts[corner + 1] = add(l.pts[corner + 1], perp(u2));
+            // Components measure from their run's start: the run after the corner starts later or earlier.
+            let shift = dot(d, u2);
+            let len = norm(sub(l.pts[corner + 1], l.pts[corner]));
+            for it in l.items.iter_mut().filter(|i| i.seg == corner) { it.at = (it.at - shift).clamp(0.0, len); }
+            if l.pts.windows(2).any(|w| norm(sub(w[1], w[0])) < 1e-6) { return Err("That would fold a run back onto itself.".into()); }
+        }
+        Op::Jog { line, seg, s0, s1, delta } => {
+            let pts = route::path(p, cat, p.line(line).ok_or("That line no longer exists.")?);
+            let l = line_mut(p, line)?;
+            l.pts = pts;
+            if seg + 1 >= l.pts.len() { return Err("That run no longer exists.".into()); }
+            let (a, b) = (l.pts[seg], l.pts[seg + 1]);
+            let len = norm(sub(b, a));
+            let u = unit(sub(b, a));
+            let d = sub(delta, mul(u, dot(delta, u)));
+            if norm(d) < 1e-3 { return Err("A jog goes square to the run: up, down or sideways.".into()); }
+            if !(s0 > 1e-6 && s1 > s0 + 1e-6 && s1 < len - 1e-6) { return Err("The jog must lie inside the run.".into()); }
+            // Each turn needs an elbow's room clear of every component on the run.
+            let lc = l.clone();
+            for it in lc.items.iter().filter(|i| i.seg == seg) {
+                let nps = route::size_at(&lc, seg, it.at);
+                let room = cat.fitting(&nps).map(|f| f.elbow_lr).unwrap_or(cat.od(&nps) * 1.5);
+                let half = route::item_len(cat, &lc, it, &nps) / 2.0 + room;
+                let mid = it.at;
+                if (mid - s0).abs() < half || (mid - s1).abs() < half {
+                    return Err("A component is where the jog would turn; place the jog clear of it.".into());
+                }
+            }
+            let l = line_mut(p, line)?;
+            let (p0, p1) = (add(a, mul(u, s0)), add(a, mul(u, s1)));
+            l.pts.splice(seg + 1..seg + 1, [p0, add(p0, d), add(p1, d), p1]);
+            for it in l.items.iter_mut() {
+                if it.seg > seg { it.seg += 4; }
+                else if it.seg == seg && it.at > s1 { it.seg += 4; it.at -= s1; }
+                else if it.seg == seg && it.at >= s0 { it.seg += 2; it.at -= s0; }
+            }
+        }
+        Op::RemoveJog { line, seg } => {
+            let pts = route::path(p, cat, p.line(line).ok_or("That line no longer exists.")?);
+            let l = line_mut(p, line)?;
+            l.pts = pts;
+            let n = l.pts.len() - 1;
+            if seg == 0 || seg + 1 >= n { return Err("Pick the middle run of a jog: a run with a turn at both ends.".into()); }
+            let (v0, v1, v2, v3) = (l.pts[seg - 1], l.pts[seg], l.pts[seg + 1], l.pts[seg + 2]);
+            let (a, b) = (sub(v1, v0), sub(v3, v2));
+            if dot(unit(a), unit(b)) > -1.0 + 1e-6 { return Err("This run is not the middle of a jog (its two legs do not go opposite ways).".into()); }
+            let m = norm(a).min(norm(b));
+            let back = mul(unit(a), -m);
+            let short = if norm(a) <= norm(b) { seg - 1 } else { seg + 1 };
+            if l.items.iter().any(|i| i.seg == short) { return Err("A component is on the jog's leg; move or delete it first.".into()); }
+            l.pts[seg] = add(v1, back);
+            l.pts[seg + 1] = add(v2, back);
+            tidy(l);
         }
         Op::Drop { line, kind, at, dir, nps2 } => {
             let l = p.line(line).ok_or("That line no longer exists.")?.clone();

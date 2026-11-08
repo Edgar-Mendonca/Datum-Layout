@@ -206,7 +206,7 @@ export const Inspector = () => {
         </Show>
         <Show when={project() && !picked().length}>
           <Show when={selEquip()} keyed>{e => <EquipInsp e={e} />}</Show>
-          <Show when={(sel()?.kind === "line" || sel()?.kind === "run") && selLine()} keyed>{l => <LineInsp l={l} />}</Show>
+          <Show when={(sel()?.kind === "line" || sel()?.kind === "run" || sel()?.kind === "corner") && selLine()} keyed>{l => <LineInsp l={l} />}</Show>
           <Show when={sel()?.kind === "item" && selLine()} keyed>{l => <ItemInsp l={l} id={(sel() as any).id} />}</Show>
           <Show when={sel()?.kind === "area"}><AreaInsp id={(sel() as any).id} /></Show>
           <Show when={!sel() || sel()!.kind === "plot"}><PlotInsp /></Show>

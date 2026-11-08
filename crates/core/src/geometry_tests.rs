@@ -6,7 +6,8 @@ use crate::catalogue::{Catalogue, NPS};
 use crate::checks::{connection_issues, connections};
 use crate::doc::{Doc, Op, RouteEnd};
 use crate::model::{End, EquipKind, Item, ItemKind, Line, Project, Radius, Term, P3};
-use crate::parts::{dist, dot, Shape};
+use crate::parts::{dist, dot, norm, sub, Shape};
+use crate::route;
 use crate::route::{build, Built};
 
 fn line(nps: &str, pts: Vec<P3>, items: Vec<Item>) -> Project {
@@ -390,4 +391,60 @@ fn groups_move_copy_rotate_and_mirror_cleanly() {
     d.apply(Op::MoveGroup { ids: pumps, delta: [0.5, 0.0, 0.0] }, &cat).unwrap();
     let b = build(&d.p, &cat);
     assert!(connection_issues(&d.p, &cat, &b).is_empty());
+}
+
+#[test]
+fn corners_move_and_jogs_come_and_go_cleanly() {
+    let cat = Catalogue::builtin();
+    let clean = |d: &Doc| { let b = build(&d.p, &cat); assert!(b.issues.is_empty(), "{:?}", b.issues); assert!(connection_issues(&d.p, &cat, &b).is_empty()); joints_ok(&b); };
+    let base = crate::examples::get("pumps").unwrap();
+    // Every line: jog the longest run up by a metre in its middle third, then take the jog out.
+    let mut jogged = 0;
+    for l in &base.lines {
+        let mut d = Doc::new(base.clone());
+        let pts = route::path(&d.p, &cat, &l.clone());
+        let (seg, len) = (0..pts.len() - 1).map(|i| (i, norm(sub(pts[i + 1], pts[i])))).fold((0, 0.0), |a, b| if b.1 > a.1 { b } else { a });
+        if len < 3.0 { continue; }
+        let up = if (pts[seg + 1][2] - pts[seg][2]).abs() > 1e-6 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] };
+        let items = d.p.line(l.id).unwrap().items.len();
+        let before: Vec<P3> = route::build(&d.p, &cat).parts.iter().filter(|q| q.line == l.id && q.item != 0 && !q.ports.is_empty()).map(|q| q.ports[0].p).collect();
+        match d.apply(Op::Jog { line: l.id, seg, s0: len / 3.0, s1: 2.0 * len / 3.0, delta: up }, &cat) {
+            Err(e) if e.contains("component") => continue,
+            r => { r.unwrap(); jogged += 1; }
+        }
+        clean(&d);
+        assert_eq!(d.p.line(l.id).unwrap().pts.len(), pts.len() + 4);
+        assert_eq!(d.p.line(l.id).unwrap().items.len(), items);
+        d.apply(Op::RemoveJog { line: l.id, seg: seg + 2 }, &cat).unwrap();
+        clean(&d);
+        assert_eq!(d.p.line(l.id).unwrap().pts.len(), pts.len(), "{}", l.number);
+        // Components are back where they were.
+        let after: Vec<P3> = route::build(&d.p, &cat).parts.iter().filter(|q| q.line == l.id && q.item != 0 && !q.ports.is_empty()).map(|q| q.ports[0].p).collect();
+        assert_eq!(before.len(), after.len());
+        for (a, b) in before.iter().zip(&after) { assert!(norm(sub(*a, *b)) < 1e-6, "{a:?} {b:?}"); }
+    }
+    assert!(jogged >= 2, "{jogged}");
+    // Drag a corner of a free-ended line: both runs stay square.
+    let mut d = Doc::new(base.clone());
+    let l = d.p.lines.iter().find(|l| l.pts.len() >= 4).unwrap().clone();
+    let pts = route::path(&d.p, &cat, &l);
+    let c = (1..pts.len() - 1).find(|&c| c > 1 && c + 1 < pts.len() - 1).unwrap_or(1);
+    let r = d.apply(Op::MoveCorner { line: l.id, corner: c, delta: [0.3, 0.3, 0.3] }, &cat);
+    if r.is_ok() {
+        let b = build(&d.p, &cat);
+        assert!(b.issues.iter().all(|i| !i.text.contains("a turn of") && !i.text.contains("square")), "{:?}", b.issues);
+    }
+    // A corner can't move off a held end.
+    assert!(d.apply(Op::MoveCorner { line: l.id, corner: 0, delta: [1.0, 0.0, 0.0] }, &cat).is_err());
+    // Remove a jog where there is none.
+    assert!(d.apply(Op::RemoveJog { line: l.id, seg: 0 }, &cat).is_err());
+}
+
+#[test]
+fn tidy_merges_straight_corners_and_keeps_components() {
+    let mut l = Line { pts: vec![[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 3.0, 0.0]], ..Default::default() };
+    l.items.push(Item { id: 9, uid: String::new(), kind: ItemKind::Gate, seg: 2, at: 1.0, nps2: String::new(), dir: [0.0, 0.0, 1.0], tag: String::new() });
+    crate::doc::tidy(&mut l);
+    assert_eq!(l.pts, vec![[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 3.0, 0.0]]);
+    assert_eq!((l.items[0].seg, l.items[0].at), (0, 3.0));
 }

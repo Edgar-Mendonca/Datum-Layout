@@ -181,6 +181,60 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.keyboard.press("Control+z"); await p.keyboard.press("Control+z"); await settle(600);
   check("undo takes the copy away again", (await state()).p.equipment.length === 3);
 
+  // 7d. Corners, jogs and what the view shows (0.1.7).
+  await open("pumps");
+  st = await state();
+  // A level run of 3 m or more with nothing on it, whose middle is in view.
+  let cand = null;
+  for (const l of st.p.lines) {
+    const ps = st.paths.find(x => x[0] === l.id)[1];
+    for (let i = 0; i + 1 < ps.length && !cand; i++) {
+      const L = Math.hypot(...[0, 1, 2].map(j => ps[i + 1][j] - ps[i][j]));
+      if (L >= 3 && Math.abs(ps[i + 1][2] - ps[i][2]) < 1e-6 && !l.items.some(it => it.seg === i)) cand = { l, i, ps, mid: [0, 1, 2].map(j => (ps[i][j] + ps[i + 1][j]) / 2) };
+    }
+  }
+  check("example 1 has a clear level run to jog", !!cand);
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(cand.l.number)})`); await settle(300);
+  const ms = await screenOf(cand.mid);
+  await p.mouse.click(ms.x, ms.y); await settle(300);
+  await p.keyboard.press("j"); await settle(800);
+  st = await state();
+  const jl = st.p.lines.find(l => l.id === cand.l.id);
+  check("J adds a jog with four corners to the selected run", st.paths.find(x => x[0] === jl.id)[1].length === cand.ps.length + 4, JSON.stringify(await calls("apply")).slice(-300));
+  check("the jog routes cleanly", !st.issues.length, JSON.stringify(st.issues.map(i => i.text)));
+  await p.click('.tabs > button:has-text("Piping")'); await p.click('.rb:has-text("Remove Jog")'); await settle(800);
+  st = await state();
+  check("Remove Jog straightens it again", st.paths.find(x => x[0] === jl.id)[1].length === cand.ps.length && !st.issues.length, JSON.stringify(st.issues.map(i => i.text)));
+  // A selected line shows its corners; clicking one selects it.
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(cand.l.number)})`); await settle(300);
+  const cs = await screenOf(cand.ps[1]);
+  await p.mouse.click(cs.x, cs.y); await settle(300);
+  check("clicking a corner dot selects the corner", ((await p.$(".toolhint.sub")) && (await p.textContent(".toolhint.sub")).includes("Corner 2")), await p.textContent(".v3d"));
+  if (shots) await shot("corner");
+  // Colour by line: a key with every line.
+  await p.click('.tabs > button:has-text("View")'); await p.selectOption("select.colourby", "line"); await settle(500);
+  check("colour by line shows a key with every line", (await p.$$(".legend span")).length === st.p.lines.length, String((await p.$$(".legend span")).length));
+  if (shots) await shot("colour-by-line");
+  await p.selectOption("select.colourby", "kind"); await settle(300);
+  check("colour by part kind has no key", !(await p.$(".legend")));
+  // Hide, isolate, show all.
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(cand.l.number)})`); await settle(300);
+  await p.keyboard.press("h"); await settle(300);
+  check("H hides the selected line", (await p.textContent(".hidnote")).includes("1 hidden"));
+  await p.keyboard.press("Shift+H"); await settle(300);
+  check("Shift+H shows everything again", !(await p.$(".hidnote")));
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(cand.l.number)})`); await settle(300);
+  await p.keyboard.press("i"); await settle(400);
+  check("I shows only the selected line", (await p.textContent(".hidnote")).includes("Showing 1 item only"));
+  await p.click('.hidnote a'); await settle(300);
+  // The section box round the whole plant, then off.
+  await p.click('.tabs > button:has-text("View")'); await p.click('.rb:has-text("Section Box")'); await settle(400);
+  check("Section Box opens its panel", !!(await p.$(".secbox")));
+  if (shots) await shot("section-box");
+  await p.click('.secbox button:has-text("Turn off")'); await settle(300);
+  check("the section box turns off", !(await p.$(".secbox")));
+
   // 7b. Turn the tank in example 1: its suction line is reported skewed; Route Again squares it.
   await open("pumps");
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(300);

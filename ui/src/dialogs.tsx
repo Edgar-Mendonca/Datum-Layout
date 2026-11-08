@@ -29,7 +29,7 @@ export const shortcuts = () => openDialog(() => (
       ["Save / Save As", "Ctrl+S / Ctrl+Shift+S"], ["Open", "Ctrl+O"], ["New", "Ctrl+N"], ["Print", "Ctrl+P"], ["Tell me what you want to do", "Ctrl+K"],
       ["Undo / Redo", "Ctrl+Z / Ctrl+Y"], ["Delete what is selected", "Del"], ["Route a line", "R"], ["Working elevation up / down one grid step", "PgUp / PgDn"],
       ["Cancel the tool", "Esc"], ["Check clashes and errors", "F5"], ["Fit the plant in the view", "F"], ["Standard views: iso, plan, front, side", "1 2 3 4"],
-      ["Orbit / pan / zoom", "Left drag / right or middle drag / wheel"], ["Select one run of the selected line", "Click its pipe (or Shift+click)"], ["This list", "F1"],
+      ["Orbit / pan / zoom", "Left drag / right or middle drag / wheel"], ["Select one run of the selected line", "Click its pipe (or Shift+click)"], ["Add a jog to the selected run", "J"], ["Hide / show only / show everything", "H / I / Shift+H"], ["This list", "F1"],
     ] as [string, string][]}>{([a, b]) => <tr><td>{a}</td><td><kbd>{b}</kbd></td></tr>}</For></tbody></table>
   </Dialog>
 ));

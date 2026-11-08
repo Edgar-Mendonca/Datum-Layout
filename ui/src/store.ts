@@ -24,6 +24,7 @@ export const setOut = (o: Out | null | undefined) => {
     const s = sel(), p = o.p;
     if (s) {
       const ok = s.kind === "equip" || s.kind === "nozzle" ? p.equipment.some(e => e.id === s.id) && (s.kind !== "nozzle" || p.equipment.find(e => e.id === s.id)!.nozzles.some(n => n.tag === s.tag))
+        : s.kind === "corner" ? p.lines.some(l => l.id === s.id && s.v > 0 && s.v < l.pts.length - 1)
         : s.kind === "line" || s.kind === "run" ? p.lines.some(l => l.id === s.id && (s.kind !== "run" || (s.seg ?? 0) < l.pts.length - 1))
         : s.kind === "item" ? p.lines.some(l => l.id === s.line && l.items.some(i => i.id === s.id))
         : s.kind === "area" ? p.areas.some(a => a.id === s.id) : true;
@@ -55,15 +56,25 @@ export const [bottom, setBottom] = createSignal<"lines" | "equipment" | "clashes
 /** What is selected: equipment, one of its nozzles, a line, one straight run of it, a component on it, an area, or the plot. */
 export type Sel =
   | { kind: "equip"; id: number } | { kind: "nozzle"; id: number; tag: string } | { kind: "line"; id: number }
-  | { kind: "run"; id: number; seg: number } | { kind: "item"; id: number; line: number } | { kind: "area"; id: number } | { kind: "plot"; id: 0 };
+  | { kind: "run"; id: number; seg: number } | { kind: "corner"; id: number; v: number } | { kind: "item"; id: number; line: number } | { kind: "area"; id: number } | { kind: "plot"; id: 0 };
 export const [sel, setSel] = createSignal<Sel | null>(null);
 /** A group of equipment and line ids picked with Ctrl+click (or Ctrl+A); empty when none. */
 export const [picked, setPicked] = createSignal<number[]>([]);
-export const selLine = (): Line | undefined => { const s = sel(), p = project(); if (!s || !p) return; const id = s.kind === "item" ? s.line : s.kind === "line" || s.kind === "run" ? s.id : -1; return p.lines.find(l => l.id === id); };
+export const selLine = (): Line | undefined => { const s = sel(), p = project(); if (!s || !p) return; const id = s.kind === "item" ? s.line : s.kind === "line" || s.kind === "run" || s.kind === "corner" ? s.id : -1; return p.lines.find(l => l.id === id); };
 export const selEquip = (): Equipment | undefined => { const s = sel(), p = project(); if (!s || !p || (s.kind !== "equip" && s.kind !== "nozzle")) return; return p.equipment.find(e => e.id === s.id); };
 export const selItem = (): Item | undefined => { const s = sel(); if (s?.kind !== "item") return; return selLine()?.items.find(i => i.id === s.id); };
 /** Something to zoom to (set by the lists and checks; the 3D view follows). */
 export const [focus, setFocus] = createSignal<{ at: V3; r: number } | null>(null);
+
+// ---------- what the view shows ----------
+/** Parts coloured by their kind, or each line's parts by its number, class, fluid or size. */
+export type ColourBy = "kind" | "line" | "class" | "fluid" | "size";
+export const [colourBy, setColourBy] = createSignal<ColourBy>("kind");
+/** Equipment and line ids hidden; or, when isolated, the only ones shown. */
+export const [hidden, setHidden] = createSignal<number[]>([]);
+export const [isolated, setIsolated] = createSignal<number[] | null>(null);
+/** The section box (plant axes): only what is inside it is drawn. */
+export const [section, setSection] = createSignal<{ lo: V3; hi: V3 } | null>(null);
 
 // ---------- tools ----------
 /** select: pick and move; route: click a path; place: put the dragged or chosen equipment down. */
@@ -88,7 +99,7 @@ export const call = async <T = any>(cmd: string, args?: object): Promise<T | und
 export const [loaded, setLoaded] = createSignal(0);
 export const loadOut = async (cmd: string, args?: object) => {
   const o = await call<Out | null>(cmd, args);
-  if (o) batch(() => { setLoaded(n => n + 1); setPicked([]); setSel(null); setChecked(null); setCheckStale(false); setMode("select"); setRoute(null); setOut(o); setBackstage(null); });
+  if (o) batch(() => { setLoaded(n => n + 1); setPicked([]); setHidden([]); setIsolated(null); setSection(null); setSel(null); setChecked(null); setCheckStale(false); setMode("select"); setRoute(null); setOut(o); setBackstage(null); });
   return o;
 };
 
