@@ -1,12 +1,22 @@
 // Commands: what the ribbon, menus, keys and Tell Me run.
-import { Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
-import { hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
+import { SavedView, Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
+import { colourBy, setColourBy, ColourBy, isolated, hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
 import * as D from "./dialogs";
 import { RouteFrom } from "./store";
 
 let fitHook: () => void = () => {};
 export const setFit = (f: () => void) => { fitHook = f; };
 let viewHook: (v: string) => void = () => {};
+/** The 3D view's camera, for saved views. */
+let camHook: { get: () => { eye: V3; target: V3 }; set: (eye: V3, target: V3) => void } | null = null;
+export const setCamHook = (h: typeof camHook) => { camHook = h; };
+
+/** Asks for a file and gives its text (WebView file input; nothing leaves the computer). */
+export const pickText = (accept: string) => new Promise<string | null>(ok => {
+  const i = document.createElement("input"); i.type = "file"; i.accept = accept; i.style.display = "none";
+  i.onchange = () => { const f = i.files?.[0]; i.remove(); if (!f) return ok(null); if (f.size > 64e6) { toast("That file is too large (over 64 MB)."); return ok(null); } f.text().then(ok, () => ok(null)); };
+  document.body.append(i); i.click();
+});
 export const setStdView = (f: (v: string) => void) => { viewHook = f; };
 
 /** Ends the route being drawn at a nozzle, a tee's branch or a free point, and adds the line. */
@@ -89,6 +99,35 @@ export const C = {
   removeJog: () => {
     const s = sel(); if (s?.kind !== "run") return toast("Select the middle run of a jog, then take the jog out.");
     act({ RemoveJog: { line: s.id, seg: s.seg } }).then(o => o && setSel({ kind: "line", id: s.id }));
+  },
+
+  // ---------- saved views ----------
+  saveView: () => {
+    const p = project(); if (!p || !camHook) return;
+    const c = camHook.get(), s = section();
+    let n = p.views.length + 1; while (p.views.some(v => v.name === `View ${n}`)) n++;
+    const v: SavedView = { name: `View ${n}`, eye: c.eye, target: c.target, colour_by: colourBy(), hidden: hidden(), isolated: isolated(), section: s ? [s.lo, s.hi] : null };
+    act({ SetViews: [...p.views, v] }).then(o => o && toast(`Saved as “${v.name}”. View › Saved Views brings it back.`, true));
+  },
+  showView: (name: string) => {
+    const v = project()?.views.find(x => x.name === name); if (!v) return;
+    setColourBy((["kind", "line", "class", "fluid", "size"].includes(v.colour_by) ? v.colour_by : "kind") as ColourBy);
+    setHidden(v.hidden ?? []); setIsolated(v.isolated ?? null); setSection(v.section ? { lo: v.section[0], hi: v.section[1] } : null);
+    camHook?.set(v.eye, v.target);
+  },
+  renameView: (name: string, to: string) => { const p = project(); if (!p || !to.trim() || p.views.some(v => v.name === to)) return; act({ SetViews: p.views.map(v => v.name === name ? { ...v, name: to.trim() } : v) }); },
+  deleteView: (name: string) => { const p = project(); if (p) act({ SetViews: p.views.filter(v => v.name !== name) }); },
+
+  // ---------- imports ----------
+  importLineList: async () => {
+    const t = await pickText(".csv,.txt"); if (t == null) return;
+    const o = await act({ ImportLineList: { csv: t } });
+    if (o) { const n = o.p.line_list.length, iss = o.issues.filter(i => i.kind === "list").length; toast(`${n} line${n === 1 ? "" : "s"} read from the line list. ${iss ? `${iss} difference${iss === 1 ? "" : "s"} with the model are under Checks.` : "The model matches it."}`, true); if (iss) setBottom("checks"); }
+  },
+  importPcf: async () => {
+    const t = await pickText(".pcf,.txt"); if (t == null) return;
+    const o = await act({ ImportPcf: { text: t } });
+    if (o?.created.length) { setPicked(o.created); setSel(null); setTimeout(fitHook, 60); toast(`${o.created.length} line${o.created.length === 1 ? "" : "s"} read from the file: elbows, flanges and gaskets are generated from the class.`, true); }
   },
 
   // ---------- what the view shows ----------
@@ -209,6 +248,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["SI units", () => C.units("SI")], ["US units", () => C.units("US")], ["Add an area", C.addArea], ["Plot settings", C.selectPlot],
   ["Add a jog to the selected run", () => C.jog(), "J"], ["Take the jog out", () => C.removeJog()],
   ["Hide the selection", () => C.hide(), "H"], ["Show only the selection (isolate)", () => C.isolate(), "I"], ["Show everything", () => C.showAll(), "Shift+H"], ["Section box", () => C.sectionBox()],
+  ["Save this view", () => C.saveView()], ["Import a line list (CSV)", () => C.importLineList()], ["Import lines from a piping component file (.pcf)", () => C.importPcf()],
   ["Measure a distance", () => C.measure(), "M"], ["Fit the plant", C.fit, "F"], ["Isometric view", () => C.std("iso"), "1"], ["Plan view", () => C.std("plan"), "2"], ["Front view (from the south)", () => C.std("front"), "3"], ["Side view (from the east)", () => C.std("side"), "4"],
   ["Options", () => setBackstage("options")], ["Check for updates", () => setBackstage("about")], ["Roadmap", () => setBackstage("roadmap")],
   ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started", () => D.gettingStarted()], ["Glossary", () => D.glossary()],

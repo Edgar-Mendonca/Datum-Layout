@@ -113,6 +113,9 @@ const LineInsp = (p: { l: Line }) => {
   const issues = () => (out()?.issues ?? []).filter(i => i.line === p.l.id);
   return (<>
     <Row l="Line number" h="lines"><input value={p.l.number} placeholder="e.g. 6&quot;-P-1001-CS1" onChange={e => set({ number: e.currentTarget.value })} /></Row>
+    <Show when={project()?.line_list.length}><Row l="From the line list" h="linelist"><select class="fromlist" onChange={e => { const v = e.currentTarget.value; if (v) act({ UseListedLine: { line: p.l.id, number: v } }); }}>
+      <option value="">{project()!.line_list.some(r => r.number === p.l.number) ? "On the list" : "Choose a listed line…"}</option>
+      <For each={project()!.line_list}>{r => <option value={r.number}>{r.number}{r.nps ? ` · ${r.nps}"` : ""}{r.class ? ` · ${r.class}` : ""}</option>}</For></select></Row></Show>
     <div class="two">
       <Row l="Size" h="resize"><SizeSel v={p.l.nps} set={s => C.resize(s)} /></Row>
       <Row l="Pipe class" h="spec"><select onChange={e => set({ class: e.currentTarget.value })}><For each={catalogue()?.cat.classes ?? []}>{c => <option selected={c.name === p.l.class}>{c.name}</option>}</For><Show when={!(catalogue()?.cat.classes ?? []).some(c => c.name === p.l.class)}><option selected>{p.l.class}</option></Show></select></Row>
@@ -221,7 +224,7 @@ const [lists, setLists] = createSignal<Lists | null>(null);
 export const refreshLists = async () => { const l = await call<Lists>("lists"); if (l) setLists(l); };
 
 const IssueRow = (p: { i: Issue }) => (
-  <tr class="f" onClick={() => C.goto(p.i)}><td><span class={`sev ${p.i.kind}`}>{({ clash: "Clash", routing: "Routing", open: "Open end", mismatch: "Mismatch", class: "Class", number: "Number" } as any)[p.i.kind]}</span></td><td>{p.i.text}</td><td class="r mono muted">{p.i.at.map(v => toU("coord", v).toFixed(2)).join(", ")}</td></tr>
+  <tr class="f" onClick={() => C.goto(p.i)}><td><span class={`sev ${p.i.kind}`}>{({ clash: "Clash", routing: "Routing", open: "Open end", mismatch: "Mismatch", class: "Class", number: "Number", list: "Line list" } as any)[p.i.kind]}</span></td><td>{p.i.text}</td><td class="r mono muted">{p.i.at.map(v => toU("coord", v).toFixed(2)).join(", ")}</td></tr>
 );
 
 export const BottomPanel = () => {

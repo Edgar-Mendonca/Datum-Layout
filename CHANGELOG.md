@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.1.8 — 2026-11-08
+Saved views, a line list to check against, and lines read from piping component files.
+
+**Saved views.** View › Save View keeps the camera, the colours, hidden or isolated items and the section box under a name, saved with the plant. View › Views brings one back, renames or deletes it.
+
+**Line list.** Lists › Import › Line List reads a CSV line list (columns found by name: line number, size, class, rating, fluid, insulation, from, to, notes; Datum Layout's own export reads back). The list is kept with the plant, and the checks show lines missing from the model, lines not on the list, and any difference in size, class, rating, fluid or insulation. In the Inspector, "From the line list" gives a line the listed values.
+
+**PCF lines.** Lists › Import › PCF Lines adds the lines of a piping component file: corners, valves, strainers, tees and reducers, with flanges, gaskets and bolts generated from the class. Ends on a free nozzle connect to it, and a run from another line's tee becomes its branch. Every example written to PCF reads back into the same lines.
+
 ## 0.1.7 — 2026-11-08
 Shape routes without routing them again, and choose what the view shows.
 

@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line } from "./api";
 import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection } from "./store";
-import { C, setFit, setStdView, finishRoute } from "./cmds";
+import { C, setFit, setStdView, setCamHook, finishRoute } from "./cmds";
 import { fmt, toU, fromU, unit } from "./units";
 
 /** Plant (east, north, up) → three.js (x, y up, z towards the viewer = south). */
@@ -571,6 +571,10 @@ export const View3D = () => {
     const loop = () => { raf = requestAnimationFrame(loop); if (!dirty) return; dirty = false; renderer.render(sc, camera); placeTags(); };
     loop();
     setFit(fit); setStdView(std);
+    setCamHook({
+      get: () => ({ eye: E(camera.position), target: E(controls.target) }),
+      set: (eye, target) => { camera.position.copy(W(eye)); controls.target.copy(W(target)); const d = camera.position.distanceTo(controls.target); camera.near = Math.max(0.02, d / 2000); camera.far = d * 50; camera.updateProjectionMatrix(); controls.update(); draw(); },
+    });
     snapshot = () => { renderer.render(sc, camera); return renderer.domElement.toDataURL("image/png"); };
     // The speed check: orbit through `frames` frames, rendering each, and give the mean and worst frame times.
     (window as any).__orbit = (frames: number) => {

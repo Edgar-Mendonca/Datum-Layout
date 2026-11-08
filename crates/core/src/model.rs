@@ -256,6 +256,39 @@ impl Default for Settings {
     fn default() -> Self { Self { clearance: 0.025, nps: "6".into(), class: "CS1".into(), rating: 150 } }
 }
 
+/// A saved view: where the camera stood and what the view showed (plant axes, metres).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct SavedView {
+    pub name: String,
+    pub eye: P3,
+    pub target: P3,
+    /// "kind", "line", "class", "fluid" or "size".
+    pub colour_by: String,
+    pub hidden: Vec<u32>,
+    pub isolated: Option<Vec<u32>>,
+    /// The section box's low and high corners.
+    pub section: Option<[P3; 2]>,
+}
+
+/// A line from the process line list: what the line should be, checked against the model.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct ListedLine {
+    pub number: String,
+    /// Nominal size; empty when the list's size could not be read.
+    pub nps: String,
+    pub class: String,
+    /// 0 when the list gives none.
+    pub rating: u32,
+    pub fluid: String,
+    /// Insulation thickness (m).
+    pub insulation: f64,
+    pub from: String,
+    pub to: String,
+    pub notes: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct Project {
@@ -272,10 +305,12 @@ pub struct Project {
     pub lines: Vec<Line>,
     pub settings: Settings,
     pub next: u32,
+    pub views: Vec<SavedView>,
+    pub line_list: Vec<ListedLine>,
 }
 impl Default for Project {
     fn default() -> Self {
-        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1 }
+        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![] }
     }
 }
 
@@ -338,6 +373,14 @@ impl Project {
             }
             if uid.is_empty() { *uid = new_uid(*id); }
         };
+        self.views.truncate(500);
+        for v in &mut self.views { p3(&mut v.eye); p3(&mut v.target); if let Some(s) = &mut v.section { p3(&mut s[0]); p3(&mut s[1]); } }
+        self.line_list.truncate(100_000);
+        for r in &mut self.line_list {
+            if !r.nps.is_empty() && !crate::catalogue::NPS.contains(&r.nps.as_str()) { r.nps.clear(); }
+            if r.rating != 0 && !crate::catalogue::RATINGS.contains(&r.rating) { r.rating = 0; }
+            fin(&mut r.insulation, 0.0, 1.0, 0.0);
+        }
         for a in &mut self.areas {
             fresh(&mut a.id, &mut a.uid, &mut seen, &mut w, "An area");
             p3(&mut a.min); p3(&mut a.max);

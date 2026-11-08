@@ -235,6 +235,43 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.click('.secbox button:has-text("Turn off")'); await settle(300);
   check("the section box turns off", !(await p.$(".secbox")));
 
+  // 7e. Saved views, the line list and PCF lines (0.1.8).
+  await open("pumps");
+  await p.click('.tabs > button:has-text("View")'); await p.selectOption("select.colourby", "line"); await settle(300);
+  await p.click('.rb:has-text("Save View")'); await settle(500);
+  st = await state();
+  check("Save View keeps the view with the plant", st.p.views.length === 1 && st.p.views[0].colour_by === "line", JSON.stringify(st.p.views));
+  await p.selectOption("select.colourby", "kind"); await settle(300);
+  await p.click('.rb:has-text("Views")'); await settle(200); await p.click('.menu button:has-text("View 1")'); await settle(500);
+  check("choosing the saved view brings back its colours", !!(await p.$(".legend")));
+  const filePick = async (button, name, text) => {
+    const [fc] = await Promise.all([p.waitForEvent("filechooser"), p.click(button)]);
+    await fc.setFiles({ name, mimeType: "text/plain", buffer: Buffer.from(text) }); await settle(900);
+  };
+  let csv = (await ask("export_csv", { kind: "lines" })).ok;
+  csv = csv.replace(/^(8""-P-1002-CS1|"8""-P-1002-CS1"),([^,]*),([^,]*),8,/m, (m, a, b, c) => `${a},${b},${c},10,`);
+  await p.click('.tabs > button:has-text("Lists")');
+  await filePick('.rb[title^="Read a line list"]', "lines.csv", csv);
+  st = await state();
+  check("Line List reads every line of the exported list", st.p.line_list.length === 5, String(st.p.line_list.length));
+  check("the checks show the one difference with the list", st.issues.filter(i => i.kind === "list").length === 1 && st.issues.some(i => i.kind === "list" && i.text.includes("size 10")), JSON.stringify(st.issues.map(i => i.text)));
+  check("the difference is listed under Checks", (await p.textContent(".bbody")).includes("Line list"));
+  await p.click('.bbody tr.f:has-text("Line list")'); await settle(400);
+  await p.selectOption("select.fromlist", { index: 2 }); await settle(700);
+  st = await state();
+  check("taking the listed line's values clears it", !st.issues.some(i => i.kind === "list"), JSON.stringify(st.issues.map(i => i.text)));
+  // PCF: the plant's lines written, taken away and read back in.
+  await open("pumps");
+  const pcfText = (await ask("export_pcf", { line: null })).ok;
+  st = await state();
+  await ask("apply", { op: { Delete: { ids: st.p.lines.map(l => l.id) } } });
+  await p.click('.tabs > button:has-text("Lists")');
+  await filePick('.rb:has-text("PCF Lines")', "plant.pcf", pcfText);
+  st = await state();
+  check("PCF Lines reads the plant's lines back", st.p.lines.length === 5, String(st.p.lines.length));
+  check("the lines read back connect to their nozzles and tees, clean", !st.issues.length && st.p.lines.filter(l => l.from.kind === "nozzle" || l.to.kind === "nozzle").length === 4 && st.p.lines.filter(l => l.from.kind === "branch").length === 3, JSON.stringify(st.issues.map(i => i.text)));
+  if (shots) await shot("pcf-import");
+
   // 7b. Turn the tank in example 1: its suction line is reported skewed; Route Again squares it.
   await open("pumps");
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(300);

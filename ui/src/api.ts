@@ -21,8 +21,10 @@ export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flang
 export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string }
 export interface Line { id: number; uid: string; number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; radius: "long" | "short"; from: End; to: End; pts: V3[]; items: Item[]; area: number }
 export interface Settings { clearance: number; nps: string; class: string; rating: number }
-export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number }
-export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "class" | "number"; text: string; at: V3; line: number; item: number; equip: number }
+export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[] }
+export interface SavedView { name: string; eye: V3; target: V3; colour_by: string; hidden: number[]; isolated: number[] | null; section: [V3, V3] | null }
+export interface ListedLine { number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; from: string; to: string; notes: string }
+export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "class" | "number" | "list"; text: string; at: V3; line: number; item: number; equip: number }
 export interface Out { p: Project; path: string | null; dirty: boolean; undo: boolean; redo: boolean; created: number[]; warnings: string[]; issues: Issue[]; paths: [number, V3[]][] }
 
 export interface PartRef { kind: string; line: number; equip: number; item: number; seg: number; nps: string; t0: number; t1: number; lo: V3; hi: V3 }

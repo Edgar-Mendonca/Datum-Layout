@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.7 (2026-11-08) |
+| **Current version** | 0.1.8 (2026-11-08) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -92,6 +92,10 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.6 | UI: `picked` (Ctrl+click) is separate from `sel` (the single Inspector item); commands act on `picked` when it is not empty, else on `sel` | Every single-item command keeps working unchanged |
 | 0.1.7 | Corner and jog edits are engine ops on the path (index of corner or run); a jog refuses to turn within an elbow's room of a component; `tidy` merges straight corners and zero runs keeping components in place | Routes change without routing again, and nothing ends up on an elbow |
 | 0.1.7 | Hiding collapses a part's triangles to a point in the one index buffer (order kept, so picking by triangle still works); the section box uses six clipping planes and picking skips hits outside it; both are view state only, never saved | Keeps one draw call and leaves the model untouched |
+| 0.1.8 | Imports read the file's text in the window (a file input; nothing leaves the computer) and send it to the engine as an op (`ImportLineList`, `ImportPcf`), so they undo like any edit and need no new shell command | Small shell, and the bridge tests drive them unchanged |
+| 0.1.8 | The line list is matched by line number, or by the number after its size ("8\"-P-1001" matches "10\"-P-1001") since the model renames a line when it is resized | A resized line is reported as a difference, not as two strangers |
+| 0.1.8 | PCF import walks each pipeline's end-point graph from a free end, takes elbows' centre points as corners and keeps valves, strainers, tees and reducers as items; flanges, gaskets and bolts are generated again; a reducer next to an end that lands on a free nozzle is the nozzle's own and is dropped | Round trip of every example gives the same lines, parts and findings |
+| 0.1.8 (user) | The window is to follow Datum Mesh's shell (steps bar, plant tree with filter, marks and eyes, context bar, tool strip, resizable panes): next release | The user: "improvements on the UI is one of the biggest tasks… look at Datum Mesh and do the same here" |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -109,6 +113,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.5 | Catalogue merged from the outside helper's tables (flanges 150–2500 with `blind_thick_in`, valves in all classes, fittings); missing valve sizes interpolated (`valve_length`); all six ratings in the model and window; eight example classes; measure tool | ✅ |
 | 0.1.6 | Multi-select (Ctrl+click, Select All), group move, copy (Ctrl+D), turn ±90°, mirror east–west / north–south and delete (`Op::MoveGroup`, `CopyGroup`, `RotateGroup`, `MirrorGroup`) | ✅ |
 | 0.1.7 | Corners (`Op::MoveCorner`) and jogs (`Op::Jog`, `Op::RemoveJog`, `doc::tidy`); colour by line, class, fluid or size with a key; hide, isolate, show all; section box (clipping planes, picking honours it) | ✅ |
+| 0.1.8 | Saved views (`Project.views`, `Op::SetViews`); line list import and check (`Project.line_list`, `ImportLineList`, `UseListedLine`, `checks::line_list_issues`); PCF import (`pcf::import`, `Op::ImportPcf`), proved by reading every example back | ✅ |
 | 0.2 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | 🔜 |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -147,6 +152,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - The user handed over 0.1.5 to 0.2.0 to be done unattended, in the order of `docs/PLAN-0.2.md` (industry gap analysis): the catalogue, then working with many items, routing edits, views, imports, lists and checks, then the class editor.
 - 0.1.5: merged the outside helper's flanges, valves and fittings (see Decisions); eight example classes; all six ratings; measure tool.
 - 0.1.6: multi-select and group move, copy, turn, mirror and delete; engine test `groups_move_copy_rotate_and_mirror_cleanly`; UI checks for Ctrl+A, Ctrl+D, mirror and undo.
+- 0.1.8: saved views; line list import and check; PCF import (round-trip test over every example); UI checks with real file choosers.
 - 0.1.7: move corners, add and remove jogs (engine tests on every example line: components return to the same place); colour by with a key; hide/isolate; section box; UI checks for each.
 
 ## 5. Known limits

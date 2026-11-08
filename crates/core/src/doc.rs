@@ -4,7 +4,7 @@
 
 use crate::catalogue::{Catalogue, NPS};
 use crate::equipment;
-use crate::model::{Area, End, EquipKind, Equipment, Item, ItemKind, Line, Plot, Project, Settings, Term, P3};
+use crate::model::{Area, End, EquipKind, Equipment, Item, ItemKind, Line, ListedLine, Plot, Project, SavedView, Settings, Term, P3};
 use crate::parts::{add, dot, mul, norm, sub, unit};
 use crate::route;
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,15 @@ pub enum Op {
     /// Mirrors equipment and lines in a vertical plane through `about`: across north–south
     /// (east becomes west) when `east_west` is false, across east–west otherwise.
     MirrorGroup { ids: Vec<u32>, about: P3, east_west: bool },
+    /// The plant's saved views (replaces the list).
+    SetViews(Vec<SavedView>),
+    /// Reads a line list (CSV text with a header row) and keeps it with the plant, replacing any
+    /// earlier list; the checks compare the model's lines with it.
+    ImportLineList { csv: String },
+    /// Gives a line the number, size, class, rating, fluid and insulation of a listed line.
+    UseListedLine { line: u32, number: String },
+    /// Adds the lines of a piping component file (.pcf).
+    ImportPcf { text: String },
     Batch(Vec<Op>),
 }
 
@@ -219,6 +228,64 @@ fn pass_along(pts: &mut [P3], delta: P3, move_last: bool, min_len: f64) -> P3 {
     }
     // A free far end moved with the rest: nothing is left over.
     if move_last { [0.0; 3] } else { d }
+}
+
+/// A line list from CSV text: the header row names the columns (any order, any case): line
+/// number, size (inches like 6, 1-1/2 or 6", or DN150), class, rating, fluid, insulation (mm),
+/// from, to and notes. Datum Layout's own line list export reads back. Gives the rows and how
+/// many rows were left out.
+pub fn read_line_list(csv: &str) -> Result<(Vec<ListedLine>, usize), String> {
+    let rows = csv_rows(csv);
+    let Some((head, body)) = rows.split_first() else { return Err("The line list is empty.".into()) };
+    let col = |names: &[&str]| head.iter().position(|h| { let h = h.trim().to_lowercase(); names.iter().any(|n| h == *n || h.starts_with(&format!("{n} ("))) });
+    let number = col(&["line number", "line", "number", "line no", "line no."]).ok_or("The line list needs a \"Line number\" column.")?;
+    let (size, class, rating, fluid, ins, from, to, notes) = (col(&["size", "nps", "size (in)", "dn"]), col(&["class", "pipe class", "spec", "piping class"]), col(&["rating", "flange rating"]), col(&["fluid", "fluid code", "service"]), col(&["insulation", "insulation (mm)"]), col(&["from"]), col(&["to"]), col(&["notes", "remarks"]));
+    let get = |r: &[String], c: Option<usize>| c.and_then(|c| r.get(c)).map(|s| s.trim().trim_start_matches('\'').to_string()).unwrap_or_default();
+    let mut out = vec![];
+    let mut skipped = 0;
+    for r in body {
+        let n = get(r, Some(number));
+        if n.is_empty() { skipped += 1; continue; }
+        let s = get(r, size);
+        let nps = list_size(&s);
+        out.push(ListedLine {
+            number: n, nps: nps.unwrap_or("").into(), class: get(r, class), rating: get(r, rating).trim_start_matches("Class ").trim_start_matches("CL").trim().parse().ok().filter(|v| crate::catalogue::RATINGS.contains(v)).unwrap_or(0),
+            fluid: get(r, fluid), insulation: get(r, ins).parse::<f64>().ok().filter(|v| v.is_finite() && *v >= 0.0).map_or(0.0, |v| v / 1000.0),
+            from: get(r, from), to: get(r, to), notes: get(r, notes),
+        });
+    }
+    if out.is_empty() { return Err("No lines could be read from the line list.".into()); }
+    Ok((out, skipped))
+}
+
+/// A size as written in a line list: 6, 6", 1-1/2, 1 1/2, 1.5 or DN150.
+fn list_size(s: &str) -> Option<&'static str> {
+    let t = s.trim().trim_end_matches('"').trim_end_matches("in").trim().replace(' ', "-");
+    if let Some(dn) = t.to_uppercase().strip_prefix("DN") { return crate::pcf::import::nps_of(dn.trim().parse().ok()?, false); }
+    if let Some(n) = NPS.iter().copied().find(|n| *n == t) { return Some(n); }
+    crate::pcf::import::nps_of(t.parse().ok()?, true)
+}
+
+/// CSV rows (quoted cells, doubled quotes, CR LF or LF).
+fn csv_rows(s: &str) -> Vec<Vec<String>> {
+    let mut rows = vec![];
+    let (mut row, mut cell, mut q) = (vec![], String::new(), false);
+    let mut it = s.trim_start_matches('\u{feff}').chars().peekable();
+    while let Some(c) = it.next() {
+        match (c, q) {
+            ('"', true) if it.peek() == Some(&'"') => { cell.push('"'); it.next(); }
+            ('"', true) => q = false,
+            // A quote opens a quoted cell only at its start (6" is a size, not a quote).
+            ('"', false) if cell.trim().is_empty() => { cell.clear(); q = true; }
+            (',', false) | (';', false) => row.push(std::mem::take(&mut cell)),
+            ('\n', false) => { row.push(std::mem::take(&mut cell)); if row.iter().any(|c: &String| !c.trim().is_empty()) { rows.push(std::mem::take(&mut row)); } else { row.clear(); } }
+            ('\r', false) => {}
+            _ => cell.push(c),
+        }
+    }
+    row.push(cell);
+    if row.iter().any(|c| !c.trim().is_empty()) { rows.push(row); }
+    rows
 }
 
 /// Removes zero-length runs and corners in a straight line; components keep their place.
@@ -566,6 +633,37 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
                         _ => End::Point { term: Term::Open },
                     };
                 }
+                created.push(l.id);
+                p.lines.push(l);
+            }
+        }
+        Op::SetViews(v) => { p.views = v; }
+        Op::ImportLineList { csv } => {
+            let (rows, _) = read_line_list(&csv)?;
+            p.line_list = rows;
+        }
+        Op::UseListedLine { line, number } => {
+            let r = p.line_list.iter().find(|r| r.number == number).cloned().ok_or("That line is not on the line list.")?;
+            // Resizing renames the line by its size; the list's number is set afterwards.
+            p.line(line).ok_or("That line no longer exists.")?;
+            if !r.nps.is_empty() { apply(p, Op::Resize { line, nps: r.nps.clone() }, cat, created)?; }
+            let l = line_mut(p, line)?;
+            l.number = r.number;
+            if !r.class.is_empty() { l.class = r.class; }
+            if r.rating != 0 { l.rating = r.rating; }
+            if !r.fluid.is_empty() { l.fluid = r.fluid; }
+            l.insulation = r.insulation;
+        }
+        Op::ImportPcf { text } => {
+            let mut next = p.next.max(1);
+            let used: std::collections::HashSet<u32> = p.equipment.iter().map(|e| e.id).chain(p.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id)))).chain(p.areas.iter().map(|a| a.id)).collect();
+            let mut id = || { while used.contains(&next) || next == 0 { next += 1; } next += 1; next - 1 };
+            let (lines, _) = crate::pcf::import::read(&text, p, cat, &mut id)?;
+            if lines.is_empty() { return Err("The file has no lines that could be read.".into()); }
+            p.next = next;
+            for mut l in lines {
+                l.uid = crate::model::new_uid(l.id);
+                for it in &mut l.items { it.uid = crate::model::new_uid(it.id); }
                 created.push(l.id);
                 p.lines.push(l);
             }

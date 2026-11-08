@@ -23,6 +23,15 @@ export const confirmClose = (quit: () => void) => openDialog(() => (
   </Dialog>
 ));
 
+export const renameView = (name: string) => {
+  let to = name;
+  openDialog(() => (
+    <Dialog title="Rename the view" okText="Rename" ok={() => { C.renameView(name, to); }} cancel="Cancel" help="views">
+      <label class="fld">Name<input value={name} onInput={e => { to = e.currentTarget.value; }} /></label>
+    </Dialog>
+  ));
+};
+
 export const shortcuts = () => openDialog(() => (
   <Dialog title="Keyboard shortcuts">
     <table class="tbl keys"><tbody><For each={[

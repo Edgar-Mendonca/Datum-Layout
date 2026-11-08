@@ -250,3 +250,216 @@ mod tests {
         }
     }
 }
+
+/// Lines read back from a piping component file (Datum Layout's own, or any that lists its
+/// components in the usual way): each pipeline's runs become lines with their corners (the elbows'
+/// centre points), valves, strainers, tees and reducers. Flanges, gaskets and bolts are generated
+/// again from the class. An end on a free nozzle of the plant connects to it; a run starting at
+/// another line's tee branch becomes its branch; caps and blind flanges are kept.
+pub mod import {
+    use crate::catalogue::{Catalogue, NPS};
+    use crate::model::{End, Item, ItemKind, Line, Project, Term, P3};
+    use crate::parts::{add, dist, dot, mul, norm, sub, unit};
+
+    #[derive(Default)]
+    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, skey: String, desc: String }
+    #[derive(Default)]
+    struct Group { name: String, spec: String, comps: Vec<Comp> }
+
+    fn num(s: &str) -> Option<f64> { s.trim().parse::<f64>().ok().filter(|v| v.is_finite()) }
+
+    /// A nominal size from a bore: nominal millimetres (DN) or inches.
+    pub fn nps_of(bore: f64, inch: bool) -> Option<&'static str> {
+        NPS.iter().copied().find(|n| if inch { crate::catalogue::nps_inches(n).is_some_and(|v| (v - bore).abs() < 0.01) } else { super::dn(n) as f64 == bore.round() })
+    }
+
+    fn groups(text: &str) -> Result<(Vec<Group>, f64, bool), String> {
+        let mut gs: Vec<Group> = vec![];
+        let (mut coord, mut inch) = (0.001, false);
+        let mut raw_pts: Vec<(usize, usize, String, Vec<String>)> = vec![];
+        for raw in text.lines() {
+            if raw.trim().is_empty() { continue; }
+            let indented = raw.starts_with(' ') || raw.starts_with('\t');
+            let mut words = raw.split_whitespace().map(|w| w.to_string());
+            let key = words.next().unwrap_or_default().to_uppercase();
+            let rest: Vec<String> = words.collect();
+            if !indented {
+                if key == "UNITS-CO-ORDS" { coord = if rest.first().is_some_and(|u| u.to_uppercase().starts_with("INCH")) { 0.0254 } else { 0.001 }; }
+                else if key == "UNITS-BORE" { inch = rest.first().is_some_and(|u| u.to_uppercase().starts_with("INCH")); }
+                else if key == "PIPELINE-REFERENCE" { gs.push(Group { name: rest.join(" "), ..Default::default() }); }
+                else if key.contains("UNITS") || key.ends_with("-FILES") || key.starts_with("PROJECT") || key.starts_with("AREA") || key.starts_with("DATE") || key.starts_with("REVISION") || key == "MESSAGE-SQUARE" {}
+                else {
+                    if gs.is_empty() { gs.push(Group { name: "Imported".into(), ..Default::default() }); }
+                    gs.last_mut().unwrap().comps.push(Comp { kind: key, ..Default::default() });
+                }
+                continue;
+            }
+            let Some(g) = gs.last_mut() else { continue };
+            if g.comps.is_empty() { if key == "PIPING-SPEC" { g.spec = rest.join(" "); } continue; }
+            let c = g.comps.len() - 1;
+            raw_pts.push((gs.len() - 1, c, key, rest));
+        }
+        // Points are read once the units (which may come later in the header) are known.
+        for (g, c, key, rest) in raw_pts {
+            let comp = &mut gs[g].comps[c];
+            let pt = |v: &[String]| -> Option<(P3, f64)> { Some(([num(v.first()?)? * coord, num(v.get(1)?)? * coord, num(v.get(2)?)? * coord], v.get(3).and_then(|b| num(b)).unwrap_or(0.0))) };
+            match key.as_str() {
+                "END-POINT" => if let Some(p) = pt(&rest) { comp.eps.push(p) },
+                "CENTRE-POINT" => comp.cp = pt(&rest).map(|p| p.0),
+                "BRANCH1-POINT" => comp.bp = pt(&rest),
+                "SKEY" => comp.skey = rest.join(" ").to_uppercase(),
+                "ITEM-DESCRIPTION" => comp.desc = rest.join(" ").to_uppercase(),
+                _ => {}
+            }
+        }
+        if !gs.iter().any(|g| g.comps.iter().any(|c| c.eps.len() >= 2)) {
+            return Err("This file has no piping components with end points: is it a piping component file (.pcf)?".into());
+        }
+        Ok((gs, coord, inch))
+    }
+
+    fn item_kind(c: &Comp) -> Option<ItemKind> {
+        let k = c.kind.as_str();
+        Some(if k == "VALVE" {
+            if c.skey.starts_with("CK") { ItemKind::Check } else if c.skey.starts_with("VG") { ItemKind::Globe } else if c.skey.starts_with("VB") { ItemKind::Ball } else { ItemKind::Gate }
+        } else if k == "FILTER" { ItemKind::Strainer } else if k.starts_with("TEE") { ItemKind::Tee } else if k.starts_with("REDUCER") { ItemKind::Reducer } else { return None })
+    }
+
+    /// Reads the file into new lines (ids from `id`), connecting ends to free nozzles of `p`.
+    pub fn read(text: &str, p: &Project, cat: &Catalogue, id: &mut dyn FnMut() -> u32) -> Result<(Vec<Line>, Vec<String>), String> {
+        let (gs, _, inch) = groups(text)?;
+        let mut out: Vec<Line> = vec![];
+        let mut warnings = vec![];
+        let mut tees: Vec<(P3, u32, u32)> = vec![]; // branch point, line, item
+        let mut skipped = 0usize;
+        for g in &gs {
+            // The graph of end points (merged to 0.5 mm) and the components between them.
+            let mut nodes: Vec<P3> = vec![];
+            let node = |q: P3, nodes: &mut Vec<P3>| -> usize { if let Some(i) = nodes.iter().position(|x| dist(*x, q) < 5e-4) { i } else { nodes.push(q); nodes.len() - 1 } };
+            let mut edges: Vec<(usize, usize, usize)> = vec![];
+            for (ci, c) in g.comps.iter().enumerate() {
+                if c.eps.len() < 2 { skipped += 1; continue; }
+                let (a, b) = (node(c.eps[0].0, &mut nodes), node(c.eps[1].0, &mut nodes));
+                if a != b { edges.push((a, b, ci)); }
+            }
+            let deg = |n: usize, used: &[bool]| edges.iter().enumerate().filter(|(i, e)| !used[*i] && (e.0 == n || e.1 == n)).count();
+            let mut used = vec![false; edges.len()];
+            let mut k = 0;
+            while let Some(first) = (0..edges.len()).find(|&i| !used[i]) {
+                // Start at a true end: the file's first free end, else any node with an odd count.
+                let total: Vec<usize> = (0..nodes.len()).map(|n| deg(n, &vec![false; edges.len()])).collect();
+                let start = [edges[first].0, edges[first].1].into_iter().find(|&n| total[n] == 1)
+                    .or_else(|| (0..nodes.len()).find(|&n| total[n] == 1 && deg(n, &used) == 1))
+                    .or_else(|| (0..nodes.len()).find(|&n| deg(n, &used) % 2 == 1))
+                    .unwrap_or(edges[first].0);
+                let mut cur = start;
+                let mut walk: Vec<(usize, bool)> = vec![];
+                let mut dir: Option<P3> = None;
+                loop {
+                    let cands: Vec<usize> = (0..edges.len()).filter(|&i| !used[i] && (edges[i].0 == cur || edges[i].1 == cur)).collect();
+                    let Some(&e) = cands.iter().max_by(|&&x, &&y| {
+                        let d = |i: usize| { let o = if edges[i].0 == cur { edges[i].1 } else { edges[i].0 }; dir.map_or(0.0, |u| dot(u, unit(sub(nodes[o], nodes[cur])))) };
+                        d(x).total_cmp(&d(y))
+                    }) else { break };
+                    used[e] = true;
+                    let fwd = edges[e].0 == cur;
+                    let next = if fwd { edges[e].1 } else { edges[e].0 };
+                    let c = &g.comps[edges[e].2];
+                    // Leaving an elbow, the run goes from its centre point to its far end.
+                    dir = Some(unit(sub(nodes[next], c.cp.filter(|_| c.kind == "ELBOW").unwrap_or(nodes[cur]))));
+                    walk.push((edges[e].2, fwd));
+                    cur = next;
+                }
+                if walk.is_empty() { break; }
+                // The path: end points, with each elbow's centre point as the corner.
+                let mut l = Line { id: id(), number: if k == 0 { g.name.clone() } else { format!("{}/{}", g.name, k + 1) }, class: if g.spec.is_empty() { p.settings.class.clone() } else { g.spec.clone() }, rating: p.settings.rating, ..Default::default() };
+                k += 1;
+                l.pts.push(nodes[start]);
+                let mut size: Option<&str> = None;
+                for &(ci, fwd) in &walk {
+                    let c = &g.comps[ci];
+                    let (a, b) = if fwd { (c.eps[0], c.eps[1]) } else { (c.eps[1], c.eps[0]) };
+                    if size.is_none() { size = nps_of(a.1, inch); }
+                    if let Some(r) = c.desc.split_whitespace().skip_while(|w| *w != "CLASS").nth(1).and_then(|r| r.parse::<u32>().ok()) { if crate::catalogue::RATINGS.contains(&r) { l.rating = r; } }
+                    if c.kind == "ELBOW" { if let Some(cp) = c.cp { l.pts.push(cp); } }
+                    l.pts.push(b.0);
+                }
+                l.nps = size.unwrap_or(p.settings.nps.as_str()).to_string();
+                crate::doc::tidy(&mut l);
+                if l.pts.len() < 2 { continue; }
+                // Components on the path.
+                let place = |q: P3, pts: &[P3]| -> Option<(usize, f64)> {
+                    (0..pts.len() - 1).filter_map(|s| { let u = unit(sub(pts[s + 1], pts[s])); let t = dot(sub(q, pts[s]), u); let len = dist(pts[s], pts[s + 1]); (t > -1e-4 && t < len + 1e-4 && dist(add(pts[s], mul(u, t)), q) < 1e-3).then_some((s, t.clamp(0.0, len))) }).next()
+                };
+                for &(ci, fwd) in &walk {
+                    let c = &g.comps[ci];
+                    let Some(kind) = item_kind(c) else { continue };
+                    let (a, b) = if fwd { (c.eps[0], c.eps[1]) } else { (c.eps[1], c.eps[0]) };
+                    let centre = if kind == ItemKind::Tee { c.cp.unwrap_or(mul(add(a.0, b.0), 0.5)) } else { mul(add(a.0, b.0), 0.5) };
+                    let Some((seg, at)) = place(centre, &l.pts) else { continue };
+                    let u = unit(sub(l.pts[seg + 1], l.pts[seg]));
+                    let mut it = Item { id: id(), kind, seg, at, dir: if u[2].abs() > 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] }, ..Default::default() };
+                    if kind == ItemKind::Reducer { it.nps2 = nps_of(b.1, inch).unwrap_or("").to_string(); }
+                    if kind == ItemKind::Tee {
+                        if let Some((bp, bb)) = c.bp {
+                            it.dir = unit(sub(bp, centre));
+                            it.nps2 = nps_of(bb, inch).filter(|n| *n != l.nps).unwrap_or("").to_string();
+                            tees.push((bp, l.id, it.id));
+                        }
+                    }
+                    l.items.push(it);
+                }
+                // Caps and blind flanges at the ends.
+                let term = |c: &Comp| if c.kind == "CAP" { Some(Term::Cap) } else if c.kind == "FLANGE-BLIND" { Some(Term::Blind) } else { None };
+                if let Some(t) = term(&g.comps[walk[0].0]) { l.from = End::Point { term: t }; }
+                if let Some(t) = term(&g.comps[walk[walk.len() - 1].0]) { l.to = End::Point { term: t }; }
+                out.push(l);
+            }
+        }
+        // Ends on free nozzles connect to them; a reducer next to such an end is the nozzle's own.
+        let mut taken: Vec<End> = p.lines.iter().flat_map(|l| [l.from.clone(), l.to.clone()]).collect();
+        for l in &mut out {
+            for start in [true, false] {
+                let q = if start { l.pts[0] } else { *l.pts.last().unwrap() };
+                if !matches!(if start { &l.from } else { &l.to }, End::Point { term: Term::Open }) { continue; }
+                let hit = p.equipment.iter().flat_map(|e| e.nozzles.iter().map(move |n| (e, n))).find(|(e, n)| {
+                    let me = End::Nozzle { equip: e.id, nozzle: n.tag.clone() };
+                    !taken.contains(&me) && dist(crate::equipment::nozzle(e, n, cat).port.p, q) < 1e-3
+                });
+                let Some((e, n)) = hit else { continue };
+                let me = End::Nozzle { equip: e.id, nozzle: n.tag.clone() };
+                taken.push(me.clone());
+                if start { l.from = me; } else { l.to = me; }
+                // The first component from this end, if a reducer close to it, belongs to the nozzle.
+                let n_seg = l.pts.len() - 1;
+                let near = |it: &Item| if start { it.seg == 0 } else { it.seg == n_seg - 1 };
+                let mut on: Vec<&Item> = l.items.iter().filter(|it| near(it)).collect();
+                on.sort_by(|a, b| a.at.total_cmp(&b.at));
+                let first = if start { on.first() } else { on.last() };
+                if let Some(r) = first.filter(|r| r.kind == ItemKind::Reducer) {
+                    let len = dist(l.pts[if start { 0 } else { n_seg - 1 }], l.pts[if start { 1 } else { n_seg }]);
+                    let from_end = if start { r.at } else { len - r.at };
+                    if from_end < crate::doc::lead_for(cat, &l.nps, l.rating) {
+                        let (rid, after) = (r.id, r.nps2.clone());
+                        l.items.retain(|it| it.id != rid);
+                        if start && !after.is_empty() { l.nps = after; }
+                    }
+                }
+            }
+        }
+        // A run starting (or ending) at another line's tee branch becomes that branch.
+        for i in 0..out.len() {
+            for start in [true, false] {
+                let q = if start { out[i].pts[0] } else { *out[i].pts.last().unwrap() };
+                if !matches!(if start { &out[i].from } else { &out[i].to }, End::Point { term: Term::Open }) { continue; }
+                if let Some(&(_, line, item)) = tees.iter().find(|t| dist(t.0, q) < 1e-3 && t.1 != out[i].id) {
+                    let e = End::Branch { line, item };
+                    if start { out[i].from = e; } else { out[i].to = e; }
+                }
+            }
+        }
+        if skipped > 0 { warnings.push(format!("{skipped} component(s) with fewer than two end points were left out.")); }
+        let _ = norm;
+        Ok((out, warnings))
+    }
+}

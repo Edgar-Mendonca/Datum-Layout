@@ -145,6 +145,7 @@ export const Ribbon = () => {
       </Show>
       <Show when={tab() === "lists"}>
         <G l="Lists" h="lists"><B big i="list" l="Line List" run={() => setBottom("lines")} /><B big i="vvessel" l="Equipment" run={() => setBottom("equipment")} /><B big i="mto" l="Take-off" run={() => setBottom("lines")} title="The material take-off is under the line list" /></G>
+        <G l="Import" h="import"><B big i="import" l="Line List" run={C.importLineList} title="Read a line list (CSV) to check the model against" /><B big i="pipe" l="PCF Lines" run={C.importPcf} title="Add lines from a piping component file (.pcf)" /></G>
         <G l="Export CSV" h="csv"><S><B i="csv" l="Line list" run={() => C.exportCsv("lines")} /><B i="csv" l="Equipment and nozzles" run={() => C.exportCsv("equipment")} /><B i="csv" l="Material take-off" run={() => C.exportCsv("mto")} /></S></G>
         <G l="Exports" h="pcf"><B big i="pipe" l="PCF for Datum Pipe" run={() => C.exportPcf(selLine()?.id)} /><B big i="cube" l="glTF 3D Model" run={C.exportGltf} /><Planned big i="ifc" l="IFC" v="0.4" /></G>
         <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
@@ -156,6 +157,7 @@ export const Ribbon = () => {
           <label class="rsel">Colour by<select class="colourby" onChange={e => setColourBy(e.currentTarget.value as ColourBy)}><For each={[["kind", "Part kind"], ["line", "Line"], ["class", "Pipe class"], ["fluid", "Fluid"], ["size", "Size"]] as [ColourBy, string][]}>{([k, l]) => <option value={k} selected={colourBy() === k}>{l}</option>}</For></select></label></S>
           <S><B i="hide" l="Hide" run={C.hide} off={!sel() && !picked().length} title="Hide the selection (H)" /><B i="isolate" l="Isolate" run={C.isolate} off={!sel() && !picked().length} title="Show only the selection (I)" /><B i="showall" l="Show All" run={C.showAll} off={!hidden().length && !isolated()} title="Show everything again (Shift+H)" /></S>
           <B big i="section" l="Section Box" on={!!section()} run={C.sectionBox} title="Draw only what is inside a box round the selection or the whole plant" /></G>
+        <G l="Saved Views" h="views"><B big i="camera" l="Save View" run={C.saveView} title="Keep this camera, colours, hidden items and section box under a name" /><B big i="views" l="Views" off={!p()?.views.length} dd={e => { const vs = p()?.views ?? []; openMenu(e, [...vs.map(v => ({ label: v.name, run: () => C.showView(v.name) })), "-", { label: "Rename", sub: vs.map(v => ({ label: v.name, run: () => D.renameView(v.name) })) }, { label: "Delete", sub: vs.map(v => ({ label: v.name, run: () => C.deleteView(v.name) })) }]); }} /></G>
         <G l="Plot" h="plot"><B big i="grid" l="Plot" run={C.selectPlot} title="Grid, extent, north and ground in the Inspector" /><B big i="area" l="Add Area" run={C.addArea} /></G>
         <G l="Walk"><Planned big i="walk" l="Walk Through" v="a later release" /></G>
       </Show>

@@ -114,6 +114,41 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
     for l in p.lines.iter().filter(|l| l.number.trim().is_empty()) {
         out.push(Issue { kind: "number", text: format!("A {}\" line has no line number.", l.nps), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 });
     }
+    out.extend(line_list_issues(p));
+    out
+}
+
+/// Two line numbers for the same line, one perhaps with an older size in front (6"-P-1001 and
+/// 8"-P-1001): the model renames a line when its size changes.
+pub fn same_line(a: &str, b: &str) -> bool {
+    let rest = |s: &str| s.split_once("\"-").map(|x| x.1.to_string());
+    a == b || matches!((rest(a), rest(b)), (Some(x), Some(y)) if x == y && !x.is_empty())
+}
+
+/// The model against the line list (when the plant has one): lines on the list but not in the
+/// model, lines in the model but not on the list, and lines whose size, class, rating, fluid or
+/// insulation differ.
+pub fn line_list_issues(p: &Project) -> Vec<Issue> {
+    let mut out = vec![];
+    if p.line_list.is_empty() { return out; }
+    let centre = [(p.plot.e[0] + p.plot.e[1]) / 2.0, (p.plot.n[0] + p.plot.n[1]) / 2.0, p.plot.ground];
+    for r in &p.line_list {
+        let Some(l) = p.lines.iter().find(|l| l.number == r.number).or_else(|| p.lines.iter().find(|l| same_line(&l.number, &r.number))) else {
+            out.push(Issue { kind: "list", text: format!("Line {} is on the line list but not in the model yet.", r.number), at: centre, line: 0, item: 0, equip: 0 });
+            continue;
+        };
+        let mut d = vec![];
+        if l.number != r.number { d.push(format!("number {} (the model has {})", r.number, l.number)); }
+        if !r.nps.is_empty() && r.nps != l.nps { d.push(format!("size {}\" (the model has {}\")", r.nps, l.nps)); }
+        if !r.class.is_empty() && r.class != l.class { d.push(format!("class {} (the model has {})", r.class, l.class)); }
+        if r.rating != 0 && r.rating != l.rating { d.push(format!("rating {} (the model has {})", r.rating, l.rating)); }
+        if !r.fluid.is_empty() && r.fluid != l.fluid { d.push(format!("fluid {} (the model has {})", r.fluid, l.fluid)); }
+        if (r.insulation - l.insulation).abs() > 0.0005 { d.push(format!("insulation {:.0} mm (the model has {:.0} mm)", r.insulation * 1000.0, l.insulation * 1000.0)); }
+        if !d.is_empty() { out.push(Issue { kind: "list", text: format!("Line {}: the line list says {}.", r.number, d.join(", ")), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 }); }
+    }
+    for l in p.lines.iter().filter(|l| !l.number.trim().is_empty() && !p.line_list.iter().any(|r| r.number == l.number || (same_line(&l.number, &r.number) && !p.lines.iter().any(|x| x.number == r.number)))) {
+        out.push(Issue { kind: "list", text: format!("Line {} is not on the line list.", l.number), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 });
+    }
     out
 }
 
