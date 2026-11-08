@@ -24,7 +24,7 @@ export interface Settings { clearance: number; nps: string; class: string; ratin
 export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[] }
 export interface SavedView { name: string; eye: V3; target: V3; colour_by: string; hidden: number[]; isolated: number[] | null; section: [V3, V3] | null }
 export interface ListedLine { number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; from: string; to: string; notes: string }
-export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "class" | "number" | "list"; text: string; at: V3; line: number; item: number; equip: number }
+export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "class" | "number" | "list" | "rule"; text: string; at: V3; line: number; item: number; equip: number }
 export interface Out { p: Project; path: string | null; dirty: boolean; undo: boolean; redo: boolean; created: number[]; warnings: string[]; issues: Issue[]; paths: [number, V3[]][] }
 
 export interface PartRef { kind: string; line: number; equip: number; item: number; seg: number; nps: string; t0: number; t1: number; lo: V3; hi: V3 }
@@ -40,7 +40,8 @@ export interface LineRow { id: number; number: string; from: string; to: string;
 export interface NozzleRow { tag: string; nps: string; rating: number; facing: string; service: string; at: V3; dir: V3; line: string }
 export interface EquipRow { id: number; tag: string; kind: string; at: V3; rot: number; sizes: [string, number][]; data: [string, string][]; nozzles: NozzleRow[] }
 export interface MtoRow { line: string; group: string; what: string; nps: string; qty: number; unit: string }
-export interface Lists { lines: LineRow[]; equipment: EquipRow[]; mto: MtoRow[] }
+export interface ValveRow { line_id: number; item: number; tag: string; kind: string; nps: string; rating: number; line: string; at: V3; stem: string }
+export interface Lists { lines: LineRow[]; equipment: EquipRow[]; mto: MtoRow[]; valves: ValveRow[] }
 
 export interface Example { id: string; name: string; what: string }
 export interface Shown { q: string; label: string; factor: number; offset: number; dim?: number[] }

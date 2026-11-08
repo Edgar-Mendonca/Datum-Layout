@@ -5,7 +5,7 @@
 //! boxes and measured with exact convex distance.
 
 use crate::catalogue::Catalogue;
-use crate::model::{Project, P3};
+use crate::model::{End, EquipKind, Project, P3};
 use crate::parts::{add, dist, dot, mul, rotate, unit, Shape};
 use crate::route::{Built, Issue, Part};
 use parry3d_f64::math::{Pose, Vector};
@@ -115,6 +115,44 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
         out.push(Issue { kind: "number", text: format!("A {}\" line has no line number.", l.nps), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 });
     }
     out.extend(line_list_issues(p));
+    out.extend(design_rules(p, cat, b));
+    out
+}
+
+/// Good-practice rules a layout designer checks by eye: a valve stem pointing down (hard to reach
+/// and it collects dirt in the bonnet); a swing check valve in a run flowing down (it cannot
+/// close: the flow runs from a line's start to its end, or away from a pump's discharge); a pipe piece between fittings too short
+/// to weld well (6 to 50 mm; under 6 mm the fittings are welded straight together).
+pub fn design_rules(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
+    let _ = cat;
+    let mut out = vec![];
+    let name = |id: u32| p.line(id).map(|l| if l.number.is_empty() { "(no number)".to_string() } else { l.number.clone() }).unwrap_or_default();
+    for q in &b.parts {
+        let mid = if q.ports.len() >= 2 { crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5) } else { q.ports.first().map(|x| x.p).unwrap_or_default() };
+        let iss = |text: String| Issue { kind: "rule", text, at: mid, line: q.line, item: q.item, equip: 0 };
+        match q.kind {
+            "gate" | "globe" | "ball" if q.item != 0 => {
+                let it = p.line(q.line).and_then(|l| l.items.iter().find(|i| i.id == q.item));
+                if it.is_some_and(|i| i.dir[2] < -0.5) {
+                    out.push(iss(format!("Line {}: the {} valve's stem points down; turn it up or sideways, where it can be reached and its bonnet stays clean.", name(q.line), q.kind)));
+                }
+            }
+            "check" if q.ports.len() >= 2 => {
+                // The flow's direction: from the line's start to its end, unless a pump says
+                // otherwise (flow leaves its discharge D and enters its suction S).
+                let u = crate::parts::unit(crate::parts::sub(q.ports[1].p, q.ports[0].p));
+                let pump = |e: &End, tag: &str| matches!(e, End::Nozzle { equip, nozzle } if nozzle == tag && p.equip(*equip).is_some_and(|x| x.kind == EquipKind::Pump));
+                let back = p.line(q.line).is_some_and(|l| pump(&l.to, "D") || pump(&l.from, "S"));
+                if (if back { -u[2] } else { u[2] }) < -0.9 {
+                    out.push(iss(format!("Line {}: a swing check valve in a run flowing down cannot close; put it in a level run or one flowing up (or reverse the line if it is drawn against the flow).", name(q.line))));
+                }
+            }
+            "pipe" if q.length >= 0.006 && q.length < 0.05 => {
+                out.push(iss(format!("Line {}: a pipe piece only {:.0} mm long between fittings is too short to weld well (weld fittings straight together, or keep at least 50 mm of pipe); move the fitting or the corner.", name(q.line), q.length * 1000.0)));
+            }
+            _ => {}
+        }
+    }
     out
 }
 

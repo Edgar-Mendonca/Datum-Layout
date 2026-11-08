@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.1.10 — 2026-11-08
+The valve list, butt welds in the take-off, and design rules in the checks.
+
+**Valve list.** Lists › Valve List (and its CSV): every valve and strainer with its tag, type, size, class, line, position and the way its stem points. Click a row to select the valve.
+
+**Butt welds.** The material take-off counts the butt welds of each line by size: every joint where pipe, fittings and weld-neck flanges meet.
+
+**Design rules.** The checks now also find a valve stem pointing down, a swing check valve in a run flowing down (the flow runs from a line's start to its end, or away from a pump's discharge), and pipe pieces between fittings too short to weld well (6 to 50 mm).
+
 ## 0.1.9 — 2026-11-08
 A new workspace, laid out like Datum Mesh's: the work in order, everything in the plant at a glance.
 

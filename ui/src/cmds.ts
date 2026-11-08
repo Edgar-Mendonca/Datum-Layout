@@ -217,7 +217,7 @@ export const C = {
     if (text) download(`${safe(l?.number || p.name)}.pcf`, text, `${l ? `line ${l.number}` : "every line"} for Datum Pipe (File › Import there)`);
   },
   exportGltf: async () => { const d = await call<string>("export_gltf"); if (d) download(`${safe(project()?.name ?? "plant")}.glb`, d, "the 3D model (glTF)"); },
-  exportCsv: async (kind: "lines" | "equipment" | "mto") => {
+  exportCsv: async (kind: "lines" | "equipment" | "mto" | "valves") => {
     const text = await call<string>("export_csv", { kind });
     if (text) download(`${safe(project()?.name ?? "plant")} ${kind === "mto" ? "material take-off" : kind === "lines" ? "line list" : "equipment list"}.csv`, text, kind === "mto" ? "the material take-off" : kind === "lines" ? "the line list" : "the equipment list");
   },

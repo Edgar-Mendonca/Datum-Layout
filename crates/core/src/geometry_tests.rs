@@ -448,3 +448,48 @@ fn tidy_merges_straight_corners_and_keeps_components() {
     assert_eq!(l.pts, vec![[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 3.0, 0.0]]);
     assert_eq!((l.items[0].seg, l.items[0].at), (0, 3.0));
 }
+
+#[test]
+fn design_rules_find_stems_down_check_valves_flowing_down_and_short_pieces() {
+    let cat = Catalogue::builtin();
+    let rules = |p: &Project| { let b = build(p, &cat); crate::checks::design_rules(p, &cat, &b) };
+    // Every example follows the rules.
+    for ex in crate::examples::list() { let p = crate::examples::get(ex.id).unwrap(); assert!(rules(&p).is_empty(), "{}: {:?}", ex.name, rules(&p)); }
+    // A gate valve with its stem down; a check valve on a run flowing down.
+    let mut v = item(5, ItemKind::Gate, 0, 2.5); v.dir = [0.0, 0.0, -1.0];
+    let p = line("4", vec![[0.0, 0.0, 3.0], [5.0, 0.0, 3.0], [5.0, 0.0, -3.0]], vec![v, item(6, ItemKind::Check, 1, 3.0)]);
+    let r = rules(&p);
+    assert_eq!(r.len(), 2, "{r:?}");
+    assert!(r.iter().any(|i| i.text.contains("stem points down")) && r.iter().any(|i| i.text.contains("flowing down")));
+    // Drawn the other way (flowing up), the check valve is fine.
+    let mut v = item(5, ItemKind::Gate, 1, 2.5); v.dir = [0.0, 1.0, 0.0];
+    let p = line("4", vec![[5.0, 0.0, -3.0], [5.0, 0.0, 3.0], [0.0, 0.0, 3.0]], vec![item(6, ItemKind::Check, 0, 3.0), v]);
+    assert!(rules(&p).is_empty(), "{:?}", rules(&p));
+    // Two elbows 20 mm of pipe apart.
+    let e = cat.fitting("8").unwrap().elbow_lr * 2.0 + 0.02; // two 8" long-radius elbows and 20 mm of pipe
+    let p = line("8", vec![[0.0, 0.0, 0.0], [3.0, 0.0, 0.0], [3.0, e, 0.0], [6.0, e, 0.0]], vec![]);
+    let r = rules(&p);
+    assert!(r.len() == 1 && r[0].text.contains("too short"), "{r:?}");
+}
+
+#[test]
+fn the_take_off_counts_butt_welds_and_the_valve_list_lists_valves() {
+    let cat = Catalogue::builtin();
+    // Pipe, elbow, pipe: two welds; a valve adds its two flanges' welds.
+    let p = line("6", vec![[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 5.0, 0.0]], vec![]);
+    let welds = |p: &Project| crate::lists::lists(p, &cat).mto.iter().filter(|r| r.group == "Welds").map(|r| r.qty).sum::<f64>();
+    assert_eq!(welds(&p), 2.0);
+    let mut v = item(5, ItemKind::Gate, 0, 2.0); v.dir = [0.0, 0.0, 1.0]; v.tag = "HV-1".into();
+    let p = line("6", vec![[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 5.0, 0.0]], vec![v]);
+    assert_eq!(welds(&p), 4.0);
+    let l = crate::lists::lists(&p, &cat);
+    assert_eq!(l.valves.len(), 1);
+    assert_eq!((l.valves[0].tag.as_str(), l.valves[0].kind.as_str(), l.valves[0].nps.as_str(), l.valves[0].stem.as_str()), ("HV-1", "gate", "6", "up"));
+    assert!((l.valves[0].at[0] - 2.0).abs() < 1e-6, "{:?}", l.valves[0].at);
+    let csv = crate::lists::csv(&l, "valves").unwrap();
+    assert!(csv.starts_with("Tag,Type") && csv.contains("HV-1,gate,6,150"), "{csv}");
+    // Example 1: every valve listed.
+    let p = crate::examples::get("pumps").unwrap();
+    let n: usize = p.lines.iter().map(|l| l.items.iter().filter(|i| matches!(i.kind, ItemKind::Gate | ItemKind::Globe | ItemKind::Check | ItemKind::Ball | ItemKind::Strainer)).count()).sum();
+    assert_eq!(crate::lists::lists(&p, &cat).valves.len(), n);
+}

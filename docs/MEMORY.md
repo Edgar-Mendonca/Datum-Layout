@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.9 (2026-11-08) |
+| **Current version** | 0.1.10 (2026-11-08) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -100,6 +100,9 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.9 (user) | The window copies Datum Mesh's shell (steps bar, tree with steps, branches, counts, marks and eyes, filter, context bar, tool strip, properties card over the view with grips) into `ui/src/shell.tsx`, adapted to the six steps of a layout (Plot, Equipment, Lines, Fittings, Check, Hand over); the catalogue became the tree's second tab | The user: Mesh's panes look like a commercial app; make Layout the same |
 | 0.1.9 | The properties card hides while a tool is active (route, place, measure) and Esc closes it; tree eyes and View › Hide share one hidden list | The card never covers the nozzle being clicked; one idea of "hidden" |
 | 0.1.9 | Roadmap re-ordered as PLAN-0.2 proposed: 0.2 pipe classes and fittings (with the valve list, weld count and design rules), 0.3 steel and supports, 0.4 drawings, 0.5 From Schema, 0.6 CAD exchange, 0.7 big models | The work an engineer meets first comes first; Schema's package can wait for its format to settle |
+| 0.1.10 | Flow runs from a line's start to its end unless a pump says otherwise (away from its discharge D, into its suction S); the swing-check rule uses that | The examples draw discharge lines from the header to the pump; the rule must not flag correct valves |
+| 0.1.10 | A pipe piece under 6 mm between fittings counts as fittings welded straight together; 6 to 50 mm is reported as too short to weld | The router leaves a few millimetres where fittings meet; a real short spool is what matters |
+| 0.1.10 | The valve list, weld count and design rules (planned for 0.2) came first as 0.1.10; 0.2 keeps the class editor, eccentric reducers, crosses and sloped lines | Small releases, each finished and tested |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -119,7 +122,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.7 | Corners (`Op::MoveCorner`) and jogs (`Op::Jog`, `Op::RemoveJog`, `doc::tidy`); colour by line, class, fluid or size with a key; hide, isolate, show all; section box (clipping planes, picking honours it) | ✅ |
 | 0.1.8 | Saved views (`Project.views`, `Op::SetViews`); line list import and check (`Project.line_list`, `ImportLineList`, `UseListedLine`, `checks::line_list_issues`); PCF import (`pcf::import`, `Op::ImportPcf`), proved by reading every example back | ✅ |
 | 0.1.9 | The workspace after Datum Mesh's shell (`ui/src/shell.tsx`): steps bar, plant tree (filter, counts, marks, eyes, menus), context bar, tool strip, properties card over the view, resizable panes; site.json and roadmap brought up to date | ✅ |
-| 0.2 Pipe classes and fittings | Class editor with branch table; eccentric reducers, crosses, sloped lines; valve list, weld count, design-rule checks | 🔜 |
+| 0.1.10 | Valve list (`lists::ValveRow`, CSV "valves"); butt welds counted in the take-off; design rules (`checks::design_rules`: stem down, swing check flowing down, short pipe pieces) | ✅ |
+| 0.2 Pipe classes and fittings | Class editor with branch table; eccentric reducers, crosses, sloped lines | 🔜 |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
 | 0.5 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check | ⬜ |
@@ -158,6 +162,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - The user handed over 0.1.5 to 0.2.0 to be done unattended, in the order of `docs/PLAN-0.2.md` (industry gap analysis): the catalogue, then working with many items, routing edits, views, imports, lists and checks, then the class editor.
 - 0.1.5: merged the outside helper's flanges, valves and fittings (see Decisions); eight example classes; all six ratings; measure tool.
 - 0.1.6: multi-select and group move, copy, turn, mirror and delete; engine test `groups_move_copy_rotate_and_mirror_cleanly`; UI checks for Ctrl+A, Ctrl+D, mirror and undo.
+- 0.1.10: valve list, butt-weld count, design rules (engine tests with failing and passing cases; UI checks for the list, a rule and undo).
 - 0.1.9 (the user's request mid-run): Datum Mesh's shell studied (its UI test run for screenshots) and copied: steps bar, plant tree, context bar, tool strip, properties card; UI checks for each; the filter bug the new check found fixed; site.json brought up to date for 0.1.5–0.1.9.
 - 0.1.8: saved views; line list import and check; PCF import (round-trip test over every example); UI checks with real file choosers.
 - 0.1.7: move corners, add and remove jogs (engine tests on every example line: components return to the same place); colour by with a key; hide/isolate; section box; UI checks for each.

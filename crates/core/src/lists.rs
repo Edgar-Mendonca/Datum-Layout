@@ -15,8 +15,16 @@ pub struct NozzleRow { pub tag: String, pub nps: String, pub rating: u32, pub fa
 pub struct EquipRow { pub id: u32, pub tag: String, pub kind: String, pub at: P3, pub rot: f64, pub sizes: Vec<(String, f64)>, pub data: Vec<(String, String)>, pub nozzles: Vec<NozzleRow> }
 #[derive(Serialize, Clone, Debug)]
 pub struct MtoRow { pub line: String, pub group: &'static str, pub what: String, pub nps: String, pub qty: f64, pub unit: &'static str }
+#[derive(Serialize, Clone, Debug)]
+pub struct ValveRow { pub line_id: u32, pub item: u32, pub tag: String, pub kind: String, pub nps: String, pub rating: u32, pub line: String, pub at: P3, pub stem: String }
 #[derive(Serialize, Clone, Debug, Default)]
-pub struct Lists { pub lines: Vec<LineRow>, pub equipment: Vec<EquipRow>, pub mto: Vec<MtoRow> }
+pub struct Lists { pub lines: Vec<LineRow>, pub equipment: Vec<EquipRow>, pub mto: Vec<MtoRow>, pub valves: Vec<ValveRow> }
+
+/// Where a valve's stem points, in words.
+fn stem_words(d: P3) -> String {
+    let (x, y, z) = (d[0], d[1], d[2]);
+    if z > 0.7 { "up".into() } else if z < -0.7 { "down".into() } else if x.abs() >= y.abs() { if x > 0.0 { "east".into() } else { "west".into() } } else if y > 0.0 { "north".into() } else { "south".into() }
+}
 
 fn end_text(p: &Project, e: &End) -> String {
     match e {
@@ -55,6 +63,22 @@ fn describe(q: &Part, class: &str, sched: &str, material: &str) -> Option<(&'sta
 pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
     let b = build(p, cat);
     let mut out = Lists::default();
+    // Butt welds: joints where both parts end in a bevel (pipe, fittings, a weld-neck's neck).
+    let mut welds: BTreeMap<(u32, String), f64> = BTreeMap::new();
+    for (&(i, j), &(a, c)) in &crate::checks::connections(&b) {
+        if (i, j) > (a, c) { continue; }
+        let (x, y) = (&b.parts[i], &b.parts[a]);
+        if x.ports[j].end == "BW" && y.ports[c].end == "BW" {
+            let line = if x.line != 0 { x.line } else { y.line };
+            *welds.entry((line, x.ports[j].nps.clone())).or_default() += 1.0;
+        }
+    }
+    for q in b.parts.iter().filter(|q| matches!(q.kind, "gate" | "globe" | "check" | "ball" | "strainer") && q.item != 0) {
+        let Some(l) = p.line(q.line) else { continue };
+        let it = l.items.iter().find(|i| i.id == q.item);
+        let at = if q.ports.len() >= 2 { crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5) } else { q.ports.first().map(|x| x.p).unwrap_or_default() };
+        out.valves.push(ValveRow { line_id: l.id, item: q.item, tag: it.map(|i| i.tag.clone()).unwrap_or_default(), kind: q.kind.into(), nps: q.nps.clone(), rating: q.rating, line: l.number.clone(), at, stem: if q.kind == "check" || q.kind == "strainer" { String::new() } else { it.map(|i| stem_words(i.dir)).unwrap_or_default() } });
+    }
     let mut by_line: BTreeMap<u32, Vec<&Part>> = BTreeMap::new();
     for q in b.parts.iter().filter(|q| q.line != 0) { by_line.entry(q.line).or_default().push(q); }
     for l in &p.lines {
@@ -68,12 +92,16 @@ pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
         let class = cat.class(&l.class);
         let material = class.map(|c| c.material.to_lowercase()).unwrap_or_else(|| "carbon steel".into());
         let mut rows: BTreeMap<(usize, &'static str, String, usize), (f64, &'static str)> = BTreeMap::new();
-        let group_order = |g: &str| ["Pipe", "Fittings", "Flanges", "Valves", "Gaskets", "Bolts"].iter().position(|x| *x == g).unwrap_or(9);
+        let group_order = |g: &str| ["Pipe", "Fittings", "Flanges", "Valves", "Gaskets", "Bolts", "Welds"].iter().position(|x| *x == g).unwrap_or(9);
         for q in &parts {
             let sched = class.map(|c| c.schedule(&q.nps)).unwrap_or_else(|| "STD".into());
             let Some((g, what)) = describe(q, &l.class, &sched, &material) else { continue };
             let e = rows.entry((group_order(g), g, what, crate::catalogue::nps_index(&q.nps))).or_insert((0.0, if g == "Pipe" { "m" } else if g == "Bolts" { "set" } else { "ea" }));
             e.0 += if g == "Pipe" { q.length } else { 1.0 };
+        }
+        for ((line, nps), n) in welds.iter().filter(|((line, _), _)| *line == l.id) {
+            let _ = line;
+            rows.insert((group_order("Welds"), "Welds", "Butt weld (shop or field)".into(), crate::catalogue::nps_index(nps)), (*n, "ea"));
         }
         for ((_, g, what, k), (qty, unit)) in rows {
             out.mto.push(MtoRow { line: l.number.clone(), group: g, what, nps: crate::catalogue::NPS.get(k).map(|s| s.to_string()).unwrap_or_default(), qty: if unit == "m" { (qty * 1000.0).round() / 1000.0 } else { qty }, unit });
@@ -128,6 +156,10 @@ pub fn csv(l: &Lists, kind: &str) -> Result<String, String> {
         "mto" => {
             s += &row(&["Line", "Group", "Description", "Size (in)", "Quantity", "Unit"].map(String::from));
             for r in &l.mto { s += &row(&[r.line.clone(), r.group.into(), r.what.clone(), r.nps.clone(), if r.unit == "m" { f(r.qty, 3) } else { f(r.qty, 0) }, r.unit.into()]); }
+        }
+        "valves" => {
+            s += &row(&["Tag", "Type", "Size (in)", "Rating", "Line", "E (m)", "N (m)", "EL (m)", "Stem"].map(String::from));
+            for v in &l.valves { s += &row(&[v.tag.clone(), v.kind.clone(), v.nps.clone(), v.rating.to_string(), v.line.clone(), f(v.at[0], 3), f(v.at[1], 3), f(v.at[2], 3), v.stem.clone()]); }
         }
         _ => return Err(format!("There is no list called {kind}.")),
     }

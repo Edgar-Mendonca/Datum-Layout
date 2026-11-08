@@ -144,9 +144,9 @@ export const Ribbon = () => {
         <G l="Against the P&ID"><Planned big i="compare" l="3D vs P&ID" v="0.2" /></G>
       </Show>
       <Show when={tab() === "lists"}>
-        <G l="Lists" h="lists"><B big i="list" l="Line List" run={() => setBottom("lines")} /><B big i="vvessel" l="Equipment" run={() => setBottom("equipment")} /><B big i="mto" l="Take-off" run={() => setBottom("lines")} title="The material take-off is under the line list" /></G>
+        <G l="Lists" h="lists"><B big i="list" l="Line List" run={() => setBottom("lines")} /><B big i="vvessel" l="Equipment" run={() => setBottom("equipment")} /><B big i="valve" l="Valve List" run={() => setBottom("valves")} title="Every valve and strainer: tag, type, size, class, line, position and stem" /><B big i="mto" l="Take-off" run={() => setBottom("lines")} title="The material take-off is under the line list" /></G>
         <G l="Import" h="import"><B big i="import" l="Line List" run={C.importLineList} title="Read a line list (CSV) to check the model against" /><B big i="pipe" l="PCF Lines" run={C.importPcf} title="Add lines from a piping component file (.pcf)" /></G>
-        <G l="Export CSV" h="csv"><S><B i="csv" l="Line list" run={() => C.exportCsv("lines")} /><B i="csv" l="Equipment and nozzles" run={() => C.exportCsv("equipment")} /><B i="csv" l="Material take-off" run={() => C.exportCsv("mto")} /></S></G>
+        <G l="Export CSV" h="csv"><S><B i="csv" l="Line list" run={() => C.exportCsv("lines")} /><B i="csv" l="Equipment and nozzles" run={() => C.exportCsv("equipment")} /><B i="csv" l="Material take-off" run={() => C.exportCsv("mto")} /><B i="csv" l="Valve list" run={() => C.exportCsv("valves")} /></S></G>
         <G l="Exports" h="pcf"><B big i="pipe" l="PCF for Datum Pipe" run={() => C.exportPcf(selLine()?.id)} /><B big i="cube" l="glTF 3D Model" run={C.exportGltf} /><Planned big i="ifc" l="IFC" v="0.4" /></G>
         <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
       </Show>

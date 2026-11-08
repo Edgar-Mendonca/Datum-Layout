@@ -147,7 +147,7 @@ const applyFilter = (body: HTMLElement, q: string) => {
     if (inner) (d as HTMLDetailsElement).open = true;
   });
 };
-const KIND_NAME: Record<string, string> = { clash: "Clashes", routing: "Routing", open: "Open ends", mismatch: "Mismatches", class: "Pipe class", number: "Line numbers", list: "Line list" };
+const KIND_NAME: Record<string, string> = { clash: "Clashes", routing: "Routing", open: "Open ends", mismatch: "Mismatches", class: "Pipe class", number: "Line numbers", list: "Line list", rule: "Design rules" };
 
 export const Tree = () => {
   const p = () => project();
@@ -202,6 +202,7 @@ export const Tree = () => {
             <Row2 icon="pipe" label="PCF for Datum Pipe" sub="every line" run={() => C.exportPcf()} />
             <Row2 icon="csv" label="Line list" sub="CSV" run={() => C.exportCsv("lines")} />
             <Row2 icon="mto" label="Material take-off" sub="CSV" run={() => C.exportCsv("mto")} />
+            <Row2 icon="valve" label="Valve list" sub="CSV" run={() => C.exportCsv("valves")} />
             <Row2 icon="cube" label="3D model" sub="glTF" run={C.exportGltf} />
           </Step>
         </>}</Show>
@@ -253,7 +254,7 @@ const TOOLS: Record<string, () => Tl[]> = {
   piping: () => [["route", "Route a line (R)", C.route, () => mode() === "route"], ["route", "Route the selected line again", C.reroute], "-", ["jog", "Add a jog to the selected run (J)", () => C.jog()], ["straight", "Remove the jog", C.removeJog], "-", ["up", "One size larger", () => C.step(true)], ["down", "One size smaller", () => C.step(false)]],
   fittings: () => ITEMS.map(([k, l, i]) => [i, `${l}: on the selected line`, () => C.dropOnSelected(k)] as Tl),
   check: () => [["clash", "Check (F5)", C.check], ["list", "Clashes", () => setBottom("clashes")], ["warn", "Checks", () => setBottom("checks")]],
-  lists: () => [["list", "Line list", () => setBottom("lines")], ["vvessel", "Equipment list", () => setBottom("equipment")], "-", ["import", "Import a line list", C.importLineList], ["pipe", "Import PCF lines", C.importPcf], "-", ["csv", "Export the line list", () => C.exportCsv("lines")]],
+  lists: () => [["list", "Line list", () => setBottom("lines")], ["vvessel", "Equipment list", () => setBottom("equipment")], ["valve", "Valve list", () => setBottom("valves")], "-", ["import", "Import a line list", C.importLineList], ["pipe", "Import PCF lines", C.importPcf], "-", ["csv", "Export the line list", () => C.exportCsv("lines")]],
   view: () => [["fit", "Fit (F)", C.fit], ["cube", "Isometric", () => C.std("iso")], ["plan", "Plan", () => C.std("plan")], "-", ["hide", "Hide (H)", C.hide], ["isolate", "Isolate (I)", C.isolate], ["showall", "Show all", C.showAll], ["section", "Section box", C.sectionBox, () => !!section()], "-", ["camera", "Save this view", C.saveView]],
 };
 /** Beside the tree: the open tab's most used tools, one click each. */

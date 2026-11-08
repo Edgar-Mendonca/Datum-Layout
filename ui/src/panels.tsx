@@ -224,7 +224,7 @@ const [lists, setLists] = createSignal<Lists | null>(null);
 export const refreshLists = async () => { const l = await call<Lists>("lists"); if (l) setLists(l); };
 
 const IssueRow = (p: { i: Issue }) => (
-  <tr class="f" onClick={() => C.goto(p.i)}><td><span class={`sev ${p.i.kind}`}>{({ clash: "Clash", routing: "Routing", open: "Open end", mismatch: "Mismatch", class: "Class", number: "Number", list: "Line list" } as any)[p.i.kind]}</span></td><td>{p.i.text}</td><td class="r mono muted">{p.i.at.map(v => toU("coord", v).toFixed(2)).join(", ")}</td></tr>
+  <tr class="f" onClick={() => C.goto(p.i)}><td><span class={`sev ${p.i.kind}`}>{({ clash: "Clash", routing: "Routing", open: "Open end", mismatch: "Mismatch", class: "Class", number: "Number", list: "Line list", rule: "Design rule" } as any)[p.i.kind]}</span></td><td>{p.i.text}</td><td class="r mono muted">{p.i.at.map(v => toU("coord", v).toFixed(2)).join(", ")}</td></tr>
 );
 
 export const BottomPanel = () => {
@@ -233,7 +233,7 @@ export const BottomPanel = () => {
   createEffect(on(bottom, () => refreshLists()));
   const clashes = createMemo(() => (checked() ?? []).filter(i => i.kind === "clash"));
   const others = createMemo(() => checked() ? checked()!.filter(i => i.kind !== "clash") : (out()?.issues ?? []));
-  const tabs: [typeof bottom extends () => infer T ? T : never, string][] = [["lines", "Lines"], ["equipment", "Equipment"], ["clashes", "Clashes"], ["checks", "Checks"]];
+  const tabs: [typeof bottom extends () => infer T ? T : never, string][] = [["lines", "Lines"], ["equipment", "Equipment"], ["valves", "Valves"], ["clashes", "Clashes"], ["checks", "Checks"]];
   return (
     <section class="bpanel">
       <nav class="btabs">
@@ -241,6 +241,7 @@ export const BottomPanel = () => {
         <span class="grow" />
         <Show when={bottom() === "lines"}><label class="chk"><input type="checkbox" checked={mto()} onChange={e => setMto(e.currentTarget.checked)} />Material take-off</label><button class="btn sm" onClick={() => C.exportCsv(mto() ? "mto" : "lines")}>CSV</button></Show>
         <Show when={bottom() === "equipment"}><button class="btn sm" onClick={() => C.exportCsv("equipment")}>CSV</button></Show>
+        <Show when={bottom() === "valves"}><button class="btn sm" onClick={() => C.exportCsv("valves")}>CSV</button></Show>
         <Show when={bottom() === "clashes" || bottom() === "checks"}><Show when={checkStale()}><span class="muted">The plant changed since the check.</span></Show><button class="btn sm pri" onClick={C.check}>Check now</button></Show>
       </nav>
       <div class="bbody">
@@ -259,6 +260,13 @@ export const BottomPanel = () => {
             <For each={lists()?.equipment ?? []} fallback={<tr><td colSpan={10} class="muted">No equipment yet: drag it from the catalogue onto the plot.</td></tr>}>{e => <For each={e.nozzles.length ? e.nozzles : [null]}>{(n, i) => <tr class="f" classList={{ on: selEquip()?.id === e.id }} onClick={() => setSel(n ? { kind: "nozzle", id: e.id, tag: n.tag } : { kind: "equip", id: e.id })}>
               <td>{i() === 0 ? <b>{e.tag}</b> : ""}</td><td>{i() === 0 ? e.kind : ""}</td><td>{n?.tag}</td><td>{n ? inch(n.nps) : ""}</td><td>{n?.rating}</td><td>{n?.service}</td>
               <For each={[0, 1, 2]}>{k => <td class="r mono">{toU("coord", (n ? n.at : e.at)[k]).toFixed(3)}</td>}</For><td>{n?.line}</td></tr>}</For>}</For>
+          </tbody></table>
+        </Show>
+        <Show when={bottom() === "valves"}>
+          <table class="tbl lst"><thead><tr><th>Tag</th><th>Type</th><th>Size</th><th>Class</th><th>Line</th><th class="r">E</th><th class="r">N</th><th class="r">EL</th><th>Stem</th></tr></thead><tbody>
+            <For each={lists()?.valves ?? []} fallback={<tr><td colSpan={9} class="muted">No valves yet: drag them from the catalogue onto a pipe.</td></tr>}>{v => <tr class="f" classList={{ on: sel()?.kind === "item" && (sel() as { id: number }).id === v.item }} onClick={() => setSel({ kind: "item", id: v.item, line: v.line_id })}>
+              <td>{v.tag || <i class="muted">no tag</i>}</td><td>{({ gate: "Gate", globe: "Globe", check: "Check (swing)", ball: "Ball", strainer: "Strainer (Y)" } as Record<string, string>)[v.kind] ?? v.kind}</td><td>{inch(v.nps)}</td><td>{v.rating}</td><td>{v.line}</td>
+              <For each={[0, 1, 2]}>{k => <td class="r mono">{toU("coord", v.at[k]).toFixed(3)}</td>}</For><td>{v.stem}</td></tr>}</For>
           </tbody></table>
         </Show>
         <Show when={bottom() === "clashes"}>

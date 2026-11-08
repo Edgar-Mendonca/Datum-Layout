@@ -54,7 +54,7 @@
       ]
     },
     {
-      "v": "0.1.5–0.1.9",
+      "v": "0.1.5–0.1.10",
       "title": "Working like a layout designer",
       "when": "Done",
       "items": [
@@ -62,7 +62,8 @@
         "Select several items; move, copy, turn, mirror and delete them together",
         "Move corners and add or remove jogs; colour by line, class, fluid or size; hide, isolate, section box",
         "Saved views; a line list to check against; lines from piping component files",
-        "The workspace: steps bar, plant tree, context bar and tool strip"
+        "The workspace: steps bar, plant tree, context bar and tool strip",
+        "A valve list, butt welds in the take-off, design-rule checks"
       ]
     },
     {
@@ -72,7 +73,7 @@
       "items": [
         "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
         "Eccentric reducers, crosses, sloped lines",
-        "A valve list, a weld count and design-rule checks (minimum straight runs, valve access)"
+        "Design rules for supports and access (with 0.3's steel)"
       ]
     },
     {

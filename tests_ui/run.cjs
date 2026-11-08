@@ -77,7 +77,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the empty state says what to do", (await p.textContent(".v3d .empty")).includes("Drag equipment"));
   check("the window has the eight ribbon tabs", JSON.stringify(await p.$$eval(".tabs > button:not(.file)", els => els.map(e => e.textContent))) === JSON.stringify(["Home", "Equipment", "Piping", "Fittings", "Check", "Lists", "View", "Help"]));
   const bt = await p.$$eval(".btabs > button:not(.btn)", els => els.map(e => e.childNodes[0].textContent));
-  check("the bottom panel has Lines, Equipment, Clashes and Checks", bt.join() === "Lines,Equipment,Clashes,Checks", bt.join());
+  check("the bottom panel has Lines, Equipment, Valves, Clashes and Checks", bt.join() === "Lines,Equipment,Valves,Clashes,Checks", bt.join());
   for (const t of ["Home", "Equipment", "Piping", "Fittings", "Check", "Lists", "View", "Help"]) { await p.click(`.tabs > button:has-text("${t}")`); await settle(80); seen.push(await allText()); }
 
   // 3. Place equipment from the catalogue by drag and drop onto the plot.
@@ -107,7 +107,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const parts = sc2 => sc2.parts.filter(q => q.line === line.id).map(q => q.kind);
   let s2 = (await ask("scene")).ok;
   check("its elbows, flanges and gaskets were placed by themselves", parts(s2).includes("elbow90") && parts(s2).filter(k => k === "flange").length === 2 && parts(s2).filter(k => k === "gasket").length === 2, JSON.stringify(parts(s2)));
-  check("the routed line has no routing problems", st.issues.filter(i => i.line === line.id && i.kind !== "number").length === 0, JSON.stringify(st.issues));
+  check("the routed line has no routing problems", st.issues.filter(i => i.line === line.id && i.kind !== "number" && i.kind !== "rule").length === 0, JSON.stringify(st.issues));
 
   // 5. Drag a gate valve onto the line's longest run: it snaps, splits the pipe, nothing is open.
   const pts = st.paths.find(x => x[0] === line.id)[1];
@@ -211,6 +211,21 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the context bar switches units", (await state()).p.units === "US");
   await p.selectOption("select.ctxunits", "SI"); await settle(400);
   if (shots) { const eq = (await state()).p.equipment.find(e => e.tag === "P-101A").id; await p.click(`.tree .ti[data-id="${eq}"] > span:not(.teye)`); await settle(300); await shot("workspace"); }
+
+  // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
+  await open("pumps");
+  const nv = (await ask("lists")).ok.valves.length;
+  await p.click('.tabs > button:has-text("Lists")'); await p.click('.rb:has-text("Valve List")'); await settle(500);
+  check("the valve list shows every valve", nv === 6 && (await p.$$(".bbody tr.f")).length === nv, `${nv} ${(await p.$$(".bbody tr.f")).length}`);
+  check("the take-off counts butt welds", (await ask("lists")).ok.mto.some(r => r.group === "Welds" && r.qty > 0));
+  await p.click('.bbody tr.f:has-text("Gate")'); await settle(400);
+  await p.selectOption('.ipop .iprow:has(label:has-text("Stem")) select', { label: "Down" }); await settle(600);
+  st = await state();
+  check("a valve stem turned down breaks a design rule", st.issues.some(i => i.kind === "rule" && i.text.includes("stem points down")), JSON.stringify(st.issues.map(i => i.text)));
+  await p.click(".btabs > button:has-text(\"Checks\")"); await settle(300);
+  check("the Checks tab lists it as a design rule", (await p.textContent(".bbody")).includes("Design rule"));
+  await p.keyboard.press("Control+z"); await settle(500);
+  check("undo puts the stem back and clears the rule", !(await state()).issues.some(i => i.kind === "rule"));
 
   // 7d. Corners, jogs and what the view shows (0.1.7).
   await open("pumps");

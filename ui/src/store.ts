@@ -50,7 +50,7 @@ export const [opts, setOpts] = createSignal<Options>({ autosave: 5, beta: false,
 export const [backstage, setBackstage] = createSignal<string | null>("home");
 export const [tab, setTab] = createSignal("home");
 /** The bottom panel's tab and whether it is open. */
-export const [bottom, setBottom] = createSignal<"lines" | "equipment" | "clashes" | "checks">("lines");
+export const [bottom, setBottom] = createSignal<"lines" | "equipment" | "valves" | "clashes" | "checks">("lines");
 
 // ---------- selection ----------
 /** What is selected: equipment, one of its nozzles, a line, one straight run of it, a component on it, an area, or the plot. */
