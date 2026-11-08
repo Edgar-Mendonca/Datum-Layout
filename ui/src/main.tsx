@@ -12,12 +12,13 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "./styles.css";
 import { invoke, listen, Out, Options, Shown, Typed } from "./api";
-import { picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
+import { setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
 import { C } from "./cmds";
 import { TitleBar, Ribbon, palette } from "./ribbon";
 import { Backstage, update, checkUpdate } from "./backstage";
 import { View3D } from "./view3d";
-import { CataloguePanel, Inspector, BottomPanel } from "./panels";
+import { Inspector, BottomPanel } from "./panels";
+import { Flow, Tree, CtxBar, ToolStrip, grip, treeW, inspW, popShown } from "./shell";
 import { Menu, Toast } from "./ui";
 import { setUnitTable, fmt } from "./units";
 import * as D from "./dialogs";
@@ -68,6 +69,7 @@ const App = () => {
     else if (e.key === "F5") { e.preventDefault(); C.check(); }
     else if (e.key === "Escape" && backstage() && out()) setBackstage(null);
     else if (e.key === "Escape" && mode() !== "select") C.cancelTool();
+    else if (e.key === "Escape" && !typing && (sel() || picked().length)) { setSel(null); setPicked([]); }
     else if (ctrl && k === "a" && !typing && !backstage()) { e.preventDefault(); C.selectAll(); }
     else if (ctrl && k === "d" && !typing && !backstage()) { e.preventDefault(); C.copyGroup(); }
     else if (typing || ctrl || backstage()) return;
@@ -92,15 +94,23 @@ const App = () => {
     <div class="app" ref={() => document.addEventListener("keydown", keys)}>
       <TitleBar update={update()?.available ? update()!.latest : null} />
       <Ribbon />
+      <Show when={out()}><CtxBar /></Show>
       <main class="work">
         <Show when={out()}>
-          <CataloguePanel />
-          <div class="center">
-            <View3D />
-            <div class="bhandle" onPointerDown={drag} />
-            <div style={{ height: `${bh()}px`, flex: "none", display: "flex" }}><BottomPanel /></div>
+          <Flow />
+          <div class="content" style={{ "--tree-w": `${treeW()}px`, "--insp-w": `${inspW()}px` }}>
+            <Tree />
+            <div class="vgrip" onPointerDown={e => grip(e, "tree")} title="Drag to widen or narrow the tree" />
+            <ToolStrip />
+            <div class="center">
+              <div class="viewwrap">
+                <View3D />
+                <Show when={popShown()}><div class="ipop"><div class="vgrip" onPointerDown={e => grip(e, "insp")} title="Drag to widen or narrow this panel" /><Inspector /></div></Show>
+              </div>
+              <div class="bhandle" onPointerDown={drag} />
+              <div style={{ height: `${bh()}px`, flex: "none", display: "flex" }}><BottomPanel /></div>
+            </div>
           </div>
-          <Inspector />
         </Show>
       </main>
       <Status />

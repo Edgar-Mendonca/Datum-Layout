@@ -69,7 +69,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the update card names Datum Layout", (await p.textContent(".card .brand")).includes("Datum Layout"));
   seen.push(await allText());
   for (const k of ["Export", "Options", "Roadmap", "Updates"]) { await p.click(`.bs aside button:has-text("${k}")`); await settle(150); seen.push(await allText()); }
-  check("File › Roadmap lists 0.2 From Schema", seen[seen.length - 2].includes("From Schema"));
+  check("File › Roadmap lists the next release and From Schema", seen[seen.length - 2].includes("Pipe classes and fittings") && seen[seen.length - 2].includes("From Schema"));
 
   // 2. An empty plot: grid coordinates and plant north, an empty state that offers the first action.
   await open(null);
@@ -113,6 +113,10 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const pts = st.paths.find(x => x[0] === line.id)[1];
   let k = 0, best = -1; for (let i = 0; i + 1 < pts.length; i++) { const d = Math.hypot(...[0, 1, 2].map(j => pts[i + 1][j] - pts[i][j])); if (d > best) { best = d; k = i; } }
   const mid = [0, 1, 2].map(j => (pts[k][j] + pts[k + 1][j]) / 2);
+  check("the routed line's properties show over the view", !!(await p.$(".ipop .insp")));
+  await p.keyboard.press("Escape"); await settle(200);
+  check("Esc closes the properties card", !(await p.$(".ipop")));
+  await p.keyboard.press("f"); await settle(300);
   await dropAt("item", "gate", mid);
   st = await state();
   const gate = st.p.lines[0].items.find(i => i.kind === "gate");
@@ -180,6 +184,33 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("mirroring the copy keeps it clean", !st.issues.length, JSON.stringify(st.issues.map(i => i.text)));
   await p.keyboard.press("Control+z"); await p.keyboard.press("Control+z"); await settle(600);
   check("undo takes the copy away again", (await state()).p.equipment.length === 3);
+
+  // 7f. The workspace (0.1.9, after Datum Mesh): steps bar, plant tree, eyes, filter, catalogue tab.
+  await open("pumps");
+  check("the steps bar shows six steps, equipment and lines done", (await p.$$(".flow button .fn")).length === 6 && (await p.$$(".flow button.done")).length >= 3, String((await p.$$(".flow button.done")).length));
+  await p.click('.flow button:has-text("Fittings")'); await settle(200);
+  check("a step opens its ribbon tab", (await p.textContent(".tabs button.on")).includes("Fittings"));
+  check("the tree lists the equipment and every line", (await p.$$(".tree .ti[data-id]")).length === 8, String((await p.$$(".tree .ti[data-id]")).length));
+  check("the tree lists the valves on the lines", (await p.textContent(".tree")).includes("Gate valves"));
+  const lid = (await state()).p.lines.find(l => l.number.includes("1002")).id;
+  const row = `.tree .ti[data-id="${lid}"]`;
+  await p.click(`${row} > span:not(.teye)`); await settle(300);
+  check("clicking a line in the tree selects it and opens its properties", (await p.textContent(".ipop .insp header")).includes("P-1002"));
+  await p.click(`${row} .teye`); await settle(300);
+  check("its eye hides it in the view", (await p.textContent(".hidnote")).includes("1 hidden") && !!(await p.$(`${row}.dim`)));
+  await p.click(`${row} .teye`); await settle(300);
+  check("and shows it again", !(await p.$(".hidnote")));
+  await p.fill(".tfilter input", "P-101B"); await settle(300);
+  const vis = await p.$$eval(".tree .ti[data-id]", els => els.filter(e => e.offsetParent !== null).map(e => e.textContent));
+  check("the filter keeps only matching rows", vis.length === 1 && vis[0].includes("P-101B"), JSON.stringify(vis));
+  await p.fill(".tfilter input", ""); await settle(200);
+  await p.click('.ttabs button:has-text("Catalogue")'); await settle(200);
+  check("the Catalogue tab holds the parts to drag", (await p.$$(".tree .cattile")).length >= 10 && await p.isVisible(".tree .cattile"));
+  await p.click('.ttabs button:has-text("Plant")'); await settle(200);
+  await p.selectOption("select.ctxunits", "US"); await settle(500);
+  check("the context bar switches units", (await state()).p.units === "US");
+  await p.selectOption("select.ctxunits", "SI"); await settle(400);
+  if (shots) { const eq = (await state()).p.equipment.find(e => e.tag === "P-101A").id; await p.click(`.tree .ti[data-id="${eq}"] > span:not(.teye)`); await settle(300); await shot("workspace"); }
 
   // 7d. Corners, jogs and what the view shows (0.1.7).
   await open("pumps");

@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.8 (2026-11-08) |
+| **Current version** | 0.1.9 (2026-11-08) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -47,7 +47,8 @@ Coordinates: metres, X east, Y north, Z up, in the engine, the file and PCF; the
 | `src-tauri/src/main.rs` | Commands (state, apply, history, scene, check, lists, examples, catalogue, packs, exports, files, options, recovery, recent, open_url, updates); `guard` (a panic becomes a message), crash.log, atomic saves, read limits |
 | `src-tauri/src/update.rs` | Plan's updater (`REPO` = Datum-Layout; requires SHA256SUMS.txt) |
 | `ui/src/view3d.tsx` | The 3D view: plot (ground, grid, coordinates, plant north), areas, parts from one buffer with colours per part, picking, selection colours, labels, ports and the route preview, snap marker while dragging, axis arrows (gizmo), standard views and fit, the orbit speed check |
-| `ui/src/panels.tsx` | Catalogue panel (search, drag source, classes, packs), Inspector (equipment with nozzles and datasheet, line, component, area, plot), bottom panel (Lines with take-off, Equipment, Clashes, Checks) |
+| `ui/src/shell.tsx` | The workspace after Datum Mesh: steps bar (`Flow`), plant tree (`Tree`: steps, branches, counts, marks, eyes, filter, menus), context bar (`CtxBar`), tool strip (`ToolStrip`), pane grips and the properties card |
+| `ui/src/panels.tsx` | Catalogue (the tree's second tab: search, drag source, classes, packs), Inspector (the properties card) (equipment with nozzles and datasheet, line, component, area, plot), bottom panel (Lines with take-off, Equipment, Clashes, Checks) |
 | `ui/src/ribbon.tsx`, `cmds.ts` | Title bar, Tell Me, ribbon (Home · Equipment · Piping · Fittings · Check · Lists · View · Help, contextual Format); every command |
 | `ui/src/store.ts`, `api.ts`, `units.ts` | Window state (plant, scene, selection, tools, checks), the engine's shapes, display units |
 | `ui/src/backstage.tsx`, `print.tsx`, `dialogs.tsx`, `help.tsx`, `roadmap.tsx`, `ui.tsx`, `styles.css`, `index.html` | File page, print (view + lists), dialogs and help pages, ? cards, roadmap, components, the family styles (steel), the icon sprite |
@@ -96,6 +97,9 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.8 | The line list is matched by line number, or by the number after its size ("8\"-P-1001" matches "10\"-P-1001") since the model renames a line when it is resized | A resized line is reported as a difference, not as two strangers |
 | 0.1.8 | PCF import walks each pipeline's end-point graph from a free end, takes elbows' centre points as corners and keeps valves, strainers, tees and reducers as items; flanges, gaskets and bolts are generated again; a reducer next to an end that lands on a free nozzle is the nozzle's own and is dropped | Round trip of every example gives the same lines, parts and findings |
 | 0.1.8 (user) | The window is to follow Datum Mesh's shell (steps bar, plant tree with filter, marks and eyes, context bar, tool strip, resizable panes): next release | The user: "improvements on the UI is one of the biggest tasks… look at Datum Mesh and do the same here" |
+| 0.1.9 (user) | The window copies Datum Mesh's shell (steps bar, tree with steps, branches, counts, marks and eyes, filter, context bar, tool strip, properties card over the view with grips) into `ui/src/shell.tsx`, adapted to the six steps of a layout (Plot, Equipment, Lines, Fittings, Check, Hand over); the catalogue became the tree's second tab | The user: Mesh's panes look like a commercial app; make Layout the same |
+| 0.1.9 | The properties card hides while a tool is active (route, place, measure) and Esc closes it; tree eyes and View › Hide share one hidden list | The card never covers the nozzle being clicked; one idea of "hidden" |
+| 0.1.9 | Roadmap re-ordered as PLAN-0.2 proposed: 0.2 pipe classes and fittings (with the valve list, weld count and design rules), 0.3 steel and supports, 0.4 drawings, 0.5 From Schema, 0.6 CAD exchange, 0.7 big models | The work an engineer meets first comes first; Schema's package can wait for its format to settle |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -114,11 +118,13 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.6 | Multi-select (Ctrl+click, Select All), group move, copy (Ctrl+D), turn ±90°, mirror east–west / north–south and delete (`Op::MoveGroup`, `CopyGroup`, `RotateGroup`, `MirrorGroup`) | ✅ |
 | 0.1.7 | Corners (`Op::MoveCorner`) and jogs (`Op::Jog`, `Op::RemoveJog`, `doc::tidy`); colour by line, class, fluid or size with a key; hide, isolate, show all; section box (clipping planes, picking honours it) | ✅ |
 | 0.1.8 | Saved views (`Project.views`, `Op::SetViews`); line list import and check (`Project.line_list`, `ImportLineList`, `UseListedLine`, `checks::line_list_issues`); PCF import (`pcf::import`, `Op::ImportPcf`), proved by reading every example back | ✅ |
-| 0.2 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check; more classes as packs | 🔜 |
+| 0.1.9 | The workspace after Datum Mesh's shell (`ui/src/shell.tsx`): steps bar, plant tree (filter, counts, marks, eyes, menus), context bar, tool strip, properties card over the view, resizable panes; site.json and roadmap brought up to date | ✅ |
+| 0.2 Pipe classes and fittings | Class editor with branch table; eccentric reducers, crosses, sloped lines; valve list, weld count, design-rule checks | 🔜 |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
-| 0.5 CAD exchange | Optional engine on first use; STEP import and export | ⬜ |
-| 0.6 Big models and teams | Level of detail, areas on demand, project database with history, several users | ⬜ |
+| 0.5 From Schema | Import the plant package; place and route from it; 3D-against-P&ID check | ⬜ |
+| 0.6 CAD exchange | Optional engine on first use; STEP import and export | ⬜ |
+| 0.7 Big models and teams | Level of detail, areas on demand, project database with history, several users | ⬜ |
 | Parked | Datum Library: the shared data repo for every app's tables (see Decisions, 2026-11-08) | 💭 |
 | 1.0 | Catalogue validated against its sources, user guide, signed installer | ⬜ |
 
@@ -152,6 +158,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - The user handed over 0.1.5 to 0.2.0 to be done unattended, in the order of `docs/PLAN-0.2.md` (industry gap analysis): the catalogue, then working with many items, routing edits, views, imports, lists and checks, then the class editor.
 - 0.1.5: merged the outside helper's flanges, valves and fittings (see Decisions); eight example classes; all six ratings; measure tool.
 - 0.1.6: multi-select and group move, copy, turn, mirror and delete; engine test `groups_move_copy_rotate_and_mirror_cleanly`; UI checks for Ctrl+A, Ctrl+D, mirror and undo.
+- 0.1.9 (the user's request mid-run): Datum Mesh's shell studied (its UI test run for screenshots) and copied: steps bar, plant tree, context bar, tool strip, properties card; UI checks for each; the filter bug the new check found fixed; site.json brought up to date for 0.1.5–0.1.9.
 - 0.1.8: saved views; line list import and check; PCF import (round-trip test over every example); UI checks with real file choosers.
 - 0.1.7: move corners, add and remove jogs (engine tests on every example line: components return to the same place); colour by with a key; hide/isolate; section box; UI checks for each.
 

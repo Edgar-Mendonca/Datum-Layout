@@ -7,7 +7,7 @@
   "for": "Piping and layout designers, mechanical and process engineers, and students learning plant design.",
   "about": [
     "Datum Layout lays out one plant in 3D. You place equipment from its datasheet sizes, route pipes between nozzles, and the elbows, tees, flanges and valves appear and size themselves from the line's size and pipe class. Every part is generated from a dimension table and a shape rule, so nothing is downloaded and every dimension has a source.",
-    "Then it checks the model for clashes, open ends and spec problems, lists every line, the equipment with its nozzles and the material take-off, and hands each line to Datum Pipe as a piping component file for its isometric and stress analysis."
+    "Then it checks the model for clashes, open ends, spec problems and differences with the line list, lists every line, the equipment with its nozzles and the material take-off, and hands each line to Datum Pipe as a piping component file for its isometric and stress analysis. Lines can also come in from a piping component file."
   ],
   "steps": [
     {
@@ -24,14 +24,17 @@
     }
   ],
   "highlights": [
+    "A workspace laid out in the order of the work: a steps bar, a plant tree with filters and eyes to show or hide each item, a context bar and a tool strip",
     "Six parametric equipment types with nozzles: vertical vessel, horizontal drum, storage tank, column, centrifugal pump with motor and baseplate, shell-and-tube exchanger",
     "Routing with orthogonal guides: long- or short-radius elbows at every turn, reducers where sizes change, weld-neck flanges, gaskets and bolt sets at flanged nozzles",
+    "Drag corners, add or remove jogs, move runs: the elbows follow and components stay put",
     "Drag and drop valves, strainers, flange pairs, tees and reducers that snap onto the pipe by their ports; a tee starts a branch",
-    "Change a line's size and every component re-sizes; move a run and the elbows follow; undo everything",
-    "Clash check (pipe–pipe, pipe–equipment, pipe–ground) with a clearance, plus open ends, mismatches, class rules and missing line numbers",
-    "Line list, equipment and nozzle list, and material take-off per line, all to CSV",
-    "PCF export that Datum Pipe reads unchanged, and glTF 2.0 for any 3D viewer",
-    "A catalogue of generated parts (½\" to 24\") with every row's source, and plug-in packs for company pipe classes"
+    "Select several items to move, copy, turn, mirror or delete them together",
+    "Colour by line, class, fluid or size; hide, isolate, section box, measure and saved views",
+    "Clash check (pipe–pipe, pipe–equipment, pipe–ground) with a clearance, plus open ends, mismatches, class rules, line numbers and the line list",
+    "Line list, equipment and nozzle list, and material take-off per line, all to CSV; a line list CSV read back to check against",
+    "PCF export that Datum Pipe reads unchanged, PCF import, and glTF 2.0 for any 3D viewer",
+    "A catalogue of generated parts (½\" to 24\", flanges class 150 to 2500, valves in every class) with every row's source, eight example pipe classes, and plug-in packs"
   ],
   "screenshots": [
     "docs/images/pumps-3d.png",
@@ -43,7 +46,7 @@
     {
       "v": "0.1",
       "title": "Spec-driven piping in 3D",
-      "when": "Next",
+      "when": "Done",
       "items": [
         "Plot, six equipment types, routing with automatic elbows, reducers and flanges",
         "Drag-and-drop fittings that snap and split",
@@ -51,20 +54,31 @@
       ]
     },
     {
-      "v": "0.2",
-      "title": "From Schema",
-      "when": "Soon",
+      "v": "0.1.5–0.1.9",
+      "title": "Working like a layout designer",
+      "when": "Done",
       "items": [
-        "Import Datum Schema's plant package: equipment with datasheet values and nozzles, lines with from/to, size, class and component order",
-        "Place equipment and route its lines from the package",
-        "A 3D-against-P&ID check: missing or extra components, wrong order, wrong size, unconnected lines",
-        "More pipe classes as plug-in packs"
+        "Flanges to class 2500, valves in every class, eight example pipe classes, a measure tool",
+        "Select several items; move, copy, turn, mirror and delete them together",
+        "Move corners and add or remove jogs; colour by line, class, fluid or size; hide, isolate, section box",
+        "Saved views; a line list to check against; lines from piping component files",
+        "The workspace: steps bar, plant tree, context bar and tool strip"
+      ]
+    },
+    {
+      "v": "0.2",
+      "title": "Pipe classes and fittings",
+      "when": "Next",
+      "items": [
+        "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
+        "Eccentric reducers, crosses, sloped lines",
+        "A valve list, a weld count and design-rule checks (minimum straight runs, valve access)"
       ]
     },
     {
       "v": "0.3",
       "title": "Steel and supports",
-      "when": "Later",
+      "when": "Soon",
       "items": [
         "Pipe racks, platforms, ladders and stairs as parametric steel",
         "Pipe supports (rest, guide, anchor, shoe) placed on lines and sent to Datum Pipe with the PCF"
@@ -82,6 +96,17 @@
     },
     {
       "v": "0.5",
+      "title": "From Schema",
+      "when": "Later",
+      "items": [
+        "Import Datum Schema's plant package: equipment with datasheet values and nozzles, lines with from/to, size, class and component order",
+        "Place equipment and route its lines from the package",
+        "A 3D-against-P&ID check: missing or extra components, wrong order, wrong size, unconnected lines",
+        "More pipe classes as plug-in packs"
+      ]
+    },
+    {
+      "v": "0.6",
       "title": "CAD exchange",
       "when": "Later",
       "items": [
@@ -89,7 +114,7 @@
       ]
     },
     {
-      "v": "0.6",
+      "v": "0.7",
       "title": "Big models and teams",
       "when": "Later",
       "items": [

@@ -3,7 +3,7 @@
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
 import { CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
-import { picked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
+import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help } from "./help";
 import { Icon } from "./ui";
@@ -196,10 +196,10 @@ const AreaInsp = (p: { id: number }) => {
 };
 
 export const Inspector = () => {
-  const title = () => { const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
+  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
   return (
     <aside class="insp">
-      <header>Inspector <b>{title()}</b><Help k="inspector" /></header>
+      <header>Properties <b>{title()}</b><Help k="inspector" /><button class="x" title="Close (Esc)" onClick={() => { setSel(null); setPicked([]); }}>×</button></header>
       <div class="ibody">
         <Show when={project() && picked().length}>
           <p class="iwhat"><b>{picked().length} items selected</b></p>

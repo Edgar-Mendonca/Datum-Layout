@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.1.9 — 2026-11-08
+A new workspace, laid out like Datum Mesh's: the work in order, everything in the plant at a glance.
+
+**Steps bar.** At the far left: Plot, Equipment, Lines, Fittings, Check and Hand over, each marked when done. A click opens that step's ribbon tab.
+
+**Plant tree.** Everything in the plant in that order: the plot and areas; equipment with its nozzles (and the line on each); lines and the line list; valves and fittings grouped by kind; the check's findings; saved views and the hand-over files. Click a row to select it (Ctrl+click adds to a group), double-click to zoom to it, right-click to hide, isolate, export or delete it. Each row's eye shows or hides it in the view. A filter finds any tag, line number or valve. The catalogue is the tree's second tab.
+
+**Context bar.** Under the ribbon, whatever the tab: size, class and rating for new lines, the working elevation, colour by, labels, section box, show all, the standard views and the units.
+
+**Tool strip and properties card.** Beside the tree, the open tab's most used tools. The properties of what is selected open on a card over the view, as a compact grid; Esc or × closes it, and it steps aside while routing or placing. The tree and the card can be widened by dragging their edge.
+
 ## 0.1.8 — 2026-11-08
 Saved views, a line list to check against, and lines read from piping component files.
 
