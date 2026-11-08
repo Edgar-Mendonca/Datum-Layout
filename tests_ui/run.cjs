@@ -212,6 +212,24 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.selectOption("select.ctxunits", "SI"); await settle(400);
   if (shots) { const eq = (await state()).p.equipment.find(e => e.tag === "P-101A").id; await p.click(`.tree .ti[data-id="${eq}"] > span:not(.teye)`); await settle(300); await shot("workspace"); }
 
+  // 7h. The Library (0.2.0): classes and parts tables with their sources.
+  await open("pumps");
+  await p.click('.flow button[data-tool="library"]'); await settle(600);
+  check("the Library lists every pipe class and the four parts tables", (await p.$$('.libx .mlist > button')).length === 12, String((await p.$$('.libx .mlist > button')).length));
+  await p.click('.libx .mlist > button:has-text("CS300")'); await settle(300);
+  const lt = await p.textContent(".libpage");
+  check("a class page shows its wall by size and allowed components", lt.includes("Class 300") && /½"\s*80/.test(lt) && lt.includes("Gate valve"), lt.slice(0, 300));
+  if (shots) await shot("library-class");
+  await p.click('.libx .mlist > button:has-text("Use for new lines")').catch(() => {});
+  await p.click('.libpage button:has-text("Use for new lines")'); await settle(500);
+  check("Use for new lines sets the class", (await state()).p.settings.class === "CS300");
+  await p.click('.libx .mlist > button:has-text("Flanges")'); await settle(200);
+  await p.fill(".libsearch", "2500"); await settle(300);
+  const fr = await p.$$eval(".libtbl tbody tr", rs => rs.map(r => r.children[1]?.textContent));
+  check("search narrows the flange table to class 2500", fr.length > 5 && fr.every(x => x === "2500"), JSON.stringify(fr.slice(0, 5)));
+  if (shots) await shot("library-flanges");
+  await p.keyboard.press("Escape"); await settle(200);
+
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
   const nv = (await ask("lists")).ok.valves.length;

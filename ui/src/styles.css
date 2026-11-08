@@ -1086,3 +1086,31 @@ tr.behind td { background: var(--err-bg); }
 .ipop .iprow input, .ipop .iprow select { height: 23px; font-size: 12px; }
 .ipop .ibody > h4, .ipop .ibody h4 { margin: 10px 10px 4px; }
 .ipop .ibody > p, .ipop .ibody > .v3, .ipop .ibody > table, .ipop .ibody > .ntab, .ipop .ibody > .ti { margin-left: 10px; margin-right: 10px; }
+
+/* 0.2.0: the Library (after Datum Mesh's materials library). */
+.dlg:has(.libx) { width: min(1180px, 94vw); }
+.libx { grid-template-columns: 230px 1fr; height: min(640px, 72vh); }
+.libx .mlist { overflow-y: auto; gap: 1px; }
+.libx .mlist .libsearch { margin-bottom: 6px; }
+.libx .mlist .fam { font: 500 9.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 10px 0 3px 2px; }
+.libx .mlist > button { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.libx .mlist > button small { margin-left: auto; color: var(--muted); font: 10.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+.libx .libpack { font-size: 12px; padding: 3px 8px; color: var(--text2); }
+.libpage { overflow-y: auto; min-width: 0; padding-right: 4px; }
+.libpage h3 { margin: 0 0 6px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.libpage h3 small { font-weight: 400; font-size: 12px; }
+.libpage h4 { font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 12px 0 4px; }
+.libmeta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--text2); padding: 8px 10px; background: var(--panel); border: 1px solid var(--line2); }
+.libmeta b { font-weight: 500; color: var(--muted); margin-right: 4px; }
+.libcols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.libtbl { max-height: 380px; overflow: auto; border: 1px solid var(--line2); }
+.libtbl table { font-size: 12px; width: 100%; }
+.libtbl thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+.libtbl td, .libtbl th { padding: 3px 8px; white-space: nowrap; }
+.libtbl td small { white-space: normal; }
+.libsrc { margin-top: 10px; }
+.catclass[role=button] { cursor: pointer; }
+.catclass[role=button]:hover { background: var(--pale); }
+.libx .libpage { display: block; }
+.libtbl td small.src { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 320px; white-space: normal; line-height: 1.3; }
+.libpage > .libtbl { max-height: calc(min(640px, 72vh) - 110px); }

@@ -34,7 +34,8 @@
     "Clash check (pipe–pipe, pipe–equipment, pipe–ground) with a clearance, plus open ends, mismatches, class rules, line numbers and the line list",
     "Line list, equipment and nozzle list, and material take-off per line, all to CSV; a line list CSV read back to check against",
     "PCF export that Datum Pipe reads unchanged, PCF import, and glTF 2.0 for any 3D viewer",
-    "A catalogue of generated parts (½\" to 24\", flanges class 150 to 2500, valves in every class) with every row's source, eight example pipe classes, and plug-in packs"
+    "A catalogue of generated parts (½\" to 24\", flanges class 150 to 2500, valves in every class) with every row's source, eight example pipe classes, and plug-in packs",
+    "A Library of every pipe class and parts table, searchable, each row with its source"
   ],
   "screenshots": [
     "docs/images/pumps-3d.png",
@@ -71,6 +72,7 @@
       "title": "Pipe classes and fittings",
       "when": "Next",
       "items": [
+        "The Library: every pipe class and parts table, browsable, with its source (0.2.0)",
         "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
         "Eccentric reducers, crosses, sloped lines",
         "Design rules for supports and access (with 0.3's steel)"

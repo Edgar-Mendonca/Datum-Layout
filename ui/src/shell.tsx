@@ -57,7 +57,7 @@ export const Flow = () => (
     <span class="fgrow" />
     <span class="fcap">Tools</span>
     <button class="fextra" data-tool="catalogue" classList={{ on: treeTab() === "catalogue" }} title="The catalogue: equipment, valves, fittings, pipe classes and packs" onClick={() => setTreeTab(treeTab() === "catalogue" ? "plant" : "catalogue")}><Ic n="list" /><span>Catalogue</span></button>
-    <button class="fextra" title="Check clashes and errors (F5)" onClick={() => C.check()}><Ic n="clash" /><span>Check</span></button>
+    <button class="fextra" data-tool="library" title="The library: every pipe class and parts table, with its source" onClick={() => import("./library").then(k => k.library())}><Ic n="library" /><span>Library</span></button>
     <button class="fextra" title="Options" onClick={() => setBackstage("options")}><Ic n="opts" /><span>Options</span></button>
   </nav>
 );

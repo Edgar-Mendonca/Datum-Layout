@@ -42,7 +42,7 @@ export const CataloguePanel = () => {
         <div class="catgrid"><For each={ITEMS.slice(5)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
         <Show when={!q()}>
           <h4>Pipe classes <Help k="spec" /></h4>
-          <For each={catalogue()?.cat.classes ?? []}>{c => <div class="catclass"><b>{c.name}</b><span>{c.description}</span><small>{inch(c.sizes[0] ?? "")}–{inch(c.sizes[c.sizes.length - 1] ?? "")} · class {c.ratings.join(", ")}</small></div>}</For>
+          <For each={catalogue()?.cat.classes ?? []}>{c => <div class="catclass" role="button" title="Open in the Library" onClick={() => import("./library").then(k => k.library(`class:${c.name}`))}><b>{c.name}</b><span>{c.description}</span><small>{inch(c.sizes[0] ?? "")}–{inch(c.sizes[c.sizes.length - 1] ?? "")} · class {c.ratings.join(", ")}</small></div>}</For>
           <h4>Plug-in packs <Help k="packs" /></h4>
           <For each={catalogue()?.cat.packs ?? []} fallback={<p class="muted">Company pipe classes and extra parts, as a folder of CSV and JSON files.</p>}>{p => <div class="catpack"><span>{p}</span><button class="x" title="Remove the pack" onClick={async () => { await call("remove_pack", { name: p }); refetchCatalogue(); }}>×</button></div>}</For>
           <Show when={catalogue()?.cat.warnings.length}><details class="catwarn"><summary>{catalogue()!.cat.warnings.length} row(s) not used</summary><For each={catalogue()!.cat.warnings}>{w => <p>{w}</p>}</For></details></Show>

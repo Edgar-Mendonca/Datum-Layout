@@ -124,6 +124,7 @@ export const Ribbon = () => {
         <G l="Route" h="route"><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Click a nozzle or a point, then the corners; end on a nozzle or double-click (R)" /><S><ElevBox /><B i="up" l="Up one grid step" run={() => C.elevation(p()?.plot.grid ?? 1)} /><B i="down" l="Down one grid step" run={() => C.elevation(-(p()?.plot.grid ?? 1))} /></S><S><B i="route" l="Route Again" run={C.reroute} off={!selLine()} title="Route the selected line square again between its ends (after equipment moved or turned)" /></S></G>
         <G l="New Lines" h="spec"><S>
           <label class="rsel">Size<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, nps: e.currentTarget.value } })}><For each={NPS}>{s => <option value={s} selected={p()?.settings.nps === s}>{inch(s)}</option>}</For></select></label>
+          <B i="library" l="Library" run={() => import("./library").then(k => k.library(`class:${p()?.settings.class ?? ""}`))} title="The pipe classes and parts tables" />
           <label class="rsel">Class<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, class: e.currentTarget.value } })}><For each={catalogue()?.cat.classes ?? []}>{c => <option value={c.name} selected={p()?.settings.class === c.name}>{c.name}</option>}</For></select></label>
           <label class="rsel">Rating<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, rating: +e.currentTarget.value } })}><For each={RATINGS}>{r => <option value={r} selected={p()?.settings.rating === r}>Class {r}</option>}</For></select></label>
         </S></G>
@@ -175,7 +176,7 @@ export const Ribbon = () => {
       </Show>
       <Show when={tab() === "help"}>
         <G l="Learn"><B big i="report" l="Getting Started" run={() => D.gettingStarted()} /><B big i="info" l="Glossary" run={() => D.glossary()} /><B big i="help" l="What Is This Tool?" dd={e => openMenu(e, Object.entries(HELP).map(([k, h]) => ({ label: h.t, run: () => helpCard(k) })))} /><B big i="keys" l="Shortcuts" run={() => D.shortcuts()} /><B big i="search" l="Tell Me" run={palette} /></G>
-        <G l="Catalogue"><B big i="info" l="Sources" run={() => D.sources()} title="Where every dimension table comes from" /></G>
+        <G l="Catalogue" h="library"><B big i="library" l="Library" run={() => import("./library").then(k => k.library())} title="Every pipe class and parts table, with its source" /><B big i="info" l="Sources" run={() => D.sources()} title="Where every dimension table comes from" /></G>
         <G l="Datum Layout on GitHub"><B big i="github" l="GitHub" run={() => call("open_url", { url: GH })} /><B big i="tag" l="Releases" run={() => call("open_url", { url: `${GH}/releases` })} /><B big i="bug" l="Report an Issue" run={() => call("open_url", { url: `${GH}/issues/new` })} /></G>
         <G l="Updates"><B big i="upd" l="Check for Updates" run={() => setBackstage("about")} /><B big i="list" l="Roadmap" run={() => setBackstage("roadmap")} /></G>
       </Show>

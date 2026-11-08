@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.2.0 — 2026-11-08
+The Library: every pipe class and parts table, browsable, with its source.
+
+**Pipe classes.** Each class's material, flange ratings, sizes and elbows; its wall schedule size by size with the pipe's outside diameter and wall; the components it allows and in which sizes; how many lines use it. "Use for new lines" sets it for the next lines you route.
+
+**Parts tables.** Pipe (267 sizes and schedules), butt-weld fittings, flanges (½" to 24", class 150 to 2500, weld-neck and blind) and valves (466 rows), row by row, each with its source.
+
+**Search.** Find a class, a size (6, 1-1/2), a valve type or a flange class (2500). Open the Library from the steps bar, Help › Library, Piping › Library, or by clicking a pipe class in the catalogue.
+
 ## 0.1.10 — 2026-11-08
 The valve list, butt welds in the take-off, and design rules in the checks.
 

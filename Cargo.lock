@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "datum-core"
-version = "0.1.10"
+version = "0.2.0"
 dependencies = [
  "parry3d-f64",
  "serde",
@@ -536,7 +536,7 @@ dependencies = [
 
 [[package]]
 name = "datum-layout"
-version = "0.1.10"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "datum-core",

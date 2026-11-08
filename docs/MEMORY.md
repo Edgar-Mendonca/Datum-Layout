@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.1.10 (2026-11-08) |
+| **Current version** | 0.2.0 (2026-11-08) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -103,6 +103,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.10 | Flow runs from a line's start to its end unless a pump says otherwise (away from its discharge D, into its suction S); the swing-check rule uses that | The examples draw discharge lines from the header to the pump; the rule must not flag correct valves |
 | 0.1.10 | A pipe piece under 6 mm between fittings counts as fittings welded straight together; 6 to 50 mm is reported as too short to weld | The router leaves a few millimetres where fittings meet; a real short spool is what matters |
 | 0.1.10 | The valve list, weld count and design rules (planned for 0.2) came first as 0.1.10; 0.2 keeps the class editor, eccentric reducers, crosses and sloped lines | Small releases, each finished and tested |
+| 0.2.0 (user) | 0.2 is built in small releases the user can look at each morning: 0.2.0 the Library, 0.2.1 more components (eccentric reducers, weldolets), 0.2.2 crosses or polish; not everything at once | The user: "just few things… then it would be good for me to go ahead and view all this" |
+| 0.2.0 | The Library shows the catalogue the engine already sends (`catalogue` command); the class's schedule by size uses the engine's rule (last "from" size not above it) | No new engine code, one rule |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -123,6 +125,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.8 | Saved views (`Project.views`, `Op::SetViews`); line list import and check (`Project.line_list`, `ImportLineList`, `UseListedLine`, `checks::line_list_issues`); PCF import (`pcf::import`, `Op::ImportPcf`), proved by reading every example back | ✅ |
 | 0.1.9 | The workspace after Datum Mesh's shell (`ui/src/shell.tsx`): steps bar, plant tree (filter, counts, marks, eyes, menus), context bar, tool strip, properties card over the view, resizable panes; site.json and roadmap brought up to date | ✅ |
 | 0.1.10 | Valve list (`lists::ValveRow`, CSV "valves"); butt welds counted in the take-off; design rules (`checks::design_rules`: stem down, swing check flowing down, short pipe pieces) | ✅ |
+| 0.2.0 | The Library (`ui/src/library.tsx`, after Datum Mesh's materials library): pipe classes (wall by size, components allowed, lines using it, use for new lines) and the parts tables with sources, searchable | ✅ |
 | 0.2 Pipe classes and fittings | Class editor with branch table; eccentric reducers, crosses, sloped lines | 🔜 |
 | 0.3 Steel and supports | Racks, platforms, ladders, stairs; pipe supports sent to Datum Pipe with the PCF | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -166,6 +169,10 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - 0.1.9 (the user's request mid-run): Datum Mesh's shell studied (its UI test run for screenshots) and copied: steps bar, plant tree, context bar, tool strip, properties card; UI checks for each; the filter bug the new check found fixed; site.json brought up to date for 0.1.5–0.1.9.
 - 0.1.8: saved views; line list import and check; PCF import (round-trip test over every example); UI checks with real file choosers.
 - 0.1.7: move corners, add and remove jogs (engine tests on every example line: components return to the same place); colour by with a key; hide/isolate; section box; UI checks for each.
+
+### 2026-11-08: Session 4 (0.2.x)
+- The user confirmed the family flow (Schema → Layout → Pipe; PCF as the hand-over, a documented plain-text format we read and write with our own code) and asked for a few small 0.2 releases to view in the morning, the look kept in step with Datum Mesh (Datum Pipe is getting the same).
+- 0.2.0: the Library.
 
 ## 5. Known limits
 
