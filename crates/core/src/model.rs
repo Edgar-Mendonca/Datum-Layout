@@ -160,6 +160,31 @@ pub enum ItemKind {
     FlangePair,
     Tee,
     Reducer,
+    /// A pipe support at a point of a run (it takes no length; the pipe is split there so the
+    /// stress model has a node).
+    Support,
+}
+
+/// What a pipe support holds: a rest carries the weight, a guide also stops sideways movement,
+/// a line stop stops movement along the pipe, an anchor holds it fixed.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum SupportKind {
+    #[default]
+    Rest,
+    Guide,
+    Stop,
+    Anchor,
+}
+impl SupportKind {
+    pub const ALL: [SupportKind; 4] = [SupportKind::Rest, SupportKind::Guide, SupportKind::Stop, SupportKind::Anchor];
+    pub fn name(self) -> &'static str {
+        match self { SupportKind::Rest => "Rest (shoe)", SupportKind::Guide => "Guide", SupportKind::Stop => "Line stop", SupportKind::Anchor => "Anchor" }
+    }
+    /// The SKEY written to the piping component file (Datum Pipe reads ANC, GUI and LST).
+    pub fn skey(self) -> &'static str {
+        match self { SupportKind::Rest => "REST", SupportKind::Guide => "GUI", SupportKind::Stop => "LST", SupportKind::Anchor => "ANC" }
+    }
 }
 impl ItemKind {
     pub fn key(self) -> &'static str {
@@ -172,6 +197,7 @@ impl ItemKind {
             ItemKind::FlangePair => "flange",
             ItemKind::Tee => "tee",
             ItemKind::Reducer => "reducer",
+            ItemKind::Support => "support",
         }
     }
     pub fn name(self) -> &'static str {
@@ -184,6 +210,7 @@ impl ItemKind {
             ItemKind::FlangePair => "Flange pair",
             ItemKind::Tee => "Tee",
             ItemKind::Reducer => "Concentric reducer",
+            ItemKind::Support => "Pipe support",
         }
     }
     pub fn valve(self) -> bool {
@@ -209,6 +236,8 @@ pub struct Item {
     /// Tees: the branch direction (unit, square to the run). Valves: where the stem points.
     pub dir: P3,
     pub tag: String,
+    /// Supports: what it holds.
+    pub support: SupportKind,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]

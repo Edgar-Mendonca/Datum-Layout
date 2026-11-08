@@ -245,6 +245,26 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("only the branch is left, and nothing else differs from the P&ID", st.issues.filter(i => i.kind === "list").length === 1 && st.issues.some(i => i.kind === "list" && i.text.includes("2003")), JSON.stringify(st.issues.filter(i => i.kind === "list").map(i => i.text)));
   if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("from-pid"); }
 
+  // 7j. Pipe supports (0.2.2): on the rack, placed, changed and written for Datum Pipe.
+  await open("rack");
+  st = await state();
+  const nsup = st.p.lines.reduce((n, l) => n + l.items.filter(i => i.kind === "support").length, 0);
+  check("the rack example has its rests, guides and anchors", nsup === 9 && (await p.textContent(".tree")).includes("Pipe supports"), String(nsup));
+  const la = st.p.lines.find(l => l.number.includes("3001"));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(la.number)})`); await settle(300);
+  await p.click('.tabs > button:has-text("Piping")'); await p.click('.rb:has-text("Rest")'); await settle(700);
+  st = await state();
+  const added = st.p.lines.find(l => l.id === la.id).items.filter(i => i.kind === "support");
+  check("Piping › Rest puts a support on the selected line", added.length === 5, String(added.length));
+  await p.selectOption(".ipop select.supkind", "anchor"); await settle(600);
+  st = await state();
+  check("the properties change what it holds", st.p.lines.find(l => l.id === la.id).items.filter(i => i.kind === "support" && i.support === "anchor").length === 2);
+  const pcfA = (await ask("export_pcf", { line: la.id })).ok;
+  check("supports go to Datum Pipe in the PCF", (pcfA.match(/^SUPPORT$/gm) ?? []).length === 5 && pcfA.includes("SKEY ANC") && pcfA.includes("SKEY GUI"), pcfA.slice(-400));
+  check("supports raise no clash or class finding", !st.issues.some(i => i.kind === "class" || i.kind === "clash"), JSON.stringify(st.issues.map(i => i.text)));
+  if (shots) { await p.keyboard.press("Escape"); await settle(200); await p.evaluate(() => (window).__screen); await p.keyboard.press("f"); await settle(400); await shot("supports"); }
+
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
   const nv = (await ask("lists")).ok.valves.length;

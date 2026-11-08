@@ -54,6 +54,12 @@ impl B<'_> {
         self.d.p.normalize();
         id
     }
+    /// A pipe support of a kind on a line near `at`, through the window's own edits.
+    fn support(&mut self, line: u32, at: P3, k: crate::model::SupportKind) {
+        let id = self.drop(line, ItemKind::Support, at, [0.0, 0.0, 0.0]);
+        let it = self.d.p.line(line).and_then(|l| l.items.iter().find(|i| i.id == id)).cloned();
+        if let Some(mut it) = it { it.support = k; self.op(Op::SetItem { line, item: it }); }
+    }
     fn drop(&mut self, line: u32, kind: ItemKind, at: P3, dir: P3) -> u32 {
         self.op(Op::Drop { line, kind, at, dir, nps2: String::new() })[0]
     }
@@ -170,6 +176,12 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     let low = if planted { 0.01 } else { 1.0 };
     let lc = b.line("3\"-D-3003-CS1", "3", br(la, t), blind(), vec![tp, [14.0, 9.2, 5.0], [14.0, 9.2, low]]);
     b.drop(lc, ItemKind::Gate, [14.0, 9.2, 2.5], [1.0, 0.0, 0.0]);
+    // Supports on the rack: rests every 4 m or so, guides near the ends, an anchor in the middle.
+    {
+        use crate::model::SupportKind as S;
+        for (x, k) in [(7.0, S::Guide), (10.5, S::Rest), (17.5, S::Anchor), (21.0, S::Guide)] { b.support(la, [x, 10.0, 5.0], k); }
+        for (x, k) in [(6.0, S::Guide), (10.0, S::Rest), (14.0, S::Anchor), (18.0, S::Rest), (22.0, S::Guide)] { b.support(lb, [x, 11.6, 6.0], k); }
+    }
     if planted {
         // A 2" utility line laid across line A at the rack level.
         b.line("2\"-U-3004-CS1", "2", blind(), blind(), vec![[10.0, 8.5, 5.0], [10.0, 11.0, 5.0]]);

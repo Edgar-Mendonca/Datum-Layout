@@ -535,7 +535,7 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             let l = p.line(line).ok_or("That line no longer exists.")?.clone();
             let (seg, s, _) = snap(p, cat, &l, kind, at, &nps2)?;
             let nps = route::size_at(&l, seg, s);
-            let mut it = Item { id: p.id(), uid: String::new(), kind, seg, at: s, nps2, dir, tag: String::new() };
+            let mut it = Item { id: p.id(), uid: String::new(), kind, seg, at: s, nps2, dir, tag: String::new(), ..Default::default() };
             if kind == ItemKind::Reducer && it.nps2.is_empty() { it.nps2 = route::reducer_to(&it, &nps); }
             created.push(it.id);
             line_mut(p, line)?.items.push(it);

@@ -114,6 +114,7 @@ pub fn item_len(cat: &Catalogue, l: &Line, it: &Item, nps: &str) -> f64 {
         ItemKind::Tee => 2.0 * d.tee,
         ItemKind::Reducer => dimens(cat, &larger(nps, &reducer_to(it, nps)), &l.class, l.rating, l.radius).red,
         ItemKind::FlangePair => 2.0 * d.fl_y + d.gasket,
+        ItemKind::Support => 0.0,
         k => f2f(cat, k, nps, l.rating, d.od) + 2.0 * (d.fl_y + d.gasket),
     }
 }
@@ -505,6 +506,14 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
             q.corner = Some(cp);
             run.push(q, it.id);
         }
+        ItemKind::Support => {
+            let mut q = Part::new("support", l);
+            q.nps = nin.into();
+            q.shapes = support_shapes(run.at(x0), run.u, d.od / 2.0 + l.insulation, it.support);
+            q.corner = Some(run.at(x0));
+            q.note = it.support.skey().into();
+            run.push(q, it.id);
+        }
         ItemKind::FlangePair => {
             run.flange(x0, &d, nin, false, it.id);
             run.gasket(x0 + d.fl_y, &d, nin, it.id);
@@ -526,6 +535,29 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
             run.flange(v0 + body + d.gasket, &d, nin, true, it.id);
         }
     }
+}
+
+/// A pipe support at point `c` of a run along `u` (pipe or insulation radius `r`): on a level run,
+/// a shoe under the pipe (with side lugs for a guide, end lugs for a stop, both for an anchor); on
+/// a vertical run, a clamp with two lugs.
+pub fn support_shapes(c: P3, u: P3, r: f64, k: crate::model::SupportKind) -> Vec<Shape> {
+    use crate::model::SupportKind as S;
+    let box_ = |centre: P3, axes: [P3; 3], half: P3| Shape::Cuboid { centre, axes, half };
+    if u[2].abs() > 0.7 {
+        let (a, b) = crate::parts::frame(u);
+        let mut v = vec![Shape::tube(add(c, mul(u, -0.03)), add(c, mul(u, 0.03)), r + 0.02)];
+        for s in [-1.0, 1.0] { v.push(box_(add(c, mul(a, s * (r + 0.09))), [a, b, u], [0.07, 0.01, 0.05])); }
+        if k == S::Anchor { v.push(box_(add(c, mul(b, r + 0.06)), [a, b, u], [0.04, 0.04, 0.04])); }
+        return v;
+    }
+    let z: P3 = [0.0, 0.0, 1.0];
+    let side = unit(cross(z, u));
+    let h = 0.1;
+    let base = add(c, mul(z, -(r + h / 2.0)));
+    let mut v = vec![box_(base, [u, side, z], [0.15, (r * 0.7).max(0.05), h / 2.0])];
+    if matches!(k, S::Guide | S::Anchor) { for s in [-1.0, 1.0] { v.push(box_(add(c, add(mul(side, s * (r + 0.03)), mul(z, -r * 0.5))), [u, side, z], [0.08, 0.012, r * 0.5 + 0.02])); } }
+    if matches!(k, S::Stop | S::Anchor) { for s in [-1.0, 1.0] { v.push(box_(add(c, add(mul(u, s * 0.17), mul(z, -r))), [u, side, z], [0.012, (r * 0.6).max(0.04), 0.04])); } }
+    v
 }
 
 /// A valve or strainer as a simplified body: flanged ends, a body, and a handwheel, lever or cover.

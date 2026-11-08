@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.2.2 — 2026-11-08
+Pipe supports, handed to Datum Pipe with each line.
+
+**Supports.** Rests (a shoe under the pipe), guides, line stops and anchors. Piping › Supports puts one on the middle of the selected run, or drag Pipe support from the catalogue onto a pipe; choose what it holds in its properties. On a vertical run it is drawn as a clamp. The tree lists them, and the take-off counts them.
+
+**To Datum Pipe.** Each support is written into the piping component file at its point, with what it holds, and the pipe is split there so the stress model has a node. Datum Pipe's own engine reads the pipe rack example's lines with their supports, with no warnings, and solves them. Piping component files read back into Layout keep their supports.
+
+**Example 3.** The pipe rack now has rests, guides and an anchor on both lines.
+
 ## 0.2.1 — 2026-11-08
 From the P&ID: a plant package brings the P&ID's equipment and lines into the layout, and the 3D model is checked against it.
 

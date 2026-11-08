@@ -29,6 +29,7 @@
     "Six parametric equipment types with nozzles: vertical vessel, horizontal drum, storage tank, column, centrifugal pump with motor and baseplate, shell-and-tube exchanger",
     "Routing with orthogonal guides: long- or short-radius elbows at every turn, reducers where sizes change, weld-neck flanges, gaskets and bolt sets at flanged nozzles",
     "Drag corners, add or remove jogs, move runs: the elbows follow and components stay put",
+    "Pipe supports (rest, guide, line stop, anchor) that Datum Pipe reads with each line for its stress analysis",
     "Drag and drop valves, strainers, flange pairs, tees and reducers that snap onto the pipe by their ports; a tee starts a branch",
     "Select several items to move, copy, turn, mirror or delete them together",
     "Colour by line, class, fluid or size; hide, isolate, section box, measure and saved views",
@@ -75,6 +76,7 @@
       "items": [
         "The Library: every pipe class and parts table, browsable, with its source (0.2.0)",
         "From the P&ID: read a plant package, place its equipment, route its lines with their components in order, and check the 3D model against it (0.2.1)",
+        "Pipe supports (rest, guide, line stop, anchor) written for Datum Pipe's stress analysis (0.2.2)",
         "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
         "Eccentric reducers, crosses, sloped lines",
         "Design rules for supports and access (with 0.3's steel)"
@@ -82,11 +84,11 @@
     },
     {
       "v": "0.3",
-      "title": "Steel and supports",
+      "title": "Steel",
       "when": "Soon",
       "items": [
         "Pipe racks, platforms, ladders and stairs as parametric steel",
-        "Pipe supports (rest, guide, anchor, shoe) placed on lines and sent to Datum Pipe with the PCF"
+        "Supports standing on the steel, and their loads from Datum Pipe"
       ]
     },
     {

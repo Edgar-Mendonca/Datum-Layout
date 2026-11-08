@@ -9,7 +9,7 @@ import { project, out, sel, setSel, picked, setPicked, tab, setTab, mode, checke
 import { C } from "./cmds";
 import { Icon } from "./ui";
 import { Help } from "./help";
-import { EQUIP, ITEMS, NPS, RATINGS, inch, Issue } from "./api";
+import { EQUIP, ITEMS, NPS, RATINGS, SUPPORTS, inch, Issue } from "./api";
 import { catalogue, CataloguePanel } from "./panels";
 import { fmt, toU, fromU, unit } from "./units";
 
@@ -19,7 +19,7 @@ const EQ_ICON = Object.fromEntries(EQUIP.map(([k, , i]) => [k, i])) as Record<st
 const EQ_NAME = Object.fromEntries(EQUIP.map(([k, l]) => [k, l])) as Record<string, string>;
 const IT_ICON = Object.fromEntries(ITEMS.map(([k, , i]) => [k, i])) as Record<string, string>;
 const IT_NAME = Object.fromEntries(ITEMS.map(([k, l]) => [k, l.replace(/ \(.*\)$/, "")])) as Record<string, string>;
-const IT_GROUP: Record<string, string> = { gate: "Gate valves", globe: "Globe valves", check: "Check valves", ball: "Ball valves", strainer: "Strainers", flange_pair: "Flange pairs", reducer: "Reducers", tee: "Tees" };
+const IT_GROUP: Record<string, string> = { gate: "Gate valves", globe: "Globe valves", check: "Check valves", ball: "Ball valves", strainer: "Strainers", flange_pair: "Flange pairs", reducer: "Reducers", tee: "Tees", support: "Pipe supports" };
 
 // ------------------------------------------------------------------ the steps
 /** The ribbon tab of each step. */
@@ -189,7 +189,7 @@ export const Tree = () => {
           <Step n={4} f={fs()[3]}>
             <For each={ITEMS.map(([k]) => k).filter(k => items().some(x => x.it.kind === k))}>{k => (
               <Branch t={IT_GROUP[k] ?? IT_NAME[k]} icon={IT_ICON[k]} n={items().filter(x => x.it.kind === k).length} help="fittings">
-                <For each={items().filter(x => x.it.kind === k)}>{x => <Row2 icon={IT_ICON[k]} label={x.it.tag || IT_NAME[k]} sub={`${x.l.number || "line"}`} on={sel()?.kind === "item" && (sel() as { id: number }).id === x.it.id} run={() => { setPicked([]); setSel({ kind: "item", id: x.it.id, line: x.l.id }); }} />}</For></Branch>)}</For>
+                <For each={items().filter(x => x.it.kind === k)}>{x => <Row2 icon={IT_ICON[k]} label={x.it.tag || (k === "support" ? (SUPPORTS.find(s => s[0] === x.it.support)?.[1] ?? "Support") : IT_NAME[k])} sub={`${x.l.number || "line"}`} on={sel()?.kind === "item" && (sel() as { id: number }).id === x.it.id} run={() => { setPicked([]); setSel({ kind: "item", id: x.it.id, line: x.l.id }); }} />}</For></Branch>)}</For>
             <Show when={!items().length}><button class="ti ghost" onClick={() => setTreeTab("catalogue")}><Ic n="valve" /><span>Drag valves and fittings onto a pipe</span></button></Show>
           </Step>
           <Step n={5} f={fs()[4]}>
@@ -252,7 +252,7 @@ type Tl = [string, string, () => void, (() => boolean)?] | "-";
 const TOOLS: Record<string, () => Tl[]> = {
   home: () => [["route", "Route a line (R)", C.route, () => mode() === "route"], ["measure", "Measure (M)", C.measure, () => mode() === "measure"], "-", ["copy", "Copy the selection (Ctrl+D)", C.copyGroup], ["rotate", "Turn the selection 90°", () => C.rotateGroup(90)], ["mirror", "Mirror east–west", () => C.mirrorGroup(false)], "-", ["clash", "Check (F5)", C.check]],
   equipment: () => EQUIP.map(([k, l, i]) => [i, `Place a ${l.toLowerCase()}`, () => C.place(k)] as Tl),
-  piping: () => [["route", "Route a line (R)", C.route, () => mode() === "route"], ["route", "Route the selected line again", C.reroute], "-", ["jog", "Add a jog to the selected run (J)", () => C.jog()], ["straight", "Remove the jog", C.removeJog], "-", ["up", "One size larger", () => C.step(true)], ["down", "One size smaller", () => C.step(false)]],
+  piping: () => [["route", "Route a line (R)", C.route, () => mode() === "route"], ["route", "Route the selected line again", C.reroute], "-", ["jog", "Add a jog to the selected run (J)", () => C.jog()], ["straight", "Remove the jog", C.removeJog], "-", ["up", "One size larger", () => C.step(true)], ["down", "One size smaller", () => C.step(false)], "-", ["support", "Rest on the selected run", () => C.support("rest")]],
   fittings: () => ITEMS.map(([k, l, i]) => [i, `${l}: on the selected line`, () => C.dropOnSelected(k)] as Tl),
   check: () => [["clash", "Check (F5)", C.check], ["list", "Clashes", () => setBottom("clashes")], ["warn", "Checks", () => setBottom("checks")]],
   lists: () => [["list", "Line list", () => setBottom("lines")], ["vvessel", "Equipment list", () => setBottom("equipment")], ["valve", "Valve list", () => setBottom("valves")], "-", ["import", "Import a line list", C.importLineList], ["pipe", "Import PCF lines", C.importPcf], "-", ["csv", "Export the line list", () => C.exportCsv("lines")]],

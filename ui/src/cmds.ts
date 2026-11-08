@@ -1,5 +1,5 @@
 // Commands: what the ribbon, menus, keys and Tell Me run.
-import { SavedView, Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
+import { SUPPORTS, SupportKind, SavedView, Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
 import { colourBy, setColourBy, ColourBy, isolated, hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
 import * as D from "./dialogs";
 import { RouteFrom } from "./store";
@@ -176,10 +176,16 @@ export const C = {
   cancelTool: () => { setRoute(null); setPlacing(null); setMode("select"); },
   measure: () => { setRoute(null); setPlacing(null); setMode(mode() === "measure" ? "select" : "measure"); },
   /** Drops a component onto a line near a point: the engine snaps it to the nearest free place. */
-  drop: async (line: number, kind: ItemKind, at: V3) => {
+  drop: async (line: number, kind: ItemKind, at: V3, support?: SupportKind) => {
     const o = await act({ Drop: { line, kind, at, dir: [0, 0, 0], nps2: "" } });
     if (!o?.created.length) return;
     const id = o.created[0];
+    if (kind === "support") {
+      const it = o.p.lines.find(l => l.id === line)?.items.find(i => i.id === id);
+      if (it && support && support !== it.support) await act({ SetItem: { line, item: { ...it, support } } });
+      setSel({ kind: "item", id, line });
+      return toast(`${SUPPORTS.find(s => s[0] === (support ?? "rest"))?.[1]} placed on the pipe: it goes to Datum Pipe with the line for the stress analysis.`, true);
+    }
     setSel({ kind: "item", id, line });
     if (kind === "tee") {
       // A tee starts a branch: route from its branch end.
@@ -197,13 +203,15 @@ export const C = {
     setMode("route");
   },
   /** Drops a component on the selected line or run, near its middle. */
-  dropOnSelected: (kind: ItemKind) => {
+  /** A support of a kind on the selected run (or the selected line's longest run), at its middle. */
+  support: (k: SupportKind) => C.dropOnSelected("support", k),
+  dropOnSelected: (kind: ItemKind, support?: SupportKind) => {
     const l = selLine(); if (!l) return toast("Select a line (or a run of it) first, or drag the component onto a pipe.");
     const s = sel(); const pts = out()?.paths.find(x => x[0] === l.id)?.[1] ?? l.pts;
     let k = s?.kind === "run" ? s.seg : 0, best = -1;
     if (s?.kind !== "run") for (let i = 0; i + 1 < pts.length; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]); if (d > best) { best = d; k = i; } }
     const a = pts[k], b = pts[k + 1];
-    C.drop(l.id, kind, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]);
+    C.drop(l.id, kind, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2], support);
   },
   resize: (nps: string) => { const l = selLine(); if (!l) return toast("Select a line first."); act({ Resize: { line: l.id, nps } }).then(o => o && toast(`${l.number || "The line"} is now ${inch(nps)}: every component re-sized.`, true)); },
   step: (up: boolean) => { const l = selLine(); if (!l) return toast("Select a line first."); const i = NPS.indexOf(l.nps) + (up ? 1 : -1); if (i >= 0 && i < NPS.length) C.resize(NPS[i]); },
@@ -256,7 +264,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Rotate the equipment 90°", () => C.rotate(90)], ["Select everything", () => C.selectAll(), "Ctrl+A"], ["Copy the selection", () => C.copyGroup(), "Ctrl+D"],
   ["Turn the selection 90°", () => C.rotateGroup(90)], ["Turn the selection −90°", () => C.rotateGroup(-90)], ["Mirror the selection east–west", () => C.mirrorGroup(false)], ["Mirror the selection north–south", () => C.mirrorGroup(true)], ["Route a line", C.route, "R"],
   ["Add a gate valve to the selected line", () => C.dropOnSelected("gate")], ["Add a globe valve", () => C.dropOnSelected("globe")], ["Add a check valve", () => C.dropOnSelected("check")], ["Add a ball valve", () => C.dropOnSelected("ball")],
-  ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a reducer", () => C.dropOnSelected("reducer")],
+  ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a reducer", () => C.dropOnSelected("reducer")], ["Add a rest (pipe support)", () => C.support("rest")], ["Add a guide", () => C.support("guide")], ["Add a line stop", () => C.support("stop")], ["Add an anchor", () => C.support("anchor")],
   ["Route the selected line again", () => C.reroute()], ["Make the line one size larger", () => C.step(true)], ["Make the line one size smaller", () => C.step(false)],
   ["Check clashes and errors", C.check, "F5"], ["Export the plant for Datum Pipe (.pcf)", () => C.exportPcf()], ["Export the selected line for Datum Pipe", () => { const l = selLine(); if (l) C.exportPcf(l.id); else toast("Select a line first."); }],
   ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")],

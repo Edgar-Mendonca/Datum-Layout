@@ -66,7 +66,7 @@ pub fn item_kind(k: &str) -> Option<ItemKind> {
     })
 }
 pub fn kind_word(k: ItemKind) -> &'static str {
-    match k { ItemKind::Gate => "gate", ItemKind::Globe => "globe", ItemKind::Check => "check", ItemKind::Ball => "ball", ItemKind::Strainer => "strainer", ItemKind::Reducer => "reducer", ItemKind::Tee => "tee", ItemKind::FlangePair => "flange_pair" }
+    match k { ItemKind::Gate => "gate", ItemKind::Globe => "globe", ItemKind::Check => "check", ItemKind::Ball => "ball", ItemKind::Strainer => "strainer", ItemKind::Reducer => "reducer", ItemKind::Tee => "tee", ItemKind::FlangePair => "flange_pair", ItemKind::Support => "support" }
 }
 
 fn size(s: &str) -> Option<&'static str> {
@@ -210,7 +210,8 @@ pub fn route_listed(p: &mut Project, cat: &Catalogue, numbers: &[String], create
 
 /// The model's components on a line, in flow order (by run, then along it).
 pub fn order(l: &crate::model::Line) -> Vec<String> {
-    let mut v: Vec<_> = l.items.iter().collect();
+    // Supports are the layout's, not the P&ID's.
+    let mut v: Vec<_> = l.items.iter().filter(|i| i.kind != ItemKind::Support).collect();
     v.sort_by(|a, b| (a.seg, a.at).partial_cmp(&(b.seg, b.at)).unwrap_or(std::cmp::Ordering::Equal));
     v.into_iter().map(|i| kind_word(i.kind).to_string()).collect()
 }

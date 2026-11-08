@@ -53,6 +53,12 @@ pub fn write(p: &Project, cat: &Catalogue, line: Option<u32>) -> Result<String, 
         let number = if l.number.trim().is_empty() { format!("LINE-{}", l.id) } else { l.number.replace(char::is_whitespace, "_") };
         s += &format!("PIPELINE-REFERENCE {number}\n    PIPING-SPEC {}\n", l.class);
         for q in b.parts.iter().filter(|q| q.line == l.id) {
+            if q.kind == "support" {
+                let c = q.corner.unwrap_or_default();
+                let tag = p.line(l.id).and_then(|x| x.items.iter().find(|i| i.id == q.item)).map(|i| i.tag.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| format!("{}-{}", q.note, q.item));
+                s += &format!("SUPPORT\n    CO-ORDS {:.2} {:.2} {:.2} 0\n    SKEY {}\n    NAME {}\n", c[0] * 1000.0, c[1] * 1000.0, c[2] * 1000.0, q.note, tag.replace(char::is_whitespace, "_"));
+                continue;
+            }
             let Some((key, skey)) = keyword(q) else { continue };
             s += key;
             s += "\n";
@@ -262,7 +268,7 @@ pub mod import {
     use crate::parts::{add, dist, dot, mul, norm, sub, unit};
 
     #[derive(Default)]
-    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, skey: String, desc: String }
+    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, co: Option<P3>, skey: String, desc: String, name: String }
     #[derive(Default)]
     struct Group { name: String, spec: String, comps: Vec<Comp> }
 
@@ -308,6 +314,8 @@ pub mod import {
                 "CENTRE-POINT" => comp.cp = pt(&rest).map(|p| p.0),
                 "BRANCH1-POINT" => comp.bp = pt(&rest),
                 "SKEY" => comp.skey = rest.join(" ").to_uppercase(),
+                "CO-ORDS" => comp.co = pt(&rest).map(|p| p.0),
+                "NAME" => comp.name = rest.join(" "),
                 "ITEM-DESCRIPTION" => comp.desc = rest.join(" ").to_uppercase(),
                 _ => {}
             }
@@ -338,6 +346,7 @@ pub mod import {
             let node = |q: P3, nodes: &mut Vec<P3>| -> usize { if let Some(i) = nodes.iter().position(|x| dist(*x, q) < 5e-4) { i } else { nodes.push(q); nodes.len() - 1 } };
             let mut edges: Vec<(usize, usize, usize)> = vec![];
             for (ci, c) in g.comps.iter().enumerate() {
+                if c.kind.starts_with("SUPPORT") { continue; }
                 if c.eps.len() < 2 { skipped += 1; continue; }
                 let (a, b) = (node(c.eps[0].0, &mut nodes), node(c.eps[1].0, &mut nodes));
                 if a != b { edges.push((a, b, ci)); }
@@ -408,6 +417,14 @@ pub mod import {
                         }
                     }
                     l.items.push(it);
+                }
+                // Supports of this pipeline that lie on this run.
+                for c in g.comps.iter().filter(|c| c.kind.starts_with("SUPPORT")) {
+                    let Some(q) = c.co else { continue };
+                    let Some((seg, at)) = place(q, &l.pts) else { continue };
+                    let label = format!("{} {}", c.skey, c.name).to_uppercase();
+                    let support = if label.contains("ANC") { crate::model::SupportKind::Anchor } else if label.contains("GUI") { crate::model::SupportKind::Guide } else if label.contains("STOP") || label.contains("LST") { crate::model::SupportKind::Stop } else { crate::model::SupportKind::Rest };
+                    l.items.push(Item { id: id(), kind: ItemKind::Support, seg, at, support, tag: c.name.clone(), ..Default::default() });
                 }
                 // Caps and blind flanges at the ends.
                 let term = |c: &Comp| if c.kind == "CAP" { Some(Term::Cap) } else if c.kind == "FLANGE-BLIND" { Some(Term::Blind) } else { None };

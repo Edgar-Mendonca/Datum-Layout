@@ -106,7 +106,7 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
         if !class.ratings.contains(&l.rating) && said.insert((l.id, 0, "rating".to_string())) {
             out.push(Issue { kind: "class", text: format!("Line {}: class {} has no class {} flanges.", l.number, l.class, l.rating), at: l.pts[0], line: l.id, item: 0, equip: 0 });
         }
-        if !class.allows(q.kind, &q.nps) && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
+        if q.kind != "support" && !class.allows(q.kind, &q.nps) && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
             let pt = q.ports.first().map(|x| x.p).unwrap_or_default();
             out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, kind_name(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0 });
         }
@@ -311,6 +311,8 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
             let (qi, qj) = (&b.parts[i], &b.parts[j]);
             if qi.line == 0 && qj.line == 0 { continue; }
             if near[i].contains(&j) { continue; }
+            // A support sits on its own line's pipe.
+            if (qi.kind == "support" || qj.kind == "support") && qi.line == qj.line { continue; }
             if (0..3).any(|k| boxes[j].0[k] > boxes[i].1[k] + c || boxes[i].0[k] > boxes[j].1[k] + c) { continue; }
             for k in [i, j] {
                 solid_cache.entry(k).or_insert_with(|| b.parts[k].shapes.iter().flat_map(|s| { let (lo, hi) = s.aabb(); solids(s).into_iter().map(move |x| (lo, hi, x)) }).collect());

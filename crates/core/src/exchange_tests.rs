@@ -21,7 +21,8 @@ fn each_examples_pcf_reads_in_datum_pipe_with_the_same_nodes_sizes_and_component
             // Pipe warns that the file has no supports (0.1 has none), and reads a cap as a short
             // plain pipe (its reader has no cap yet: a known limit, noted for Datum Pipe).
             let caps = b.parts.iter().filter(|q| q.line == l.id && q.kind == "cap").count();
-            let mut want = vec!["The file has no supports: add anchors and supports before analysing.".to_string()];
+            let sups = b.parts.iter().filter(|q| q.line == l.id && q.kind == "support").count();
+            let mut want = if sups == 0 { vec!["The file has no supports: add anchors and supports before analysing.".to_string()] } else { vec![] };
             if caps > 0 { want.insert(0, format!("{caps} × CAP: read as plain pipe where it has two ends, otherwise left out.")); }
             assert_eq!(r.warnings, want, "{} {}", ex.name, l.number);
             let ours: Vec<_> = b.parts.iter().filter(|q| q.line == l.id && q.kind != "bolts").collect();

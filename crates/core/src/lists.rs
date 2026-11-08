@@ -56,6 +56,7 @@ fn describe(q: &Part, class: &str, sched: &str, material: &str) -> Option<(&'sta
         "check" => ("Valves", format!("Check valve, swing, class {r}, flanged RF")),
         "ball" => ("Valves", format!("Ball valve, class {r}, flanged RF")),
         "strainer" => ("Valves", format!("Strainer, Y-type, class {r}, flanged RF")),
+        "support" => ("Supports", match q.note.as_str() { "ANC" => "Pipe support: anchor", "GUI" => "Pipe support: guide", "LST" => "Pipe support: line stop", _ => "Pipe support: rest (shoe)" }.to_string()),
         _ => { let _ = class; return None }
     })
 }
@@ -68,7 +69,8 @@ pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
     for (&(i, j), &(a, c)) in &crate::checks::connections(&b) {
         if (i, j) > (a, c) { continue; }
         let (x, y) = (&b.parts[i], &b.parts[a]);
-        if x.ports[j].end == "BW" && y.ports[c].end == "BW" {
+        // Pipe meets pipe only where a support splits it: no weld there.
+        if x.ports[j].end == "BW" && y.ports[c].end == "BW" && !(x.kind == "pipe" && y.kind == "pipe") {
             let line = if x.line != 0 { x.line } else { y.line };
             *welds.entry((line, x.ports[j].nps.clone())).or_default() += 1.0;
         }
@@ -92,7 +94,7 @@ pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
         let class = cat.class(&l.class);
         let material = class.map(|c| c.material.to_lowercase()).unwrap_or_else(|| "carbon steel".into());
         let mut rows: BTreeMap<(usize, &'static str, String, usize), (f64, &'static str)> = BTreeMap::new();
-        let group_order = |g: &str| ["Pipe", "Fittings", "Flanges", "Valves", "Gaskets", "Bolts", "Welds"].iter().position(|x| *x == g).unwrap_or(9);
+        let group_order = |g: &str| ["Pipe", "Fittings", "Flanges", "Valves", "Gaskets", "Bolts", "Supports", "Welds"].iter().position(|x| *x == g).unwrap_or(9);
         for q in &parts {
             let sched = class.map(|c| c.schedule(&q.nps)).unwrap_or_else(|| "STD".into());
             let Some((g, what)) = describe(q, &l.class, &sched, &material) else { continue };

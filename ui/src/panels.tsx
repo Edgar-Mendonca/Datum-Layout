@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { SUPPORTS, SupportKind, CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help } from "./help";
@@ -154,8 +154,9 @@ const ItemInsp = (p: { l: Line; id: number }) => {
           <button class="btn sm" onClick={() => C.routeBranch(p.l.id, x().id)}>Route the branch</button>
         </Show>
       </Show>
-      <Show when={x().kind !== "tee" && x().kind !== "reducer"}><Row l="Stem or lever towards"><select onChange={e => act({ SetItem: { line: p.l.id, item: { ...x(), dir: JSON.parse(e.currentTarget.value) } } })}><For each={[["Up", [0, 0, 1]], ["Down", [0, 0, -1]], ["East", [1, 0, 0]], ["West", [-1, 0, 0]], ["North", [0, 1, 0]], ["South", [0, -1, 0]]] as [string, V3][]}>{([l, d]) => <option value={JSON.stringify(d)} selected={d.every((v, i) => Math.abs(v - x().dir[i]) < 1e-6)}>{l}</option>}</For></select></Row></Show>
-      <p class="muted">It takes the line's size ({inch(p.l.nps)}), class {p.l.class} and class {p.l.rating} flanges.</p>
+      <Show when={x().kind === "support"}><Row l="Holds" h="supports"><select class="supkind" onChange={e => act({ SetItem: { line: p.l.id, item: { ...x(), support: e.currentTarget.value as SupportKind } } })}><For each={SUPPORTS}>{([k, l]) => <option value={k} selected={x().support === k}>{l}</option>}</For></select></Row></Show>
+      <Show when={x().kind !== "tee" && x().kind !== "reducer" && x().kind !== "support"}><Row l="Stem or lever towards"><select onChange={e => act({ SetItem: { line: p.l.id, item: { ...x(), dir: JSON.parse(e.currentTarget.value) } } })}><For each={[["Up", [0, 0, 1]], ["Down", [0, 0, -1]], ["East", [1, 0, 0]], ["West", [-1, 0, 0]], ["North", [0, 1, 0]], ["South", [0, -1, 0]]] as [string, V3][]}>{([l, d]) => <option value={JSON.stringify(d)} selected={d.every((v, i) => Math.abs(v - x().dir[i]) < 1e-6)}>{l}</option>}</For></select></Row></Show>
+      <p class="muted">{x().kind === "support" ? "A support takes no length: the pipe is split at it, so Datum Pipe's stress model has a node there." : `It takes the line's size (${inch(p.l.nps)}), class ${p.l.class} and class ${p.l.rating} flanges.`}</p>
       <p class="ibtns"><button class="btn sm" onClick={() => C.del()}>Delete</button></p>
     </>}</Show>
   );

@@ -17,8 +17,10 @@ export interface Dims { d: number; l: number; h: number; elev: number; d2: numbe
 export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number }
 export type Term = "open" | "cap" | "blind";
 export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number };
-export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer";
-export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string }
+export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "support";
+export type SupportKind = "rest" | "guide" | "stop" | "anchor";
+export const SUPPORTS: [SupportKind, string][] = [["rest", "Rest (shoe)"], ["guide", "Guide"], ["stop", "Line stop"], ["anchor", "Anchor"]];
+export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string; support: SupportKind }
 export interface Line { id: number; uid: string; number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; radius: "long" | "short"; from: End; to: End; pts: V3[]; items: Item[]; area: number }
 export interface Settings { clearance: number; nps: string; class: string; rating: number }
 export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[] }
@@ -62,6 +64,7 @@ export const inch = (n: string) => n.replace("1/2", "½").replace("3/4", "¾").r
 export const ITEMS: [ItemKind, string, string][] = [
   ["gate", "Gate valve", "valve"], ["globe", "Globe valve", "globe"], ["check", "Check valve", "chkvalve"], ["ball", "Ball valve", "ball"],
   ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"],
+  ["support", "Pipe support", "support"],
 ];
 export const EQUIP: [EquipKind, string, string][] = [
   ["vertical_vessel", "Vertical vessel", "vvessel"], ["horizontal_drum", "Horizontal drum", "drum"], ["tank", "Storage tank", "tank"],

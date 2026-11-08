@@ -443,7 +443,7 @@ fn corners_move_and_jogs_come_and_go_cleanly() {
 #[test]
 fn tidy_merges_straight_corners_and_keeps_components() {
     let mut l = Line { pts: vec![[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 3.0, 0.0]], ..Default::default() };
-    l.items.push(Item { id: 9, uid: String::new(), kind: ItemKind::Gate, seg: 2, at: 1.0, nps2: String::new(), dir: [0.0, 0.0, 1.0], tag: String::new() });
+    l.items.push(Item { id: 9, uid: String::new(), kind: ItemKind::Gate, seg: 2, at: 1.0, nps2: String::new(), dir: [0.0, 0.0, 1.0], tag: String::new(), ..Default::default() });
     crate::doc::tidy(&mut l);
     assert_eq!(l.pts, vec![[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [5.0, 3.0, 0.0]]);
     assert_eq!((l.items[0].seg, l.items[0].at), (0, 3.0));
