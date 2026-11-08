@@ -86,6 +86,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.1.2 | `doc::snap` (nearest segment → size there → length → `free_place`) is the one rule for both the drag preview and `Drop` | The marker can never show a place the drop would not use |
 | 0.1.2 | A route ends on the window's dblclick event, not on a click with `detail` 2 | Pointer events carry no click count (found by the new branch UI test) |
 | 0.1.3 | Datum Pipe's real engine is run against Layout's files in a fresh clone (CI job "exchange"), in addition to the reader copied into the unit tests | The brief: "Layout's export must open in Pipe unchanged"; a clone tests what Pipe does today without linking its code |
+| 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
 ---
@@ -104,6 +105,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
 | 0.5 CAD exchange | Optional engine on first use; STEP import and export | ⬜ |
 | 0.6 Big models and teams | Level of detail, areas on demand, project database with history, several users | ⬜ |
+| Parked | Datum Library: the shared data repo for every app's tables (see Decisions, 2026-11-08) | 💭 |
 | 1.0 | Catalogue validated against its sources, user guide, signed installer | ⬜ |
 
 ---
@@ -126,6 +128,11 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - *2-minute demo:* (1) File › Examples › Pump suction and discharge. (2) Drag a Gate valve from the catalogue onto the 6" header between the two tees: the marker shows where it snaps; drop it. (3) Click the header in the Lines tab, Piping › One size larger: the valve, tees, cap, elbow and blind all become 8". (4) F5 (Check): no clashes. (5) Click 4"-P-1003-CS1 in the Lines tab, Home › To Datum Pipe: save the .pcf; in Datum Pipe, File › Import a piping component file.
 
 ---
+
+### 2026-11-08: Session 2 (catalogue data)
+- Wrote `docs/briefs/CATALOGUE-PACK.md`, a brief for an outside helper to build the parts tables in the app's exact formats (Part A: tables read today; Part B: new part types; Part C: checks and a report).
+- Reviewed the first two files: flanges.csv (115 rows, classes 150–2500, all accepted, classes 150/300 match the built-in table to 0.01") and valves.csv (433 rows, all accepted; real swing-check lengths replace the built-in ones, which were globe lengths; class 300 1¼"/1½" check, 16" globe and mm-converted rounding sent back for checking). Not merged yet: the set is merged together when complete.
+- Discussed and parked a shared Datum Library (Decisions).
 
 ## 5. Known limits
 
