@@ -74,6 +74,12 @@ pub enum Op {
     UseListedLine { line: u32, number: String },
     /// Adds the lines of a piping component file (.pcf).
     ImportPcf { text: String },
+    /// Reads a plant package (a P&ID's equipment and lines, `package`): places or updates the
+    /// equipment and puts the lines on the line list.
+    ImportPackage { json: String },
+    /// Routes listed lines not yet modelled (all, or those named) nozzle to nozzle, with their
+    /// components in the list's order.
+    RouteListed { numbers: Vec<String> },
     Batch(Vec<Op>),
 }
 
@@ -230,6 +236,13 @@ fn pass_along(pts: &mut [P3], delta: P3, move_last: bool, min_len: f64) -> P3 {
     if move_last { [0.0; 3] } else { d }
 }
 
+/// One edit, applied straight to a project (no undo step): for building several edits as one.
+pub fn apply_op(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Result<(), String> {
+    apply(p, op, cat, created)?;
+    follow_ends(p, cat);
+    Ok(())
+}
+
 /// A line list from CSV text: the header row names the columns (any order, any case): line
 /// number, size (inches like 6, 1-1/2 or 6", or DN150), class, rating, fluid, insulation (mm),
 /// from, to and notes. Datum Layout's own line list export reads back. Gives the rows and how
@@ -251,7 +264,7 @@ pub fn read_line_list(csv: &str) -> Result<(Vec<ListedLine>, usize), String> {
         out.push(ListedLine {
             number: n, nps: nps.unwrap_or("").into(), class: get(r, class), rating: get(r, rating).trim_start_matches("Class ").trim_start_matches("CL").trim().parse().ok().filter(|v| crate::catalogue::RATINGS.contains(v)).unwrap_or(0),
             fluid: get(r, fluid), insulation: get(r, ins).parse::<f64>().ok().filter(|v| v.is_finite() && *v >= 0.0).map_or(0.0, |v| v / 1000.0),
-            from: get(r, from), to: get(r, to), notes: get(r, notes),
+            from: get(r, from), to: get(r, to), notes: get(r, notes), ..Default::default()
         });
     }
     if out.is_empty() { return Err("No lines could be read from the line list.".into()); }
@@ -638,6 +651,11 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             }
         }
         Op::SetViews(v) => { p.views = v; }
+        Op::ImportPackage { json } => {
+            let pk = crate::package::read(&json)?;
+            crate::package::import(p, &pk, created)?;
+        }
+        Op::RouteListed { numbers } => { crate::package::route_listed(p, cat, &numbers, created)?; }
         Op::ImportLineList { csv } => {
             let (rows, _) = read_line_list(&csv)?;
             p.line_list = rows;

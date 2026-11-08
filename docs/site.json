@@ -12,7 +12,7 @@
   "steps": [
     {
       "title": "Place the equipment",
-      "text": "Drag vessels, drums, tanks, columns, pumps and exchangers onto the plot and set their sizes and nozzles from the datasheet."
+      "text": "Read the P&ID's plant package, or drag vessels, drums, tanks, columns, pumps and exchangers onto the plot, and set their sizes and nozzles from the datasheet."
     },
     {
       "title": "Route the lines",
@@ -25,6 +25,7 @@
   ],
   "highlights": [
     "A workspace laid out in the order of the work: a steps bar, a plant tree with filters and eyes to show or hide each item, a context bar and a tool strip",
+    "From the P&ID: a plant package places the equipment, routes the lines with their valves in the P&ID's order, and checks the 3D model against it",
     "Six parametric equipment types with nozzles: vertical vessel, horizontal drum, storage tank, column, centrifugal pump with motor and baseplate, shell-and-tube exchanger",
     "Routing with orthogonal guides: long- or short-radius elbows at every turn, reducers where sizes change, weld-neck flanges, gaskets and bolt sets at flanged nozzles",
     "Drag corners, add or remove jogs, move runs: the elbows follow and components stay put",
@@ -73,6 +74,7 @@
       "when": "Next",
       "items": [
         "The Library: every pipe class and parts table, browsable, with its source (0.2.0)",
+        "From the P&ID: read a plant package, place its equipment, route its lines with their components in order, and check the 3D model against it (0.2.1)",
         "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
         "Eccentric reducers, crosses, sloped lines",
         "Design rules for supports and access (with 0.3's steel)"
@@ -102,10 +104,8 @@
       "title": "From Schema",
       "when": "Later",
       "items": [
-        "Import Datum Schema's plant package: equipment with datasheet values and nozzles, lines with from/to, size, class and component order",
-        "Place equipment and route its lines from the package",
-        "A 3D-against-P&ID check: missing or extra components, wrong order, wrong size, unconnected lines",
-        "More pipe classes as plug-in packs"
+        "Datum Schema exports the plant package that Layout already reads",
+        "Round trips with Schema's examples; changes on the P&ID shown in the layout"
       ]
     },
     {

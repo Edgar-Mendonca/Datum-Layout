@@ -287,6 +287,11 @@ pub struct ListedLine {
     pub from: String,
     pub to: String,
     pub notes: String,
+    /// The P&ID's stable id for the line (from a plant package).
+    pub uid: String,
+    /// The components on it in flow order, as the P&ID has them (gate, check, strainer…); empty
+    /// when the list does not say.
+    pub components: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

@@ -23,7 +23,7 @@ export interface Line { id: number; uid: string; number: string; nps: string; cl
 export interface Settings { clearance: number; nps: string; class: string; rating: number }
 export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[] }
 export interface SavedView { name: string; eye: V3; target: V3; colour_by: string; hidden: number[]; isolated: number[] | null; section: [V3, V3] | null }
-export interface ListedLine { number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; from: string; to: string; notes: string }
+export interface ListedLine { number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; from: string; to: string; notes: string; uid: string; components: string[] }
 export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "class" | "number" | "list" | "rule"; text: string; at: V3; line: number; item: number; equip: number }
 export interface Out { p: Project; path: string | null; dirty: boolean; undo: boolean; redo: boolean; created: number[]; warnings: string[]; issues: Issue[]; paths: [number, V3[]][] }
 

@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.2.1 — 2026-11-08
+From the P&ID: a plant package brings the P&ID's equipment and lines into the layout, and the 3D model is checked against it.
+
+**Plant package.** Equipment › Plant Package (or Lists › Import) reads the open plant package format (docs/formats/plant-package.md) that Datum Schema will export: equipment with its class, datasheet values and nozzles; lines with their number, size, class, rating, fluid, insulation, both ends and their components in flow order; every object with the P&ID's stable id. New equipment is placed in a row to be arranged; equipment already in the plant is updated. Importing again updates, never duplicates.
+
+**Route Listed Lines.** Each listed line from nozzle to nozzle is routed and its valves and strainers are placed along it in the P&ID's order. Branches and open ends are left to route by hand, and the checks say which.
+
+**3D vs P&ID.** The checks now also compare each line's components and their order with the P&ID, as well as lines missing or extra, size, class, rating, fluid and insulation.
+
+**For Datum Schema.** The format document, a worked example (docs/formats/pump-transfer.package.json) and a brief for Schema's export (docs/briefs/SCHEMA-PLANT-PACKAGE.md).
+
 ## 0.2.0 — 2026-11-08
 The Library: every pipe class and parts table, browsable, with its source.
 

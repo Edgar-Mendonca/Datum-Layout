@@ -1,0 +1,76 @@
+{
+  "format": "datum-plant-package",
+  "version": 1,
+  "app": "Hand-written sample for Datum Layout",
+  "project": "Pump transfer",
+  "units": "SI",
+  "equipment": [
+    {
+      "uid": "eq-tank-0001",
+      "tag": "T-201",
+      "class": "Tank",
+      "service": "Crude storage",
+      "data": { "Capacity": "170 m³", "Design temperature": "60 °C" },
+      "nozzles": [
+        { "tag": "N1", "nps": "8", "rating": 150, "service": "Outlet" },
+        { "tag": "N2", "nps": "6", "rating": 150, "service": "Inlet" }
+      ]
+    },
+    {
+      "uid": "eq-pump-0001",
+      "tag": "P-201",
+      "class": "CentrifugalPump",
+      "service": "Crude transfer",
+      "data": { "Flow": "60 m³/h", "Differential head": "50 m" },
+      "nozzles": [
+        { "tag": "S", "nps": "6", "rating": 150, "service": "Suction" },
+        { "tag": "D", "nps": "4", "rating": 300, "service": "Discharge" }
+      ]
+    },
+    {
+      "uid": "eq-vessel-0001",
+      "tag": "V-201",
+      "class": "Vessel",
+      "service": "Feed drum",
+      "nozzles": [
+        { "tag": "N1", "nps": "4", "rating": 300, "service": "Inlet" }
+      ]
+    }
+  ],
+  "lines": [
+    {
+      "uid": "ln-0001",
+      "number": "8\"-P-2001-CS1",
+      "nps": "8",
+      "class": "CS1",
+      "rating": 150,
+      "fluid": "P",
+      "from": { "equipment": "T-201", "nozzle": "N1" },
+      "to": { "equipment": "P-201", "nozzle": "S" },
+      "components": [ { "uid": "v-0001", "kind": "gate", "tag": "HV-2001" }, { "uid": "v-0002", "kind": "strainer", "tag": "S-2001" } ]
+    },
+    {
+      "uid": "ln-0002",
+      "number": "4\"-P-2002-CS300",
+      "nps": "4",
+      "class": "CS300",
+      "rating": 300,
+      "fluid": "P",
+      "insulation_mm": 40,
+      "from": { "equipment": "P-201", "nozzle": "D" },
+      "to": { "equipment": "V-201", "nozzle": "N1" },
+      "components": [ { "uid": "v-0003", "kind": "check", "tag": "NRV-2002" }, { "uid": "v-0004", "kind": "gate", "tag": "HV-2002" } ]
+    },
+    {
+      "uid": "ln-0003",
+      "number": "2\"-P-2003-CS300",
+      "nps": "2",
+      "class": "CS300",
+      "rating": 300,
+      "fluid": "P",
+      "from": { "line": "4\"-P-2002-CS300" },
+      "to": { "equipment": "T-201", "nozzle": "N2" },
+      "components": [ { "uid": "v-0005", "kind": "globe", "tag": "FCV-2003" } ]
+    }
+  ]
+}

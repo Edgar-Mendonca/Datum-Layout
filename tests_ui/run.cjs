@@ -230,6 +230,21 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   if (shots) await shot("library-flanges");
   await p.keyboard.press("Escape"); await settle(200);
 
+  // 7i. From the P&ID (0.2.1): a plant package placed, listed, routed and checked.
+  await open(null);
+  const pkg = require("fs").readFileSync(require("path").join(__dirname, "../docs/formats/pump-transfer.package.json"), "utf8");
+  await p.click('.tabs > button:has-text("Equipment")');
+  const [pfc] = await Promise.all([p.waitForEvent("filechooser"), p.click('.rb:has-text("Plant Package")')]);
+  await pfc.setFiles({ name: "pump-transfer.package.json", mimeType: "application/json", buffer: Buffer.from(pkg) }); await settle(900);
+  st = await state();
+  check("the plant package places its equipment and lists its lines", st.p.equipment.length === 3 && st.p.line_list.length === 3, `${st.p.equipment.length} ${st.p.line_list.length}`);
+  check("the checks say the listed lines are not modelled yet", st.issues.filter(i => i.kind === "list").length === 3);
+  await p.click('.rb:has-text("Route Listed Lines")'); await settle(1200);
+  st = await state();
+  check("Route Listed Lines routes the nozzle-to-nozzle lines with their components", st.p.lines.length === 2 && st.p.lines.every(l => l.items.length === 2), JSON.stringify(st.p.lines.map(l => [l.number, l.items.length])));
+  check("only the branch is left, and nothing else differs from the P&ID", st.issues.filter(i => i.kind === "list").length === 1 && st.issues.some(i => i.kind === "list" && i.text.includes("2003")), JSON.stringify(st.issues.filter(i => i.kind === "list").map(i => i.text)));
+  if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("from-pid"); }
+
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
   const nv = (await ask("lists")).ok.valves.length;

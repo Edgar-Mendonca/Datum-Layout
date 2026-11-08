@@ -183,7 +183,8 @@ export const Tree = () => {
             <Show when={!pp().lines.length}><button class="ti ghost" onClick={() => C.route()}><Ic n="new" /><span>Route a line (R)</span></button></Show>
             <For each={pp().lines}>{l => <Leaf id={l.id} kind="line" icon="pipe" label={l.number || "(no number)"} sub={`${inch(l.nps)} · ${l.class}`} bad={issuesOf(l.id).find(i => i.kind === "routing")?.text} />}</For>
             <Show when={pp().line_list.length}><Branch t="Line list" icon="list" n={pp().line_list.length} help="linelist" open={false} mark={{ ok: !listIssues().length, why: `${plural(listIssues().length, "difference")} with the model` }}>
-              <For each={pp().line_list}>{r => { const m = pp().lines.find(l => l.number === r.number); return <Row2 icon="list" label={r.number} sub={`${r.nps ? inch(r.nps) : "?"} · ${r.class || "—"}${m ? "" : " · not modelled"}`} dim={!m} run={() => m && (setPicked([]), setSel({ kind: "line", id: m.id }))} />; }}</For></Branch></Show>
+              <Show when={pp().line_list.some(r => !pp().lines.some(l => l.number === r.number))}><button class="ti ghost" onClick={() => C.routeListed()}><Ic n="route" /><span>Route the listed lines</span></button></Show>
+              <For each={pp().line_list}>{r => { const m = pp().lines.find(l => l.number === r.number); return <Row2 icon="list" label={r.number} sub={`${r.nps ? inch(r.nps) : "?"} · ${r.class || "—"}${m ? "" : " · not modelled"}`} dim={!m} title={r.components.length ? `${r.from} → ${r.to}: ${r.components.join(", ")}` : `${r.from} → ${r.to}`} run={() => m && (setPicked([]), setSel({ kind: "line", id: m.id }))} />; }}</For></Branch></Show>
           </Step>
           <Step n={4} f={fs()[3]}>
             <For each={ITEMS.map(([k]) => k).filter(k => items().some(x => x.it.kind === k))}>{k => (

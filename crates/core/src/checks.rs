@@ -181,6 +181,13 @@ pub fn line_list_issues(p: &Project) -> Vec<Issue> {
         if !r.class.is_empty() && r.class != l.class { d.push(format!("class {} (the model has {})", r.class, l.class)); }
         if r.rating != 0 && r.rating != l.rating { d.push(format!("rating {} (the model has {})", r.rating, l.rating)); }
         if !r.fluid.is_empty() && r.fluid != l.fluid { d.push(format!("fluid {} (the model has {})", r.fluid, l.fluid)); }
+        if !r.components.is_empty() {
+            let model = crate::package::order(l);
+            if model != r.components {
+                let words = |v: &[String]| if v.is_empty() { "none".to_string() } else { v.iter().map(|s| s.replace('_', " ")).collect::<Vec<_>>().join(", ") };
+                d.push(format!("components {} (the model has {})", words(&r.components), words(&model)));
+            }
+        }
         if (r.insulation - l.insulation).abs() > 0.0005 { d.push(format!("insulation {:.0} mm (the model has {:.0} mm)", r.insulation * 1000.0, l.insulation * 1000.0)); }
         if !d.is_empty() { out.push(Issue { kind: "list", text: format!("Line {}: the line list says {}.", r.number, d.join(", ")), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 }); }
     }

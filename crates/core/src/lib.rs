@@ -13,6 +13,7 @@ pub mod examples;
 pub mod gltf;
 pub mod lists;
 pub mod model;
+pub mod package;
 pub mod parts;
 pub mod pcf;
 pub mod route;

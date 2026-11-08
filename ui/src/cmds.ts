@@ -124,6 +124,21 @@ export const C = {
     const o = await act({ ImportLineList: { csv: t } });
     if (o) { const n = o.p.line_list.length, iss = o.issues.filter(i => i.kind === "list").length; toast(`${n} line${n === 1 ? "" : "s"} read from the line list. ${iss ? `${iss} difference${iss === 1 ? "" : "s"} with the model are under Checks.` : "The model matches it."}`, true); if (iss) setBottom("checks"); }
   },
+  /** A plant package from a P&ID: equipment placed or updated, lines onto the line list. */
+  importPackage: async () => {
+    const t = await pickText(".json,.dpkg"); if (t == null) return;
+    const before = project();
+    const o = await act({ ImportPackage: { json: t } });
+    if (!o) return;
+    const placed = o.created.length, listed = o.p.line_list.length - (before?.line_list.length ?? 0);
+    if (placed) { setPicked(o.created); setSel(null); setTimeout(fitHook, 80); }
+    toast(`Plant package read: ${placed} equipment item${placed === 1 ? "" : "s"} placed${listed > 0 ? `, ${listed} line${listed === 1 ? "" : "s"} listed` : ""}. Arrange the equipment, then Route Listed Lines.`, true);
+  },
+  /** Routes the listed lines not yet in the model, nozzle to nozzle, with their components in the P&ID's order. */
+  routeListed: async () => {
+    const o = await act({ RouteListed: { numbers: [] } });
+    if (o?.created.length) { setPicked(o.created); setSel(null); const left = o.issues.filter(i => i.kind === "list" && i.text.includes("not in the model")).length; toast(`${o.created.length} line${o.created.length === 1 ? "" : "s"} routed with their components in the P&ID's order.${left ? ` ${left} left to route by hand (branches or open ends): see Checks.` : ""}`, true); if (left) setBottom("checks"); }
+  },
   importPcf: async () => {
     const t = await pickText(".pcf,.txt"); if (t == null) return;
     const o = await act({ ImportPcf: { text: t } });
@@ -248,7 +263,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["SI units", () => C.units("SI")], ["US units", () => C.units("US")], ["Add an area", C.addArea], ["Plot settings", C.selectPlot],
   ["Add a jog to the selected run", () => C.jog(), "J"], ["Take the jog out", () => C.removeJog()],
   ["Hide the selection", () => C.hide(), "H"], ["Show only the selection (isolate)", () => C.isolate(), "I"], ["Show everything", () => C.showAll(), "Shift+H"], ["Section box", () => C.sectionBox()],
-  ["Save this view", () => C.saveView()], ["Import a line list (CSV)", () => C.importLineList()], ["Import lines from a piping component file (.pcf)", () => C.importPcf()],
+  ["Save this view", () => C.saveView()], ["Import a line list (CSV)", () => C.importLineList()], ["Import lines from a piping component file (.pcf)", () => C.importPcf()], ["Import a plant package from a P&ID", () => C.importPackage()], ["Route the listed lines", () => C.routeListed()],
   ["Measure a distance", () => C.measure(), "M"], ["Fit the plant", C.fit, "F"], ["Isometric view", () => C.std("iso"), "1"], ["Plan view", () => C.std("plan"), "2"], ["Front view (from the south)", () => C.std("front"), "3"], ["Side view (from the east)", () => C.std("side"), "4"],
   ["Options", () => setBackstage("options")], ["Check for updates", () => setBackstage("about")], ["Roadmap", () => setBackstage("roadmap")],
   ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started", () => D.gettingStarted()], ["Glossary", () => D.glossary()],

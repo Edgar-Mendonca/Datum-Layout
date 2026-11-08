@@ -157,3 +157,50 @@ fn the_line_list_reads_back_and_is_checked_against_the_model() {
     assert_eq!(iss.iter().filter(|i| i.text.contains("not on the line list")).count(), d.p.lines.len());
     assert!(read_line_list("Size,Class\n6,CS1\n").is_err());
 }
+
+#[test]
+fn a_plant_package_places_equipment_lists_lines_and_routes_them_in_the_pids_order() {
+    use crate::doc::{Doc, Op};
+    let cat = Catalogue::builtin();
+    let json = include_str!("../../../docs/formats/pump-transfer.package.json");
+    let mut d = Doc::new(crate::model::Project::new());
+    let made = d.apply(Op::ImportPackage { json: json.into() }, &cat).unwrap();
+    assert_eq!(made.len(), 3);
+    assert_eq!(d.p.equipment.iter().map(|e| e.tag.as_str()).collect::<Vec<_>>(), ["T-201", "P-201", "V-201"]);
+    let pump = d.p.equipment.iter().find(|e| e.tag == "P-201").unwrap();
+    assert_eq!(pump.uid, "eq-pump-0001");
+    assert_eq!(pump.nozzles.iter().find(|n| n.tag == "D").map(|n| (n.nps.as_str(), n.rating)), Some(("4", 300)));
+    assert!(pump.data.iter().any(|x| x.0 == "Flow" && x.1 == "60 m³/h"));
+    assert_eq!(d.p.line_list.len(), 3);
+    assert_eq!(d.p.line_list[1].components, ["check", "gate"]);
+    // Before routing, every listed line is missing from the model.
+    let list = |d: &Doc| crate::checks::line_list_issues(&d.p);
+    assert_eq!(list(&d).iter().filter(|i| i.text.contains("not in the model")).count(), 3);
+    // Route the listed lines: the two nozzle-to-nozzle lines are made, in the P&ID's order.
+    d.apply(Op::RouteListed { numbers: vec![] }, &cat).unwrap();
+    assert_eq!(d.p.lines.len(), 2);
+    for l in &d.p.lines {
+        let r = d.p.line_list.iter().find(|r| r.number == l.number).unwrap();
+        assert_eq!(crate::package::order(l), r.components, "{}", l.number);
+        assert_eq!((l.class.as_str(), l.rating), (r.class.as_str(), r.rating));
+    }
+    assert!((d.p.lines[1].insulation - 0.04).abs() < 1e-9);
+    // Only the branch is left to route by hand; nothing else differs from the P&ID.
+    let iss = list(&d);
+    assert_eq!(iss.len(), 1, "{iss:?}");
+    assert!(iss[0].text.contains("2003"));
+    let b = build(&d.p, &cat);
+    assert!(b.issues.iter().all(|i| i.kind != "routing"), "{:?}", b.issues);
+    // A valve taken out shows as a difference in the components.
+    let l = d.p.lines[1].clone();
+    let gate = l.items.iter().find(|i| i.kind == crate::model::ItemKind::Gate).unwrap().id;
+    d.apply(Op::Delete { ids: vec![gate] }, &cat).unwrap();
+    assert!(list(&d).iter().any(|i| i.text.contains("components check, gate (the model has check)")), "{:?}", list(&d));
+    // Importing again updates rather than duplicates.
+    let made = d.apply(Op::ImportPackage { json: json.into() }, &cat).unwrap();
+    assert!(made.is_empty());
+    assert_eq!((d.p.equipment.len(), d.p.line_list.len()), (3, 3));
+    // Not a package.
+    assert!(d.apply(Op::ImportPackage { json: "{\"format\":\"other\"}".into() }, &cat).is_err());
+    assert!(d.apply(Op::ImportPackage { json: "not json".into() }, &cat).is_err());
+}
