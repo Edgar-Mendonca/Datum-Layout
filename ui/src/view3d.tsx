@@ -8,7 +8,7 @@ import { onMount, onCleanup, createEffect, on, Show } from "solid-js";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke } from "./api";
-import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded } from "./store";
+import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure } from "./store";
 import { C, setFit, setStdView, finishRoute } from "./cmds";
 import { fmt } from "./units";
 
@@ -197,6 +197,11 @@ export const View3D = () => {
     draw();
   };
   const rubber = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: 0x2f8cff, dashSize: 0.25, gapSize: 0.12 }));
+  // The measure tool: a line between the two points and its readout.
+  const measureLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xb7791f, depthTest: false }));
+  measureLine.renderOrder = 5;
+  const measureDots = new THREE.Group();
+  toolG.add(measureLine, measureDots);
   const marker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshBasicMaterial({ color: 0x2f8cff }));
   marker.visible = false; rubber.visible = false;
   toolG.add(rubber, marker);
@@ -364,6 +369,14 @@ export const View3D = () => {
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4 || down.b !== 0) { down = null; return; }
     down = null;
     if (mode() === "route") return routeClick(e);
+    if (mode() === "measure") {
+      const hit = pickPart(e);
+      const q = hit ? hit[1] : onPlane(e, project()?.plot.ground ?? 0);
+      if (!q) return;
+      const m = measure();
+      setMeasure(m.length >= 2 ? [q] : [...m, q]);
+      return;
+    }
     if (mode() === "place") { const k = placing(); const p = onPlane(e, project()?.plot.ground ?? 0); if (k && p) { const s = project()?.plot.grid ?? 1; act({ AddEquipment: { kind: k, pos: [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0] } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[0] }); }); } setMode("select"); setPlacing(null); return; }
     const hit = pickPart(e);
     if (!hit) { setSel(null); return; }
@@ -498,7 +511,16 @@ export const View3D = () => {
   createEffect(on(() => [project()?.plot, project()?.areas, themeTick(), sel()?.kind === "area" ? sel() : null], () => { liveTags = new Set([...liveTags].filter(k => k.startsWith("eq") || k.startsWith("ln"))); buildPlot(); buildLabels(); draw(); }, { defer: true }));
   createEffect(on(sel, paintSelection, { defer: true }));
   createEffect(on(() => opts().labels, () => { buildLabels(); draw(); }, { defer: true }));
-  createEffect(on(mode, () => { buildPorts(); buildGizmo(); if (mode() !== "route") { setRubber([]); marker.visible = false; } host.style.cursor = mode() === "select" ? "" : "crosshair"; }, { defer: true }));
+  createEffect(on(mode, () => { buildPorts(); buildGizmo(); if (mode() !== "route") { setRubber([]); marker.visible = false; } host.style.cursor = mode() === "select" ? "" : "crosshair"; if (mode() !== "measure") setMeasure([]); }, { defer: true }));
+  createEffect(on(measure, () => {
+    const m = measure();
+    measureLine.geometry.dispose();
+    measureLine.geometry = new THREE.BufferGeometry().setFromPoints(m.map(p => new THREE.Vector3(...p)));
+    measureLine.visible = m.length === 2;
+    measureDots.clear();
+    for (const p of m) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 8), new THREE.MeshBasicMaterial({ color: 0xb7791f, depthTest: false })); d.position.set(...p); d.renderOrder = 6; measureDots.add(d); }
+    draw();
+  }, { defer: true }));
   createEffect(on(route, () => { const r = route(); setRubber(r?.start ? [r.start, ...r.via] : []); }, { defer: true }));
   createEffect(on(focus, () => { const f = focus(); if (!f) return; const b = new THREE.Box3(W(f.at), W(f.at)); b.expandByScalar(f.r); frame(b); setFocus(null); }, { defer: true }));
   // A new plant: fit it.
@@ -513,6 +535,7 @@ export const View3D = () => {
           <span class="ibtns"><button class="btn" onClick={() => C.place("vertical_vessel")}>Place a vessel</button><button class="btn" onClick={() => C.newProject("pumps")}>Open an example</button></span></div>
       </Show>
       <Show when={mode() === "route"}><div class="toolhint">{route()?.start ? "Click to add a corner (orthogonal to the last point) · click a nozzle to end there · double-click or right-click to end at a free point · Esc to cancel" : "Click a nozzle, a tee's branch end or a point on the plot to start the line"}<span class="muted"> · Elevation {fmt("coord", elev())} · Shift: use the working elevation</span></div></Show>
+      <Show when={mode() === "measure"}><div class="toolhint">{measure().length === 2 ? (() => { const [a, b] = measure(); const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; return <span><b>{fmt("len", Math.hypot(d[0], d[1], d[2]))}</b> · ΔE {fmt("len", d[0])} · ΔN {fmt("len", d[1])} · ΔEL {fmt("len", d[2])} · horizontal {fmt("len", Math.hypot(d[0], d[1]))}</span>; })() : measure().length === 1 ? "Click the second point" : "Measure: click a point on a part or on the plot"}<span class="muted"> · Esc to finish</span></div></Show>
       <Show when={mode() === "place"}><div class="toolhint">Click on the plot to place the {placing()?.replace("_", " ")} · Esc to cancel</div></Show>
       <Show when={selLine() && sel()?.kind === "line"}><div class="toolhint sub">Click a straight run of the line to move it along an axis · drag components from the catalogue onto the pipe</div></Show>
     </div>

@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.1.5 — 2026-11-08
+The catalogue grows: flanges to class 2500, valves in every class, eight example pipe classes, and a measure tool.
+
+**Flanges in six classes.** Weld-neck and blind flanges now come in class 150, 300, 600, 900, 1500 and 2500, ½" to 24" wherever they are made, each row from a named manufacturer's catalogue. A blind flange can have its own thickness where it differs from the weld-neck's.
+
+**Valves in every class.** Gate, globe, swing-check and ball valves in all six classes, from manufacturers' catalogues. Swing-check valves now have their own lengths (they used globe lengths before). Where a size is not listed, its length is worked out between the neighbouring sizes.
+
+**Fittings checked.** Elbows, tees, reducers and caps from a fittings catalogue, with short-radius elbows from 1".
+
+**Eight example pipe classes.** Carbon steel 150, 300, 600 and 900/1500, low-temperature carbon steel, stainless steel 316 and utility water, as well as CS1. Pick one for new lines on the Piping tab, or for a line in the Inspector.
+
+**Measure.** View › Measure (or M): click two points on parts or the plot to see the distance, its east, north and elevation parts, and the horizontal distance.
+
 ## 0.1.4 — 2026-11-03
 Datum Layout 0.1 is complete: the examples, printing, help and pictures, checked end to end.
 

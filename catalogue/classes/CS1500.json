@@ -1,0 +1,94 @@
+{
+  "name": "CS1500",
+  "description": "Carbon steel, class 900 or 1500; schedule 160 to 6\", 120 above, for high-pressure service",
+  "material": "Carbon steel",
+  "ratings": [
+    900,
+    1500
+  ],
+  "sizes": [
+    "1/2",
+    "3/4",
+    "1",
+    "1-1/4",
+    "1-1/2",
+    "2",
+    "2-1/2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "8",
+    "10",
+    "12",
+    "14",
+    "16",
+    "18",
+    "20",
+    "24"
+  ],
+  "schedules": [
+    [
+      "1/2",
+      "160"
+    ],
+    [
+      "8",
+      "120"
+    ]
+  ],
+  "elbow": "long",
+  "components": [
+    {
+      "kind": "pipe"
+    },
+    {
+      "kind": "elbow90"
+    },
+    {
+      "kind": "elbow45"
+    },
+    {
+      "kind": "tee"
+    },
+    {
+      "kind": "reducer"
+    },
+    {
+      "kind": "cap"
+    },
+    {
+      "kind": "flange"
+    },
+    {
+      "kind": "blind"
+    },
+    {
+      "kind": "gasket"
+    },
+    {
+      "kind": "bolts"
+    },
+    {
+      "kind": "gate",
+      "min": "2",
+      "max": "24"
+    },
+    {
+      "kind": "globe",
+      "min": "1/2",
+      "max": "6"
+    },
+    {
+      "kind": "check",
+      "min": "2",
+      "max": "24"
+    },
+    {
+      "kind": "ball",
+      "min": "1/2",
+      "max": "24"
+    }
+  ],
+  "source": "Example class written for Datum Layout; not any company's specification. Check against your own piping class before use"
+}

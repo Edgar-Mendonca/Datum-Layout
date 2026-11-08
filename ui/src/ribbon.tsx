@@ -7,7 +7,8 @@ import { C, ALL_CMDS } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
 import { Help, helpCard, HELP } from "./help";
-import { invoke, Example, EQUIP, ITEMS, NPS, inch } from "./api";
+import { invoke, Example, EQUIP, ITEMS, NPS, RATINGS, inch } from "./api";
+import { catalogue } from "./panels";
 import { fmt, toU, fromU, unit } from "./units";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Layout";
@@ -108,7 +109,7 @@ export const Ribbon = () => {
         <G l="Place" h="equipment"><B big i="vvessel" l="Equipment" dd={e => openMenu(e, EQUIP.map(([k, l]) => ({ label: l, run: () => C.place(k) })))} /><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Route a line from a nozzle or point (R)" /></G>
         <G l="Edit" h="edit"><S><B i="undo" l="Undo" run={C.undo} off={!out()?.undo} /><B i="redo" l="Redo" run={C.redo} off={!out()?.redo} /><B i="del" l="Delete" run={C.del} off={!sel()} /></S></G>
         <G l="Units" h="units"><S><B i="units" l="SI: m, mm, bar, °C" on={p()?.units === "SI"} run={() => C.units("SI")} /><B i="units" l="US: ft, in, psi, °F" on={p()?.units === "US"} run={() => C.units("US")} /></S></G>
-        <G l="Check" h="checks"><B big i="clash" l="Check" run={C.check} title="Find clashes, open ends, mismatches and class problems (F5)" /></G>
+        <G l="Check" h="checks"><B big i="clash" l="Check" run={C.check} title="Find clashes, open ends, mismatches and class problems (F5)" /><B big i="measure" l="Measure" on={mode() === "measure"} run={C.measure} title="Measure a distance between two points (M)" /></G>
         <G l="Hand Over" h="pcf"><B big i="pipe" l="To Datum Pipe" run={() => { const l = selLine(); C.exportPcf(l?.id); }} title="Export the selected line (or every line) as a piping component file for Datum Pipe" /></G>
       </Show>
       <Show when={tab() === "equipment"}>
@@ -122,8 +123,8 @@ export const Ribbon = () => {
         <G l="Route" h="route"><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Click a nozzle or a point, then the corners; end on a nozzle or double-click (R)" /><S><ElevBox /><B i="up" l="Up one grid step" run={() => C.elevation(p()?.plot.grid ?? 1)} /><B i="down" l="Down one grid step" run={() => C.elevation(-(p()?.plot.grid ?? 1))} /></S><S><B i="route" l="Route Again" run={C.reroute} off={!selLine()} title="Route the selected line square again between its ends (after equipment moved or turned)" /></S></G>
         <G l="New Lines" h="spec"><S>
           <label class="rsel">Size<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, nps: e.currentTarget.value } })}><For each={NPS}>{s => <option value={s} selected={p()?.settings.nps === s}>{inch(s)}</option>}</For></select></label>
-          <label class="rsel">Class<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, class: e.currentTarget.value } })}><option selected>{p()?.settings.class ?? "CS1"}</option></select></label>
-          <label class="rsel">Rating<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, rating: +e.currentTarget.value } })}><For each={[150, 300]}>{r => <option value={r} selected={p()?.settings.rating === r}>Class {r}</option>}</For></select></label>
+          <label class="rsel">Class<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, class: e.currentTarget.value } })}><For each={catalogue()?.cat.classes ?? []}>{c => <option value={c.name} selected={p()?.settings.class === c.name}>{c.name}</option>}</For></select></label>
+          <label class="rsel">Rating<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, rating: +e.currentTarget.value } })}><For each={RATINGS}>{r => <option value={r} selected={p()?.settings.rating === r}>Class {r}</option>}</For></select></label>
         </S></G>
         <G l="Line Size" h="resize"><B big i="resize" l="Size" dd={sizeMenu} off={!selLine()} title="Change the selected line's size: every component re-sizes" /><S><B i="up" l="One size larger" run={() => C.step(true)} off={!selLine()} /><B i="down" l="One size smaller" run={() => C.step(false)} off={!selLine()} /></S></G>
         <G l="Elbows" h="elbows"><S><B i="elbow" l="Long radius" on={selLine()?.radius === "long"} run={() => C.radius("long")} off={!selLine()} /><B i="elbow" l="Short radius" on={selLine()?.radius === "short"} run={() => C.radius("short")} off={!selLine()} /></S></G>
@@ -147,7 +148,7 @@ export const Ribbon = () => {
         <G l="Print" h="print"><B big i="print" l="Print / PDF" run={C.print} /></G>
       </Show>
       <Show when={tab() === "view"}>
-        <G l="Zoom" h="view"><B big i="fit" l="Fit" run={C.fit} /></G>
+        <G l="Zoom" h="view"><B big i="fit" l="Fit" run={C.fit} /><B big i="measure" l="Measure" on={mode() === "measure"} run={C.measure} title="Measure a distance between two points (M)" /></G>
         <G l="Standard Views" h="view"><B big i="cube" l="Isometric" run={() => C.std("iso")} /><S><B i="plan" l="Plan (from above)" run={() => C.std("plan")} /><B i="front" l="Front (from south)" run={() => C.std("front")} /><B i="side" l="Side (from east)" run={() => C.std("side")} /></S></G>
         <G l="Show" h="view"><S><label class="chk"><input type="checkbox" checked={opts().labels} onChange={e => setOpts({ ...opts(), labels: e.currentTarget.checked })} />Tags and line numbers</label></S></G>
         <G l="Plot" h="plot"><B big i="grid" l="Plot" run={C.selectPlot} title="Grid, extent, north and ground in the Inspector" /><B big i="area" l="Add Area" run={C.addArea} /></G>

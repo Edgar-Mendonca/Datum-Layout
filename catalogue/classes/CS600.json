@@ -1,0 +1,98 @@
+{
+  "name": "CS600",
+  "description": "Carbon steel, class 600; heavier walls (schedule 80 to 6\", XS above) for higher-pressure process lines",
+  "material": "Carbon steel",
+  "ratings": [
+    600
+  ],
+  "sizes": [
+    "1/2",
+    "3/4",
+    "1",
+    "1-1/4",
+    "1-1/2",
+    "2",
+    "2-1/2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "8",
+    "10",
+    "12",
+    "14",
+    "16",
+    "18",
+    "20",
+    "22",
+    "24"
+  ],
+  "schedules": [
+    [
+      "1/2",
+      "80"
+    ],
+    [
+      "8",
+      "XS"
+    ]
+  ],
+  "elbow": "long",
+  "components": [
+    {
+      "kind": "pipe"
+    },
+    {
+      "kind": "elbow90"
+    },
+    {
+      "kind": "elbow45"
+    },
+    {
+      "kind": "tee"
+    },
+    {
+      "kind": "reducer"
+    },
+    {
+      "kind": "cap"
+    },
+    {
+      "kind": "flange"
+    },
+    {
+      "kind": "blind"
+    },
+    {
+      "kind": "gasket"
+    },
+    {
+      "kind": "bolts"
+    },
+    {
+      "kind": "strainer",
+      "max": "12"
+    },
+    {
+      "kind": "gate",
+      "min": "2",
+      "max": "24"
+    },
+    {
+      "kind": "globe",
+      "min": "1/2",
+      "max": "8"
+    },
+    {
+      "kind": "check",
+      "min": "2",
+      "max": "24"
+    },
+    {
+      "kind": "ball",
+      "min": "1/2",
+      "max": "24"
+    }
+  ],
+  "source": "Example class written for Datum Layout; not any company's specification. Check against your own piping class before use"
+}

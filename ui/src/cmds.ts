@@ -50,6 +50,7 @@ export const C = {
   // ---------- piping ----------
   route: () => { setPlacing(null); setRoute({ from: null, start: null, via: [], nps: project()?.settings.nps ?? "6" }); setMode("route"); },
   cancelTool: () => { setRoute(null); setPlacing(null); setMode("select"); },
+  measure: () => { setRoute(null); setPlacing(null); setMode(mode() === "measure" ? "select" : "measure"); },
   /** Drops a component onto a line near a point: the engine snaps it to the nearest free place. */
   drop: async (line: number, kind: ItemKind, at: V3) => {
     const o = await act({ Drop: { line, kind, at, dir: [0, 0, 0], nps2: "" } });
@@ -135,7 +136,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Check clashes and errors", C.check, "F5"], ["Export the plant for Datum Pipe (.pcf)", () => C.exportPcf()], ["Export the selected line for Datum Pipe", () => { const l = selLine(); if (l) C.exportPcf(l.id); else toast("Select a line first."); }],
   ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")],
   ["SI units", () => C.units("SI")], ["US units", () => C.units("US")], ["Add an area", C.addArea], ["Plot settings", C.selectPlot],
-  ["Fit the plant", C.fit, "F"], ["Isometric view", () => C.std("iso"), "1"], ["Plan view", () => C.std("plan"), "2"], ["Front view (from the south)", () => C.std("front"), "3"], ["Side view (from the east)", () => C.std("side"), "4"],
+  ["Measure a distance", () => C.measure(), "M"], ["Fit the plant", C.fit, "F"], ["Isometric view", () => C.std("iso"), "1"], ["Plan view", () => C.std("plan"), "2"], ["Front view (from the south)", () => C.std("front"), "3"], ["Side view (from the east)", () => C.std("side"), "4"],
   ["Options", () => setBackstage("options")], ["Check for updates", () => setBackstage("about")], ["Roadmap", () => setBackstage("roadmap")],
   ["Keyboard shortcuts", () => D.shortcuts(), "F1"], ["Getting started", () => D.gettingStarted()], ["Glossary", () => D.glossary()],
 ];

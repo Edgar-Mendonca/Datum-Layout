@@ -1,22 +1,22 @@
 nps,elbow_lr_in,elbow_sr_in,tee_c_in,reducer_h_in,cap_e_in,source
-1/2,1.5,,1.0,1.5,1.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-3/4,1.125,,1.12,1.5,1.25,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-1,1.5,1,1.5,2.0,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-1-1/4,1.875,1.25,1.88,2.0,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-1-1/2,2.25,1.5,2.25,2.5,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-2,3,2,2.5,3.0,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-2-1/2,3.75,2.5,3.0,3.5,1.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-3,4.5,3,3.38,3.5,2.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-3-1/2,5.25,3.5,3.75,4.0,2.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-4,6,4,4.12,4.0,2.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-5,7.5,5,4.88,5.0,3.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-6,9,6,5.62,5.5,3.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-8,12,8,7.0,6.0,4.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-10,15,10,8.5,7.0,5.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-12,18,12,10.0,8.0,6.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-14,21,14,11.0,13.0,6.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-16,24,16,12.0,14.0,7.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-18,27,18,13.5,15.0,8.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-20,30,20,15.0,20.0,9.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-22,33,22,16.5,20.0,10.0,Typical butt-weld fitting dimensions from manufacturers' public catalogues
-24,36,24,17.0,20.0,10.5,Typical butt-weld fitting dimensions from manufacturers' public catalogues
+1/2,1.50,,1.0,1.5,1.0,"SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated); reducer_h 1.5 kept from the earlier table (no smaller size, used only for a 1/2 large end)"
+3/4,1.125,,1.125,1.5,1.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated); elbow_lr 1.125 (1-1/8 = 1.5 x NPS) kept: the source row giving 1.50 repeats the 1/2 value
+1,1.50,1.00,1.5,2.0,1.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+1-1/4,1.875,1.25,1.875,2.0,1.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+1-1/2,2.25,1.50,2.250,2.5,1.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+2,3.00,2.00,2.5,3.0,1.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+2-1/2,3.75,2.50,3.0,3.5,1.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+3,4.50,3.00,3.375,3.5,2.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+3-1/2,5.25,3.50,3.75,4.0,2.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+4,6.00,4.00,4.125,4.0,2.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+5,7.50,5.00,4.875,5.0,3.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+6,9.00,6.00,5.625,5.5,3.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+8,12.00,8.00,7.0,6.0,4.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+10,15.00,10.00,8.5,7.0,5.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+12,18.00,12.00,10.0,8.0,6.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+14,21.00,14.00,11.0,13.0,6.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+16,24.00,16.00,12.0,14.0,7.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+18,27.00,18.00,13.5,15.0,8.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+20,30.00,20.00,15.0,20.0,9.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+22,33.00,22.00,16.5,20.0,10.0,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)
+24,36.00,24.00,17.0,20.0,10.5,SC MFG Group / Hidalgo Metals Pipe Fittings web catalogue; Butt weld LR elbows A; SR elbows C; tees D; reducers H; caps E (undated)

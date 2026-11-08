@@ -1,0 +1,102 @@
+{
+  "name": "CS300",
+  "description": "Carbon steel, butt-weld fittings, class 300 raised-face weld-neck flanges; process service to about 50 bar",
+  "material": "Carbon steel",
+  "ratings": [
+    300
+  ],
+  "sizes": [
+    "1/2",
+    "3/4",
+    "1",
+    "1-1/4",
+    "1-1/2",
+    "2",
+    "2-1/2",
+    "3",
+    "3-1/2",
+    "4",
+    "5",
+    "6",
+    "8",
+    "10",
+    "12",
+    "14",
+    "16",
+    "18",
+    "20",
+    "22",
+    "24"
+  ],
+  "schedules": [
+    [
+      "1/2",
+      "80"
+    ],
+    [
+      "2",
+      "40"
+    ],
+    [
+      "8",
+      "STD"
+    ]
+  ],
+  "elbow": "long",
+  "components": [
+    {
+      "kind": "pipe"
+    },
+    {
+      "kind": "elbow90"
+    },
+    {
+      "kind": "elbow45"
+    },
+    {
+      "kind": "tee"
+    },
+    {
+      "kind": "reducer"
+    },
+    {
+      "kind": "cap"
+    },
+    {
+      "kind": "flange"
+    },
+    {
+      "kind": "blind"
+    },
+    {
+      "kind": "gasket"
+    },
+    {
+      "kind": "bolts"
+    },
+    {
+      "kind": "strainer"
+    },
+    {
+      "kind": "gate",
+      "min": "2",
+      "max": "24"
+    },
+    {
+      "kind": "globe",
+      "min": "1/2",
+      "max": "12"
+    },
+    {
+      "kind": "check",
+      "min": "2",
+      "max": "24"
+    },
+    {
+      "kind": "ball",
+      "min": "1/2",
+      "max": "24"
+    }
+  ],
+  "source": "Example class written for Datum Layout; not any company's specification. Check against your own piping class before use"
+}

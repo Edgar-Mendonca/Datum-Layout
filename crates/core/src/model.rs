@@ -358,7 +358,7 @@ impl Project {
                 n.dir = if l > 1e-9 { [n.dir[0] / l, n.dir[1] / l, n.dir[2] / l] } else { [1.0, 0.0, 0.0] };
                 fin(&mut n.proj, 0.0, 20.0, 0.2);
                 if !crate::catalogue::NPS.contains(&n.nps.as_str()) { w.push(format!("Nozzle {} of {} had an unknown size; it is now 2\".", n.tag, e.tag)); n.nps = "2".into(); }
-                if n.rating != 150 && n.rating != 300 { n.rating = 150; }
+                if !crate::catalogue::RATINGS.contains(&n.rating) { n.rating = 150; }
                 if n.tag.trim().is_empty() || !tags.insert(n.tag.clone()) { n.tag = format!("N{}", i + 1); while !tags.insert(n.tag.clone()) { n.tag.push('\''); } }
             }
             e.data.truncate(200);
@@ -366,7 +366,7 @@ impl Project {
         for l in &mut self.lines {
             fresh(&mut l.id, &mut l.uid, &mut seen, &mut w, &format!("Line {}", l.number));
             if !crate::catalogue::NPS.contains(&l.nps.as_str()) { w.push(format!("Line {} had an unknown size; it is now 6\".", l.number)); l.nps = "6".into(); }
-            if l.rating != 150 && l.rating != 300 { l.rating = 150; }
+            if !crate::catalogue::RATINGS.contains(&l.rating) { l.rating = 150; }
             fin(&mut l.insulation, 0.0, 1.0, 0.0);
             l.pts.truncate(10_000);
             l.pts.iter_mut().for_each(p3);

@@ -64,7 +64,9 @@ export const [focus, setFocus] = createSignal<{ at: V3; r: number } | null>(null
 // ---------- tools ----------
 /** select: pick and move; route: click a path; place: put the dragged or chosen equipment down. */
 export type RouteFrom = { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number } | { kind: "point"; p: V3 };
-export const [mode, setMode] = createSignal<"select" | "route" | "place">("select");
+export const [mode, setMode] = createSignal<"select" | "route" | "place" | "measure">("select");
+/** The measure tool's points (plant axes). */
+export const [measure, setMeasure] = createSignal<V3[]>([]);
 export const [route, setRoute] = createSignal<{ from: RouteFrom | null; start: V3 | null; via: V3[]; nps: string } | null>(null);
 /** The working elevation for clicks in the 3D view (m). */
 export const [elev, setElev] = createSignal(3.0);

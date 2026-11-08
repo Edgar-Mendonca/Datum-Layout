@@ -48,6 +48,9 @@ export interface Options {
   paper: string; landscape: boolean; company: string; packs: string[];
 }
 
+/** Flange pressure classes. */
+export const RATINGS = [150, 300, 600, 900, 1500, 2500];
+
 /** Nominal sizes in order. */
 export const NPS = ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1/2", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24"];
 /** ½" instead of 1/2". */

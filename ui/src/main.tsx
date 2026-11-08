@@ -24,7 +24,7 @@ import * as D from "./dialogs";
 
 const Status = () => (
   <footer class="status">
-    <span>{mode() === "route" ? "Routing" : mode() === "place" ? "Placing" : "Ready"}</span>
+    <span>{mode() === "route" ? "Routing" : mode() === "place" ? "Placing" : mode() === "measure" ? "Measuring" : "Ready"}</span>
     <span class="muted">{project() ? `${project()!.equipment.length} equipment · ${project()!.lines.length} lines · ${scene()?.parts.filter(p => p.line).length ?? 0} piping parts` : ""}</span>
     <Show when={checked()}><span class="muted">{checked()!.length ? `${checked()!.length} findings` : "Checked: clean"}</span></Show>
     <span class="grow" />
@@ -73,6 +73,7 @@ const App = () => {
     else if (e.key === "PageUp") { e.preventDefault(); C.elevation(grid); }
     else if (e.key === "PageDown") { e.preventDefault(); C.elevation(-grid); }
     else if (k === "r") C.route();
+    else if (k === "m") C.measure();
     else if (k === "f") C.fit();
     else if ("1234".includes(k) && k.length === 1) C.std(["iso", "plan", "front", "side"][+k - 1]);
   };

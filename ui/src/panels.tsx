@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { CatalogueOut, EQUIP, ITEMS, NPS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help } from "./help";
@@ -88,7 +88,7 @@ const EquipInsp = (p: { e: Equipment }) => {
         <tr classList={{ on: sel()?.kind === "nozzle" && (sel() as any).tag === n.tag }} onClick={() => setSel({ kind: "nozzle", id: p.e.id, tag: n.tag })}>
           <td><input value={n.tag} onChange={e => setN(i(), { tag: e.currentTarget.value })} /></td>
           <td><SizeSel v={n.nps} set={s => setN(i(), { nps: s })} /></td>
-          <td><select onChange={e => setN(i(), { rating: +e.currentTarget.value })}><For each={[150, 300]}>{r => <option value={r} selected={n.rating === r}>{r}</option>}</For></select></td>
+          <td><select onChange={e => setN(i(), { rating: +e.currentTarget.value })}><For each={RATINGS}>{r => <option value={r} selected={n.rating === r}>{r}</option>}</For></select></td>
           <td>{n.facing}</td>
           <td><button class="x" title="Remove the nozzle" onClick={e => { e.stopPropagation(); set({ nozzles: p.e.nozzles.filter((_, j) => j !== i()) }); }}>×</button></td>
         </tr>
@@ -116,7 +116,7 @@ const LineInsp = (p: { l: Line }) => {
     <div class="two">
       <Row l="Size" h="resize"><SizeSel v={p.l.nps} set={s => C.resize(s)} /></Row>
       <Row l="Pipe class" h="spec"><select onChange={e => set({ class: e.currentTarget.value })}><For each={catalogue()?.cat.classes ?? []}>{c => <option selected={c.name === p.l.class}>{c.name}</option>}</For><Show when={!(catalogue()?.cat.classes ?? []).some(c => c.name === p.l.class)}><option selected>{p.l.class}</option></Show></select></Row>
-      <Row l="Flange rating"><select onChange={e => set({ rating: +e.currentTarget.value })}><For each={[150, 300]}>{r => <option value={r} selected={p.l.rating === r}>Class {r}</option>}</For></select></Row>
+      <Row l="Flange rating"><select onChange={e => set({ rating: +e.currentTarget.value })}><For each={RATINGS}>{r => <option value={r} selected={p.l.rating === r}>Class {r}</option>}</For></select></Row>
       <Row l="Fluid code"><input value={p.l.fluid} onChange={e => set({ fluid: e.currentTarget.value })} /></Row>
       <Row l="Insulation" h="insulation"><NumIn q="dim" v={p.l.insulation} min={0} set={v => set({ insulation: v })} /></Row>
       <Row l="Elbows" h="elbows"><select onChange={e => set({ radius: e.currentTarget.value as any })}><option value="long" selected={p.l.radius === "long"}>Long radius</option><option value="short" selected={p.l.radius === "short"}>Short radius</option></select></Row>

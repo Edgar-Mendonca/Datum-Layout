@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 
 pub const IN: f64 = 0.0254;
 
+/// The flange pressure classes the catalogue covers.
+pub const RATINGS: [u32; 6] = [150, 300, 600, 900, 1500, 2500];
+
 /// Nominal sizes in order (the catalogue covers these).
 pub const NPS: [&str; 21] = ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1/2", "4", "5", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24"];
 
@@ -34,7 +37,10 @@ pub struct PipeRow { pub nps: String, pub dn: u32, pub od: f64, pub schedule: St
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct FittingRow { pub nps: String, pub elbow_lr: f64, pub elbow_sr: Option<f64>, pub tee_c: f64, pub reducer_h: f64, pub cap_e: f64, pub source: String }
 #[derive(Clone, Debug, Serialize, PartialEq)]
-pub struct FlangeRow { pub nps: String, pub rating: u32, pub od: f64, pub thick: f64, pub wn_length: f64, pub raised_face: f64, pub bolts: u32, pub bolt: f64, pub gasket: f64, pub source: String }
+pub struct FlangeRow { pub nps: String, pub rating: u32, pub od: f64, pub thick: f64, pub wn_length: f64, pub raised_face: f64, pub bolts: u32, pub bolt: f64, pub gasket: f64, pub source: String,
+    /// The blind flange's thickness where it differs from the weld-neck's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blind_thick: Option<f64> }
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ValveRow { pub kind: String, pub rating: u32, pub nps: String, pub f2f: f64, pub source: String }
 
@@ -137,6 +143,13 @@ impl Catalogue {
         c.add_table("flanges.csv", include_str!("../../../catalogue/flanges.csv"));
         c.add_table("valves.csv", include_str!("../../../catalogue/valves.csv"));
         c.add_class("classes/CS1.json", include_str!("../../../catalogue/classes/CS1.json"));
+        c.add_class("classes/CS150.json", include_str!("../../../catalogue/classes/CS150.json"));
+        c.add_class("classes/CS300.json", include_str!("../../../catalogue/classes/CS300.json"));
+        c.add_class("classes/CS600.json", include_str!("../../../catalogue/classes/CS600.json"));
+        c.add_class("classes/CS1500.json", include_str!("../../../catalogue/classes/CS1500.json"));
+        c.add_class("classes/LT150.json", include_str!("../../../catalogue/classes/LT150.json"));
+        c.add_class("classes/SS150.json", include_str!("../../../catalogue/classes/SS150.json"));
+        c.add_class("classes/UW150.json", include_str!("../../../catalogue/classes/UW150.json"));
         c
     }
 
@@ -172,7 +185,7 @@ impl Catalogue {
                 let bolts = r["bolts"].parse::<u32>().ok().filter(|v| (2..=64).contains(v));
                 match (size_ok(&r["nps"]), rating, f(&r, "od_in"), f(&r, "thick_in"), f(&r, "wn_length_in"), f(&r, "raised_face_in"), bolts, f(&r, "bolt_in")) {
                     (true, Some(rating), Some(od), Some(t), Some(y), Some(rf), Some(nb), Some(bd)) if y > t && rf < od => {
-                        let row = FlangeRow { nps: r["nps"].clone(), rating, od: od * IN, thick: t * IN, wn_length: y * IN, raised_face: rf * IN, bolts: nb, bolt: bd * IN, gasket: f(&r, "gasket_in").unwrap_or(0.125) * IN, source: r["source"].clone() };
+                        let row = FlangeRow { nps: r["nps"].clone(), rating, od: od * IN, thick: t * IN, wn_length: y * IN, raised_face: rf * IN, bolts: nb, bolt: bd * IN, gasket: f(&r, "gasket_in").unwrap_or(0.125) * IN, source: r["source"].clone(), blind_thick: f(&r, "blind_thick_in").map(|v| v * IN) };
                         self.flanges.retain(|p| !(p.nps == row.nps && p.rating == row.rating));
                         self.flanges.push(row);
                     }
@@ -243,6 +256,17 @@ impl Catalogue {
     pub fn valve(&self, kind: &str, nps: &str, rating: u32) -> Option<&ValveRow> {
         self.valves.iter().find(|v| v.kind == kind && v.nps == nps && v.rating == rating)
     }
+    /// A valve's face-to-face length: from the table, or where the table has no row for that size,
+    /// interpolated by nominal size between the nearest sizes listed for the same kind and class.
+    pub fn valve_length(&self, kind: &str, nps: &str, rating: u32) -> Option<f64> {
+        if let Some(v) = self.valve(kind, nps, rating) { return Some(v.f2f); }
+        let x = nps_inches(nps)?;
+        let mut pts: Vec<(f64, f64)> = self.valves.iter().filter(|v| v.kind == kind && v.rating == rating).filter_map(|v| Some((nps_inches(&v.nps)?, v.f2f))).collect();
+        pts.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let lo = pts.iter().rev().find(|p| p.0 < x)?;
+        let hi = pts.iter().find(|p| p.0 > x)?;
+        Some(lo.1 + (hi.1 - lo.1) * (x - lo.0) / (hi.0 - lo.0))
+    }
 }
 
 #[cfg(test)]
@@ -258,8 +282,10 @@ mod tests {
             assert!(c.fitting(n).is_some(), "fittings {n}");
             for r in [150, 300] {
                 assert!(c.flange(n, r).is_some(), "flange {n} {r}");
-                for k in ["gate", "globe", "check", "ball"] { assert!(c.valve(k, n, r).is_some(), "{k} {n} {r}"); }
+                for k in ["gate", "check"] { assert!(c.valve(k, n, r).is_some() || n == "3-1/2", "{k} {n} {r}"); }
             }
+            // The higher classes exist in every size their flanges are made in.
+            for r in RATINGS { if c.flange(n, r).is_none() { assert!(["3-1/2", "22", "14", "16", "18", "20", "24"].contains(&n), "flange {n} {r}"); } }
         }
         // 6" Std: 168.3 mm × 7.11 mm.
         let p = c.pipe("6", "CS1").unwrap();
@@ -270,6 +296,16 @@ mod tests {
         assert_eq!(cs1.schedule("12"), "STD");
         assert!(cs1.allows("gate", "6") && !cs1.allows("gate", "1") && !cs1.allows("ball", "16") && cs1.allows("elbow90", "24"));
         assert!(c.pipes.iter().all(|r| !r.source.is_empty()));
+        assert_eq!(c.classes.len(), 8);
+        // Every class's schedules exist in the pipe table for its sizes (so no part falls back silently).
+        for cl in &c.classes { for s in &cl.sizes { assert!(c.pipes.iter().any(|p| p.nps == *s && p.schedule == cl.schedule(s)), "{} {s} {}", cl.name, cl.schedule(s)); } }
+        // Flanges and valves for every class 150–2500 that is made; the blind may be thicker.
+        assert!(c.flange("12", 2500).is_some() && c.flange("24", 1500).is_some() && c.flange("14", 2500).is_none());
+        assert!(c.flanges.iter().all(|f| f.blind_thick.is_none_or(|b| b >= f.thick * 0.5)));
+        assert!(c.valve("gate", "6", 900).is_some() && c.valve("ball", "5", 600).is_some());
+        // A missing size is interpolated between its neighbours: 3-1/2" gate, class 300, between 3" and 4".
+        let v = c.valve_length("gate", "3-1/2", 300).unwrap() / IN;
+        assert!(v > 11.12 && v < 12.0, "{v}");
     }
 
     #[test]

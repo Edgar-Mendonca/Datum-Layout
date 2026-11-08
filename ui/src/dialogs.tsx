@@ -81,7 +81,7 @@ export const glossary = () => openDialog(() => {
     ["Long radius elbow (LR)", "An elbow whose centreline radius is 1.5 × the pipe size; short radius (SR) is 1 ×."],
     ["Centre-to-end", "From an elbow's or tee's centre point to its end face: how far it takes up each run."],
     ["Weld-neck flange", "A flange with a tapered hub that is butt-welded to the pipe."],
-    ["Rating (class 150, 300)", "The flange pressure class; flanges that meet must have the same rating."],
+    ["Rating (class 150 to 2500)", "The flange pressure class; flanges that meet must have the same rating."],
     ["Face-to-face", "The length of a flanged valve between its two flange faces."],
     ["Reducer", "A cone fitting that joins two sizes; concentric keeps the centreline."],
     ["Tee", "A fitting with a branch at 90°; a reducing tee has a smaller branch."],

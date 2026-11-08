@@ -71,7 +71,7 @@ pub struct Built {
 }
 
 /// Where a size's dimensions are missing from the catalogue, these stand in (and are reported).
-struct Dimens { od: f64, elbow: f64, tee: f64, red: f64, cap: f64, fl_od: f64, fl_t: f64, fl_y: f64, gasket: f64, bolts: (u32, f64) }
+struct Dimens { od: f64, elbow: f64, tee: f64, red: f64, cap: f64, fl_od: f64, fl_t: f64, fl_y: f64, gasket: f64, bolts: (u32, f64), blind_t: f64 }
 
 fn dimens(cat: &Catalogue, nps: &str, class: &str, rating: u32, radius: Radius) -> Dimens {
     let od = cat.pipe(nps, class).map(|p| p.od).unwrap_or_else(|| cat.od(nps));
@@ -87,6 +87,7 @@ fn dimens(cat: &Catalogue, nps: &str, class: &str, rating: u32, radius: Radius) 
         cap: f.map(|f| f.cap_e).unwrap_or(od * 0.6),
         fl_od: fl.map(|f| f.od).unwrap_or(od * 1.8),
         fl_t: fl.map(|f| f.thick).unwrap_or(od * 0.15),
+        blind_t: fl.map(|f| f.blind_thick.unwrap_or(f.thick)).unwrap_or(od * 0.15),
         fl_y: fl.map(|f| f.wn_length).unwrap_or(od * 0.5),
         gasket: fl.map(|f| f.gasket).unwrap_or(0.003),
         bolts: fl.map(|f| (f.bolts, f.bolt)).unwrap_or((4, 0.016)),
@@ -96,7 +97,7 @@ fn dimens(cat: &Catalogue, nps: &str, class: &str, rating: u32, radius: Radius) 
 /// The face-to-face length of an in-line valve or strainer.
 fn f2f(cat: &Catalogue, kind: ItemKind, nps: &str, rating: u32, od: f64) -> f64 {
     let key = match kind { ItemKind::Strainer => "globe", k => k.key() };
-    cat.valve(key, nps, rating).map(|v| v.f2f).unwrap_or(od * 2.5)
+    cat.valve_length(key, nps, rating).unwrap_or(od * 2.5)
 }
 
 /// The size after a reducer: its own `nps2`, or the next size down.
@@ -323,7 +324,7 @@ fn line(p: &Project, cat: &Catalogue, l: &Line, b: &mut Built) {
         match e {
             End::Point { term: Term::Open } | End::Branch { .. } => 0.0,
             End::Point { term: Term::Cap } => d.cap,
-            End::Point { term: Term::Blind } => d.fl_t + d.gasket + d.fl_y,
+            End::Point { term: Term::Blind } => d.blind_t + d.gasket + d.fl_y,
             End::Nozzle { .. } => match end_port(p, cat, e) {
                 Some(np) => { let dn = dim(&np.nps); dn.gasket + dn.fl_y + if np.nps != nps { dim(&larger(&np.nps, nps)).red } else { 0.0 } }
                 None => 0.0,
@@ -445,13 +446,13 @@ fn start_end(p: &Project, cat: &Catalogue, run: &mut Run, e: &End, nps: &str, _b
             let mut q = Part::new("blind", l);
             q.nps = nps.into();
             q.rating = l.rating;
-            q.shapes = vec![Shape::tube(run.at(0.0), run.at(d.fl_t), d.fl_od / 2.0)];
-            q.ports = vec![run.port(d.fl_t, false, nps, l.rating, "FL")];
-            q.length = d.fl_t;
+            q.shapes = vec![Shape::tube(run.at(0.0), run.at(d.blind_t), d.fl_od / 2.0)];
+            q.ports = vec![run.port(d.blind_t, false, nps, l.rating, "FL")];
+            q.length = d.blind_t;
             run.push(q, 0);
-            run.gasket(d.fl_t, &d, nps, 0);
-            run.flange(d.fl_t + d.gasket, &d, nps, true, 0);
-            d.fl_t + d.gasket + d.fl_y
+            run.gasket(d.blind_t, &d, nps, 0);
+            run.flange(d.blind_t + d.gasket, &d, nps, true, 0);
+            d.blind_t + d.gasket + d.fl_y
         }
         End::Nozzle { .. } => {
             let Some(np) = end_port(p, cat, e) else { return 0.0 };

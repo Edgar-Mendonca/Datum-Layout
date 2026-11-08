@@ -158,6 +158,15 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("undo brings back the 4\" line", (await state()).p.lines[0].nps === "4");
   await p.keyboard.press("Control+y"); await settle(500);
 
+  // 7a. Measure: two clicks give the distance with its parts.
+  await p.keyboard.press("m"); await settle(200);
+  const ma = await screenOf([2, 2, 0]), mb = await screenOf([8, 2, 0]);
+  await p.mouse.click(ma.x, ma.y); await settle(150); await p.mouse.click(mb.x, mb.y); await settle(300);
+  const mt = await p.textContent(".toolhint");
+  check("measure shows the distance between two clicks", /6(\.0+)? m/.test(mt) && mt.includes("ΔE"), mt);
+  await p.keyboard.press("Escape"); await settle(150);
+  check("the catalogue lists the example pipe classes", (await p.$$(".catclass")).length === 8);
+
   // 7b. Turn the tank in example 1: its suction line is reported skewed; Route Again squares it.
   await open("pumps");
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(300);
