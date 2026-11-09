@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.2 (2026-11-08) |
+| **Current version** | 0.2.3 (2026-11-09) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -111,6 +111,10 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.1 | Imported equipment is placed in a row along the plot (the P&ID has no 3D positions); equipment already present keeps its place and only takes data; listed lines are routed only on request (Route Listed Lines), nozzle to nozzle, components spread evenly in the P&ID's order through the snap rule | The designer arranges; the tool never moves what was placed |
 | 0.2.2 | Supports went ahead of crosses and eccentric reducers: Datum Pipe already reads SUPPORT records and its stress analysis needs them, so they complete the Layout → Pipe hand-over; crosses and eccentric reducers need deeper routing changes (an offset centreline) and wait | The family flow first |
 | 0.2.2 | A support is an item of zero length that splits the pipe (Pipe places supports on nodes); pipe-to-pipe joints there are not welds; it never counts as a clash with its own line or against the class | Matches how the stress model sees it |
+| 0.2.3 (user) | Equipment moves by dragging the selected item itself across the plot (first click selects, so a drag elsewhere still orbits); the preview moves the item's own vertices in the one buffer; the engine moves it on release; lines left skewed are routed again as a separate undo step | The user found moving "a bit weird"; the arrows alone were slow and missed |
+| 0.2.3 | Arrow keys move along the plant axis nearest to the arrow's direction on screen | Up always means "away from me", whatever the view |
+| 0.2.3 | Drags capture the pointer on the canvas (the listeners' own element), and lines are picked within 4 cm (three.js's default is 1 m) | Both made dragging lose the mouse or grab the wrong thing |
+| 0.2.3 | Badges compute their words in one function each: Solid splits chained ternaries in markup into separate memos, and one read a cleared check as a list (the window stopped loading plants) | Found by the UI test |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -134,6 +138,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.0 | The Library (`ui/src/library.tsx`, after Datum Mesh's materials library): pipe classes (wall by size, components allowed, lines using it, use for new lines) and the parts tables with sources, searchable | ✅ |
 | 0.2.1 | From the P&ID: plant package format v1 (`docs/formats/plant-package.md`), import (`package.rs`, `Op::ImportPackage`), Route Listed Lines (`Op::RouteListed`), components' order in the line-list check; brief for Schema's export | ✅ |
 | 0.2.2 | Pipe supports (`ItemKind::Support`, `SupportKind`: rest, guide, stop, anchor; zero length, the pipe split at it; PCF `SUPPORT` written and read; rack example supported; proved with Datum Pipe’s real engine) | ✅ |
+| 0.2.3 | Drag selected equipment or groups across the plot (live preview, snap, Esc, lines squared again after), arrow-key nudge relative to the screen, Move to…, view cube and status badges after Datum Mesh; pointer-capture and arrow-picking bugs fixed | ✅ |
 | 0.2 Pipe classes and fittings | Class editor with branch table; eccentric reducers, crosses, sloped lines | 🔜 |
 | 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -181,6 +186,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 ### 2026-11-08: Session 4 (0.2.x)
 - The user confirmed the family flow (Schema → Layout → Pipe; PCF as the hand-over, a documented plain-text format we read and write with our own code) and asked for a few small 0.2 releases to view in the morning, the look kept in step with Datum Mesh (Datum Pipe is getting the same).
 - 0.2.0: the Library.
+- 0.2.3 (2026-11-09, the user: moving equipment felt weird; more from Datum Mesh): drag on the plot, nudge, Move to…, view cube, status badges; three window bugs found by the new checks.
 - 0.2.2: pipe supports; `scripts/verify.sh` with Datum Pipe eca6ebb: every example solved, the rack's lines read with their supports and no warnings.
 - 0.2.1: From the P&ID: plant package format, import, Route Listed Lines, component-order check; brief for Schema.
 

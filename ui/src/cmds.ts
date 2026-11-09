@@ -158,6 +158,35 @@ export const C = {
     setSection({ lo: [0, 1, 2].map(k => Math.min(...parts.map(q => q.lo[k])) - m) as V3, hi: [0, 1, 2].map(k => Math.max(...parts.map(q => q.hi[k])) + m) as V3 });
   },
 
+  // ---------- moving (0.2.3) ----------
+  /** Nudges the selection one grid step (a tenth with `fine`) in a direction on the screen: the
+   *  arrow's direction is turned to the plant axis (east, west, north or south) nearest to it as
+   *  the view looks now. Equipment, a group, or a line's run. */
+  nudge: (screen: "up" | "down" | "left" | "right", fine = false) => {
+    const p = project(); if (!p) return;
+    const ids = C.targets(), s = sel();
+    if (!ids.length && s?.kind !== "run") return;
+    const c = camHook?.get(); let f = [0, 1];
+    if (c) { const v = [c.target[0] - c.eye[0], c.target[1] - c.eye[1]], l = Math.hypot(v[0], v[1]); if (l > 1e-6) f = [v[0] / l, v[1] / l]; }
+    // Up the screen is forward (the view's direction on the plan); right is forward turned clockwise.
+    const dir = screen === "up" ? f : screen === "down" ? [-f[0], -f[1]] : screen === "right" ? [f[1], -f[0]] : [-f[1], f[0]];
+    const ax: V3 = Math.abs(dir[0]) >= Math.abs(dir[1]) ? [Math.sign(dir[0]), 0, 0] : [0, Math.sign(dir[1]), 0];
+    const g = (p.plot.grid || 1) * (fine ? 0.1 : 1), d: V3 = [ax[0] * g, ax[1] * g, 0];
+    if (s?.kind === "run" && !ids.length) { act({ MoveRun: { line: s.id, seg: s.seg, delta: d } }, true); return; }
+    act({ MoveGroup: { ids, delta: d } }).then(o => C.squareAfterMove(o));
+  },
+  /** After equipment moved: lines left skewed are routed square again (through their own corners),
+   *  as one more step (Ctrl+Z gives back the skewed lines). */
+  squareAfterMove: async (o: Out | null) => {
+    if (!o) return;
+    const bad = [...new Set(o.issues.filter(i => i.kind === "routing" && i.text.includes("no longer leaves")).map(i => i.line))].filter(Boolean);
+    if (!bad.length) return;
+    const r = await act({ Batch: bad.map(line => ({ Reroute: { line } })) }, true);
+    if (r) toast(`${bad.length} line${bad.length === 1 ? "" : "s"} routed square again to follow the move (Ctrl+Z to keep ${bad.length === 1 ? "it" : "them"} as ${bad.length === 1 ? "it was" : "they were"}).`, true);
+  },
+  /** Moves the selected equipment to a typed position. */
+  moveTo: () => { const e = selEquip(); if (!e) return toast("Select an equipment item first."); D.moveTo(e); },
+
   // ---------- equipment ----------
   /** Click on the plot to place an item of this kind. */
   place: (kind: EquipKind) => { setRoute(null); setPlacing(kind); setMode("place"); },

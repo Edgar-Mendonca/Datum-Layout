@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.2.3 — 2026-11-09
+Moving equipment made easy, the view cube, and status badges.
+
+**Drag it where it goes.** Select equipment (or a group), then drag it across the plot: it follows the mouse as you go, snapping to a tenth of the grid (hold Shift for finer), with the distance shown. Let go and the lines connected follow; any line left skewed is routed square again through its own corners (Ctrl+Z keeps it as it was). Esc while dragging puts it back.
+
+**Nudge and type.** The arrow keys move the selection one grid step the way they point on the screen (Shift: a tenth). Right-click equipment for Move to… (type its position), Turn 90° and Copy beside it.
+
+**Fixed.** Dragging an arrow could lose the mouse part-way, and the arrows took clicks a metre away from them; an arrow pointing straight at you (the vertical one in plan) is now hidden so the item under it can be dragged.
+
+**View cube.** After Datum Mesh's: click a face (Top, South, East…) to look from it, an edge to look from between two faces, or a corner for an isometric view; the house button fits the plant.
+
+**Status badges.** Check (not run, out of date, findings or clean), Routing (lines to fix or square) and P&ID (differences with the line list or plant package), each a click away from what it is about.
+
 ## 0.2.2 — 2026-11-08
 Pipe supports, handed to Datum Pipe with each line.
 

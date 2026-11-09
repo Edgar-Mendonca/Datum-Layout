@@ -25,6 +25,7 @@
   ],
   "highlights": [
     "A workspace laid out in the order of the work: a steps bar, a plant tree with filters and eyes to show or hide each item, a context bar and a tool strip",
+    "Drag equipment across the plot and its lines follow; arrow keys nudge it; a view cube turns the view",
     "From the P&ID: a plant package places the equipment, routes the lines with their valves in the P&ID's order, and checks the 3D model against it",
     "Six parametric equipment types with nozzles: vertical vessel, horizontal drum, storage tank, column, centrifugal pump with motor and baseplate, shell-and-tube exchanger",
     "Routing with orthogonal guides: long- or short-radius elbows at every turn, reducers where sizes change, weld-neck flanges, gaskets and bolt sets at flanged nozzles",
@@ -77,6 +78,7 @@
         "The Library: every pipe class and parts table, browsable, with its source (0.2.0)",
         "From the P&ID: read a plant package, place its equipment, route its lines with their components in order, and check the 3D model against it (0.2.1)",
         "Pipe supports (rest, guide, line stop, anchor) written for Datum Pipe's stress analysis (0.2.2)",
+        "Drag equipment across the plot, nudge it with the arrow keys, a view cube and status badges (0.2.3)",
         "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
         "Eccentric reducers, crosses, sloped lines",
         "Design rules for supports and access (with 0.3's steel)"

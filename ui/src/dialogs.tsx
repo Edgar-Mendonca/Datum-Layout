@@ -1,10 +1,11 @@
 // Dialogs: saving changes, closing, recovery, and the help pages (shortcuts, getting started,
 // glossary, catalogue sources).
 import { For, createSignal, createResource } from "solid-js";
-import { Out, CatalogueOut } from "./api";
-import { openDialog, closeDialog, call, out, setOut } from "./store";
+import { Out, CatalogueOut, Equipment, V3 } from "./api";
+import { openDialog, closeDialog, call, out, setOut, act } from "./store";
 import { C } from "./cmds";
 import { Dialog } from "./ui";
+import { toU, fromU, unit } from "./units";
 
 export const keepChanges = (then: () => unknown) => {
   if (!out()?.dirty) { then(); return; }
@@ -23,6 +24,19 @@ export const confirmClose = (quit: () => void) => openDialog(() => (
   </Dialog>
 ));
 
+/** Equipment › Move to…: a typed position (the lines connected follow). */
+export const moveTo = (e: Equipment) => {
+  const v = [...e.pos];
+  openDialog(() => (
+    <Dialog title={`Move ${e.tag} to`} okText="Move" cancel="Cancel" help="move" ok={() => { const p = v.map(x => fromU("coord", x)); if (p.some(x => !Number.isFinite(x))) return false; act({ SetEquipment: { ...e, pos: p as V3 } }); }}>
+      <p class="muted">Where its base centre goes, in plant coordinates. Lines connected to it follow.</p>
+      <div class="xyz">{(["E", "N", "EL"] as const).map((n, i) => <label class="fld">{n}<input type="number" step="0.1" value={+toU("coord", e.pos[i]).toFixed(3)} onInput={ev => { v[i] = +ev.currentTarget.value; }} /><span class="unit">{unit("coord")}</span></label>)}</div>
+    </Dialog>
+  ));
+  // Typed values are in display units.
+  for (let i = 0; i < 3; i++) v[i] = +toU("coord", e.pos[i]).toFixed(3);
+};
+
 export const renameView = (name: string) => {
   let to = name;
   openDialog(() => (
@@ -38,7 +52,7 @@ export const shortcuts = () => openDialog(() => (
       ["Save / Save As", "Ctrl+S / Ctrl+Shift+S"], ["Open", "Ctrl+O"], ["New", "Ctrl+N"], ["Print", "Ctrl+P"], ["Tell me what you want to do", "Ctrl+K"],
       ["Undo / Redo", "Ctrl+Z / Ctrl+Y"], ["Delete what is selected", "Del"], ["Route a line", "R"], ["Working elevation up / down one grid step", "PgUp / PgDn"],
       ["Cancel the tool", "Esc"], ["Check clashes and errors", "F5"], ["Fit the plant in the view", "F"], ["Standard views: iso, plan, front, side", "1 2 3 4"],
-      ["Orbit / pan / zoom", "Left drag / right or middle drag / wheel"], ["Select one run of the selected line", "Click its pipe (or Shift+click)"], ["Add a jog to the selected run", "J"], ["Hide / show only / show everything", "H / I / Shift+H"], ["This list", "F1"],
+      ["Orbit / pan / zoom", "Left drag / right or middle drag / wheel"], ["Select one run of the selected line", "Click its pipe (or Shift+click)"], ["Move the selected equipment or group", "Drag it, or arrow keys (Shift: a tenth)"], ["Add a jog to the selected run", "J"], ["Hide / show only / show everything", "H / I / Shift+H"], ["This list", "F1"],
     ] as [string, string][]}>{([a, b]) => <tr><td>{a}</td><td><kbd>{b}</kbd></td></tr>}</For></tbody></table>
   </Dialog>
 ));

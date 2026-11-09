@@ -12,7 +12,7 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "./styles.css";
 import { invoke, listen, Out, Options, Shown, Typed } from "./api";
-import { setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
+import { checkStale, setBottom, setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
 import { C } from "./cmds";
 import { TitleBar, Ribbon, palette } from "./ribbon";
 import { Backstage, update, checkUpdate } from "./backstage";
@@ -23,11 +23,30 @@ import { Menu, Toast } from "./ui";
 import { setUnitTable, fmt } from "./units";
 import * as D from "./dialogs";
 
+/** Status badges (after Datum Mesh's): the check, routing and the line list, each in words and
+ *  kept apart; a click opens what it is about. No badge claims more than its check found. */
+const Badges = () => {
+  const iss = () => out()?.issues ?? [];
+  const routing = () => iss().filter(i => i.kind === "routing").length;
+  const list = () => iss().filter(i => i.kind === "list").length;
+  const ck = () => checked();
+  // One function each (not chained in the markup), so a cleared check never reads as a list.
+  const checkTone = (): "ok" | "warn" | "bad" | "idle" => { const c = ck(); return !c ? "idle" : checkStale() ? "warn" : c.length ? "bad" : "ok"; };
+  const checkText = () => { const c = ck(); return !c ? "not run" : checkStale() ? "out of date" : c.length ? `${c.length} findings` : "clean"; };
+  const B = (p: { k: string; tone: "ok" | "warn" | "bad" | "idle"; label: string; text: string; run: () => void; title: string }) =>
+    <button class={`badge ${p.tone}`} data-badge={p.k} title={p.title} onClick={p.run}><i />{p.label} <b>{p.text}</b></button>;
+  return <span class="badges">
+    <B k="check" label="Check" tone={checkTone()} text={checkText()} title="Clashes, open ends, mismatches, class and design rules (F5 checks again)" run={() => { const c = ck(); if (!c || checkStale()) C.check(); else setBottom(c.some(i => i.kind === "clash") ? "clashes" : "checks"); }} />
+    <B k="routing" label="Routing" tone={routing() ? "bad" : "ok"} text={routing() ? `${routing()} to fix` : "square"} title="Lines left skewed, turns without an elbow, components that do not fit" run={() => setBottom("checks")} />
+    <Show when={project()!.line_list.length}><B k="list" label="P&ID" tone={list() ? "warn" : "ok"} text={list() ? `${list()} differences` : "matches"} title="The model against the line list or plant package" run={() => setBottom("checks")} /></Show>
+  </span>;
+};
+
 const Status = () => (
   <footer class="status">
     <span>{mode() === "route" ? "Routing" : mode() === "place" ? "Placing" : mode() === "measure" ? "Measuring" : "Ready"}</span>
     <span class="muted">{project() ? `${project()!.equipment.length} equipment · ${project()!.lines.length} lines · ${scene()?.parts.filter(p => p.line).length ?? 0} piping parts` : ""}</span>
-    <Show when={checked()}><span class="muted">{checked()!.length ? `${checked()!.length} findings` : "Checked: clean"}</span></Show>
+    <Show when={project()}><Badges /></Show>
     <span class="grow" />
     <span class="muted">Working elevation {fmt("coord", elev())}</span>
     <span class="muted">{project()?.units === "US" ? "US units" : "SI units"}</span>
@@ -68,12 +87,14 @@ const App = () => {
     else if (e.key === "F1") { e.preventDefault(); D.shortcuts(); }
     else if (e.key === "F5") { e.preventDefault(); C.check(); }
     else if (e.key === "Escape" && backstage() && out()) setBackstage(null);
+    else if (e.key === "Escape" && (window as any).__cancelDrag?.()) { e.preventDefault(); }
     else if (e.key === "Escape" && mode() !== "select") C.cancelTool();
     else if (e.key === "Escape" && !typing && (sel() || picked().length)) { setSel(null); setPicked([]); }
     else if (ctrl && k === "a" && !typing && !backstage()) { e.preventDefault(); C.selectAll(); }
     else if (ctrl && k === "d" && !typing && !backstage()) { e.preventDefault(); C.copyGroup(); }
     else if (typing || ctrl || backstage()) return;
     else if (e.key === "Delete") { e.preventDefault(); C.del(); }
+    else if (e.key.startsWith("Arrow") && (sel() || picked().length)) { e.preventDefault(); C.nudge(e.key.slice(5).toLowerCase() as "up" | "down" | "left" | "right", e.shiftKey); }
     else if (e.key === "PageUp") { e.preventDefault(); C.elevation(grid); }
     else if (e.key === "PageDown") { e.preventDefault(); C.elevation(-grid); }
     else if (k === "r") C.route();

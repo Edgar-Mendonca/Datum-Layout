@@ -1114,3 +1114,28 @@ tr.behind td { background: var(--err-bg); }
 .libx .libpage { display: block; }
 .libtbl td small.src { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 320px; white-space: normal; line-height: 1.3; }
 .libpage > .libtbl { max-height: calc(min(640px, 72vh) - 110px); }
+
+/* 0.2.3: the view cube (after Datum Mesh's). */
+.v3d .vcube { position: absolute; left: 12px; top: 10px; width: 96px; display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 3; user-select: none; }
+.v3d .vcube .vhome { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); padding: 2px 4px; cursor: pointer; line-height: 0; color: var(--text); }
+.v3d .vcube .vhome .ic { width: 15px; height: 15px; }
+.v3d .cube { width: 84px; height: 84px; overflow: visible; cursor: pointer; }
+.v3d .cube polygon { fill: color-mix(in srgb, var(--panel) 92%, #3A5A78); stroke: var(--line3); stroke-width: 1; }
+.v3d .cube .cf-top polygon, .v3d .cube .cf-bottom polygon { fill: color-mix(in srgb, var(--panel) 80%, #3A5A78); }
+.v3d .cube polygon.inner { fill: none; stroke: var(--line2); stroke-dasharray: 1.5 1.5; }
+.v3d .cube polygon.zone { fill: color-mix(in srgb, #2F8CFF 35%, transparent); stroke: #2F8CFF; pointer-events: none; }
+.v3d .cube text { font: 700 6.5px var(--mono); letter-spacing: .03em; text-transform: uppercase; fill: var(--text); pointer-events: none; }
+.v3d:has(.secbox) .vcube { top: auto; bottom: 10px; }
+
+/* 0.2.3: status badges (after Datum Mesh's). */
+.status .badges { display: inline-flex; gap: 6px; align-items: center; }
+.status .badge { display: inline-flex; align-items: center; gap: 5px; height: 18px; padding: 0 7px; border: 1px solid var(--line); border-radius: 9px; font-size: 11px; color: var(--text2); background: var(--bg2); cursor: pointer; }
+.status .badge b { font-weight: 500; color: var(--text); }
+.status .badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--line3); }
+.status .badge.ok i { background: var(--green); }
+.status .badge.warn i { background: #D9A400; }
+.status .badge.bad i { background: #D64545; }
+.status .badge:hover { border-color: var(--blue); }
+.dlg .xyz { display: flex; gap: 10px; }
+.dlg .xyz .fld { display: flex; align-items: center; gap: 4px; }
+.dlg .xyz input { width: 90px; }

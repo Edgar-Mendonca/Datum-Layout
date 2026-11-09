@@ -34,7 +34,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const b = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
   const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const errors = [];
-  p.on("pageerror", e => errors.push(e.message));
+  p.on("pageerror", e => errors.push(e.message + " @ " + (e.stack || "").split("\n").slice(1, 4).join(" | ")));
   p.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
   await p.exposeFunction("__bridge", (cmd, args) => ask(cmd, args));
   await p.addInitScript(() => {
@@ -264,6 +264,45 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("supports go to Datum Pipe in the PCF", (pcfA.match(/^SUPPORT$/gm) ?? []).length === 5 && pcfA.includes("SKEY ANC") && pcfA.includes("SKEY GUI"), pcfA.slice(-400));
   check("supports raise no clash or class finding", !st.issues.some(i => i.kind === "class" || i.kind === "clash"), JSON.stringify(st.issues.map(i => i.text)));
   if (shots) { await p.keyboard.press("Escape"); await settle(200); await p.evaluate(() => (window).__screen); await p.keyboard.press("f"); await settle(400); await shot("supports"); }
+
+  // 7k. Moving made easy (0.2.3): drag equipment across the plot, Esc, arrow keys, the view cube, badges.
+  await open("pumps");
+  await p.keyboard.press("2"); await settle(400); // plan view: the drag reads plainly east and north
+  st = await state();
+  const pA = st.p.equipment.find(e => e.tag === "P-101A");
+  await p.click(`.tree .ti[data-id="${pA.id}"] > span:not(.teye)`); await settle(300);
+  const bodyPt = [pA.pos[0] + 0.55, pA.pos[1] + 0.12, pA.pos[2] + 0.5]; // the motor, clear of the arrows
+  const s0 = await screenOf(bodyPt), sB = await screenOf([bodyPt[0] + 2, bodyPt[1], bodyPt[2]]);
+  await p.mouse.move(s0.x, s0.y); await p.mouse.down(); await p.mouse.move((s0.x + sB.x) / 2, (s0.y + sB.y) / 2, { steps: 4 }); await p.mouse.move(sB.x, sB.y, { steps: 4 }); await settle(150);
+  check("dragging shows the move as it goes",(await p.textContent(".v3d")).includes("ΔE"));
+  await p.mouse.up(); await settle(800);
+  st = await state();
+  const pA2 = st.p.equipment.find(e => e.tag === "P-101A");
+  check("dragging the selected pump moves it across the plot", Math.abs(pA2.pos[0] - pA.pos[0] - 2) < 0.35 && Math.abs(pA2.pos[1] - pA.pos[1]) < 0.35, JSON.stringify([pA.pos, pA2.pos]));
+  check("its lines follow it, connected and routed square again", !st.issues.some(i => i.kind === "open" || i.kind === "mismatch" || i.kind === "routing"), JSON.stringify(st.issues.map(i => i.text)));
+  // Esc while dragging puts it back.
+  const t0 = await screenOf([pA2.pos[0] + 0.55, pA2.pos[1] + 0.12, pA2.pos[2] + 0.5]), t1 = await screenOf([pA2.pos[0] + 0.55, pA2.pos[1] - 2.88, pA2.pos[2] + 0.5]);
+  await p.mouse.move(t0.x, t0.y); await p.mouse.down(); await p.mouse.move(t1.x, t1.y, { steps: 6 }); await settle(100);
+  await p.keyboard.press("Escape"); await p.mouse.up(); await settle(500);
+  check("Esc while dragging puts it back", JSON.stringify((await state()).p.equipment.find(e => e.tag === "P-101A").pos) === JSON.stringify(pA2.pos));
+  // Arrow keys: one grid step, along a plant axis.
+  await p.keyboard.press("ArrowRight"); await settle(600);
+  const pA3 = (await state()).p.equipment.find(e => e.tag === "P-101A");
+  const dd = [pA3.pos[0] - pA2.pos[0], pA3.pos[1] - pA2.pos[1]];
+  check("an arrow key nudges it one grid step along a plant axis", Math.abs(Math.hypot(dd[0], dd[1]) - 1) < 1e-6 && (dd[0] === 0 || dd[1] === 0), JSON.stringify(dd));
+  // The view cube: a corner gives the isometric view.
+  const before = await screenOf([0, 0, 0]);
+  // The top face's south-east corner (the view looks down): an isometric view.
+  const cb = await p.$eval(".v3d .cube", el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 60 / 84, y: r.top + r.height * 60 / 84 }; });
+  await p.mouse.move(cb.x, cb.y); await settle(100); await p.mouse.click(cb.x, cb.y); await settle(400);
+  const after = await screenOf([0, 0, 0]);
+  check("the view cube turns the view", Math.hypot(after.x - before.x, after.y - before.y) > 5, JSON.stringify([before, after]));
+  check("the cube shows the plant's faces", (await p.textContent(".v3d .cube")).includes("Top"));
+  if (shots) { await p.mouse.move(cb.x + 30, cb.y - 30); await settle(150); await shot("viewcube"); }
+  // Badges.
+  check("the check badge says it has not run", (await p.textContent('.badge[data-badge="check"]')).includes("not run"));
+  await p.keyboard.press("F5"); await settle(1200);
+  check("after F5 the check badge reports the check", /clean|findings/.test(await p.textContent('.badge[data-badge="check"]')), await p.textContent(".status"));
 
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
