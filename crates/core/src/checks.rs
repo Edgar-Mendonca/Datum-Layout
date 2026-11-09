@@ -106,7 +106,7 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
         if !class.ratings.contains(&l.rating) && said.insert((l.id, 0, "rating".to_string())) {
             out.push(Issue { kind: "class", text: format!("Line {}: class {} has no class {} flanges.", l.number, l.class, l.rating), at: l.pts[0], line: l.id, item: 0, equip: 0 });
         }
-        if q.kind != "support" && !class.allows(q.kind, &q.nps) && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
+        if q.kind != "support" && !class.allows(if q.kind == "cross" { "tee" } else { q.kind }, &q.nps) && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
             let pt = q.ports.first().map(|x| x.p).unwrap_or_default();
             out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, kind_name(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0 });
         }

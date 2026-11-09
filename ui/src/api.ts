@@ -16,8 +16,8 @@ export interface Nozzle { tag: string; nps: string; rating: number; facing: stri
 export interface Dims { d: number; l: number; h: number; elev: number; d2: number; l2: number; w: number }
 export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number }
 export type Term = "open" | "cap" | "blind";
-export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number };
-export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "support";
+export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number; port?: number };
+export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "cross" | "support";
 export type SupportKind = "rest" | "guide" | "stop" | "anchor";
 export const SUPPORTS: [SupportKind, string][] = [["rest", "Rest (shoe)"], ["guide", "Guide"], ["stop", "Line stop"], ["anchor", "Anchor"]];
 export type Flat = "none" | "top" | "bottom";
@@ -31,7 +31,7 @@ export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "clas
 export interface Out { p: Project; path: string | null; dirty: boolean; undo: boolean; redo: boolean; created: number[]; warnings: string[]; issues: Issue[]; paths: [number, V3[]][] }
 
 export interface PartRef { kind: string; line: number; equip: number; item: number; seg: number; nps: string; t0: number; t1: number; lo: V3; hi: V3 }
-export interface PortRef { p: V3; d: V3; nps: string; kind: "nozzle" | "end" | "branch"; equip: number; tag: string; line: number; item: number; used: boolean }
+export interface PortRef { p: V3; d: V3; nps: string; kind: "nozzle" | "end" | "branch"; equip: number; tag: string; line: number; item: number; used: boolean; branch: number }
 export interface Scene { pos: string; nor: string; idx: string; parts: PartRef[]; ins_pos: string; ins_nor: string; ins_idx: string; ports: PortRef[]; triangles: number }
 
 export interface PipeRow { nps: string; dn: number; od: number; schedule: string; wall: number; source: string }
@@ -64,7 +64,7 @@ export const inch = (n: string) => n.replace("1/2", "½").replace("3/4", "¾").r
 
 export const ITEMS: [ItemKind, string, string][] = [
   ["gate", "Gate valve", "valve"], ["globe", "Globe valve", "globe"], ["check", "Check valve", "chkvalve"], ["ball", "Ball valve", "ball"],
-  ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"],
+  ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"], ["cross", "Cross (two branches)", "cross"],
   ["support", "Pipe support", "support"],
 ];
 export const EQUIP: [EquipKind, string, string][] = [

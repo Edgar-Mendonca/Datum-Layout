@@ -78,7 +78,7 @@ export const [section, setSection] = createSignal<{ lo: V3; hi: V3 } | null>(nul
 
 // ---------- tools ----------
 /** select: pick and move; route: click a path; place: put the dragged or chosen equipment down. */
-export type RouteFrom = { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number } | { kind: "point"; p: V3 };
+export type RouteFrom = { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number; port?: number } | { kind: "point"; p: V3 };
 export const [mode, setMode] = createSignal<"select" | "route" | "place" | "measure">("select");
 /** The measure tool's points (plant axes). */
 export const [measure, setMeasure] = createSignal<V3[]>([]);

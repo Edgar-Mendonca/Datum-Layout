@@ -14,7 +14,12 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum RouteEnd {
     Nozzle { equip: u32, nozzle: String },
-    Branch { line: u32, item: u32 },
+    Branch {
+        line: u32,
+        item: u32,
+        #[serde(default)]
+        port: u8,
+    },
     Point { p: P3 },
 }
 
@@ -483,8 +488,8 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
                         if p.lines.iter().any(|l| l.from == me || l.to == me) { return Err(format!("Nozzle {nozzle} already has a line.")); }
                         Ok((me, port.p, Some(port.d), Some(port.nps)))
                     }
-                    RouteEnd::Branch { line, item } => {
-                        let me = End::Branch { line: *line, item: *item };
+                    RouteEnd::Branch { line, item, port } => {
+                        let me = End::Branch { line: *line, item: *item, port: *port };
                         let port = route::end_port(p, cat, &me).ok_or("That tee no longer exists.")?;
                         if p.lines.iter().any(|l| l.from == me || l.to == me) { return Err("That tee's branch already has a line.".into()); }
                         Ok((me, port.p, Some(port.d), Some(port.nps)))
@@ -719,7 +724,7 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
                 for e in [&mut l.from, &mut l.to] {
                     *e = match e.clone() {
                         End::Nozzle { equip, nozzle } if emap.contains_key(&equip) => End::Nozzle { equip: emap[&equip], nozzle },
-                        End::Branch { line, item } if lmap.contains_key(&line) && imap.contains_key(&item) => End::Branch { line: lmap[&line], item: imap[&item] },
+                        End::Branch { line, item, port } if lmap.contains_key(&line) && imap.contains_key(&item) => End::Branch { line: lmap[&line], item: imap[&item], port },
                         End::Point { term } => End::Point { term },
                         _ => End::Point { term: Term::Open },
                     };
@@ -780,7 +785,7 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             let gone_items: Vec<(u32, u32)> = p.lines.iter().flat_map(|l| l.items.iter().filter(|i| ids.contains(&i.id) || ids.contains(&l.id)).map(move |i| (l.id, i.id))).collect();
             let gone = |e: &End| match e {
                 End::Nozzle { equip, .. } => ids.contains(equip),
-                End::Branch { line, item } => gone_items.contains(&(*line, *item)),
+                End::Branch { line, item, .. } => gone_items.contains(&(*line, *item)),
                 End::Point { .. } => false,
             };
             for l in &mut p.lines {

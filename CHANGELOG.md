@@ -1,5 +1,12 @@
 # What's new in Datum Layout
 
+## 0.2.5 — 2026-11-09
+Crosses.
+
+**Two branches.** Fittings › Cross (or drag Cross from the catalogue onto a pipe) puts a cross on the line and starts routing its first branch; the second branch, opposite the first, is routed from the cross's properties or by clicking its blue end while routing. Each branch takes its own size: a reducing cross when they are smaller than the run. The class allows a cross wherever it allows a tee.
+
+**Lists and exchange.** The take-off names equal and reducing crosses. The piping component file writes a CROSS with both branch points, and reading it back reconnects both branch lines. Files saved before keep their tee branches unchanged.
+
 ## 0.2.4 — 2026-11-09
 Eccentric reducers.
 

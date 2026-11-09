@@ -19,7 +19,7 @@ const EQ_ICON = Object.fromEntries(EQUIP.map(([k, , i]) => [k, i])) as Record<st
 const EQ_NAME = Object.fromEntries(EQUIP.map(([k, l]) => [k, l])) as Record<string, string>;
 const IT_ICON = Object.fromEntries(ITEMS.map(([k, , i]) => [k, i])) as Record<string, string>;
 const IT_NAME = Object.fromEntries(ITEMS.map(([k, l]) => [k, l.replace(/ \(.*\)$/, "")])) as Record<string, string>;
-const IT_GROUP: Record<string, string> = { gate: "Gate valves", globe: "Globe valves", check: "Check valves", ball: "Ball valves", strainer: "Strainers", flange_pair: "Flange pairs", reducer: "Reducers", tee: "Tees", support: "Pipe supports" };
+const IT_GROUP: Record<string, string> = { gate: "Gate valves", globe: "Globe valves", check: "Check valves", ball: "Ball valves", strainer: "Strainers", flange_pair: "Flange pairs", reducer: "Reducers", tee: "Tees", cross: "Crosses", support: "Pipe supports" };
 
 // ------------------------------------------------------------------ the steps
 /** The ribbon tab of each step. */

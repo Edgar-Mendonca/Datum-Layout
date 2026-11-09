@@ -18,7 +18,7 @@ const E = (v: THREE.Vector3): V3 => [v.x, -v.z, v.y];
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
 
 const COLOURS: Record<string, string> = {
-  equipment: "#A7B3BF", nozzle: "#8B97A4", pipe: "#4F6F8F", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
+  equipment: "#A7B3BF", nozzle: "#8B97A4", pipe: "#4F6F8F", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
   flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", strainer: "#9C6B3A", support: "#7C8B5A",
 };
 const SELECTED = new THREE.Color("#2F8CFF"), PROBLEM = new THREE.Color("#D64545");
@@ -611,7 +611,7 @@ export const View3D = () => {
     const pt = nearPort(e);
     if (!r.start) {
       if (pt?.kind === "nozzle") setRoute({ ...r, from: { kind: "nozzle", equip: pt.equip, nozzle: pt.tag }, start: pt.p, nps: pt.nps });
-      else if (pt?.kind === "branch") setRoute({ ...r, from: { kind: "branch", line: pt.line, item: pt.item }, start: pt.p, nps: pt.nps });
+      else if (pt?.kind === "branch") setRoute({ ...r, from: { kind: "branch", line: pt.line, item: pt.item, port: pt.branch ?? 0 }, start: pt.p, nps: pt.nps });
       else { const q = cursor ?? guided(e as PointerEvent); if (q) setRoute({ ...r, from: { kind: "point", p: q }, start: q }); }
       buildPorts(); return;
     }

@@ -111,7 +111,7 @@ pub fn reducer_to(it: &Item, nps: &str) -> String {
 pub fn item_len(cat: &Catalogue, l: &Line, it: &Item, nps: &str) -> f64 {
     let d = dimens(cat, nps, &l.class, l.rating, l.radius);
     match it.kind {
-        ItemKind::Tee => 2.0 * d.tee,
+        ItemKind::Tee | ItemKind::Cross => 2.0 * d.tee,
         ItemKind::Reducer => dimens(cat, &larger(nps, &reducer_to(it, nps)), &l.class, l.rating, l.radius).red,
         ItemKind::FlangePair => 2.0 * d.fl_y + d.gasket,
         ItemKind::Support => 0.0,
@@ -141,17 +141,19 @@ pub fn end_port(p: &Project, cat: &Catalogue, e: &End) -> Option<Port> {
             let n = eq.nozzles.iter().find(|n| n.tag == *nozzle)?;
             Some(equipment::nozzle(eq, n, cat).port)
         }
-        End::Branch { line, item } => {
+        End::Branch { line, item, port } => {
             let l = p.line(*line)?;
             let it = l.items.iter().find(|i| i.id == *item)?;
+            if *port > 0 && it.kind != ItemKind::Cross { return None; }
             let pts = path_plain(p, cat, l);
             let (a, b) = (*pts.get(it.seg)?, *pts.get(it.seg + 1)?);
             let u = unit(sub(b, a));
             let nps = size_at(l, it.seg, it.at);
             let c = add(a, mul(u, it.at));
             let bd = branch_dir(u, it.dir);
+            let bd = if *port == 1 { mul(bd, -1.0) } else { bd };
             let d = dimens(cat, &nps, &l.class, l.rating, l.radius);
-            Some(Port { p: add(c, mul(bd, d.tee)), d: bd, nps: branch_size(p, l, it), rating: 0, end: "BW" })
+            Some(Port { p: add(c, mul(bd, d.tee)), d: bd, nps: branch_size(p, l, it, *port), rating: 0, end: "BW" })
         }
     }
 }
@@ -166,8 +168,8 @@ fn path_plain(p: &Project, cat: &Catalogue, l: &Line) -> Vec<P3> {
 }
 
 /// The branch size of a tee: the connected branch line's size, else its own `nps2`, else the run's.
-pub fn branch_size(p: &Project, l: &Line, it: &Item) -> String {
-    let conn = p.lines.iter().find(|b| matches!(b.from, End::Branch { line, item } if line == l.id && item == it.id) || matches!(b.to, End::Branch { line, item } if line == l.id && item == it.id));
+pub fn branch_size(p: &Project, l: &Line, it: &Item, k: u8) -> String {
+    let conn = p.lines.iter().find(|b| matches!(b.from, End::Branch { line, item, port } if line == l.id && item == it.id && port == k) || matches!(b.to, End::Branch { line, item, port } if line == l.id && item == it.id && port == k));
     let run = size_at(l, it.seg, it.at);
     let s = conn.map(|b| b.nps.clone()).unwrap_or_else(|| if it.nps2.is_empty() { run.clone() } else { it.nps2.clone() });
     // A tee's branch is never larger than its run.
@@ -516,10 +518,25 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
             let h = item_len(cat, l, it, nin);
             reducer(cat, run, x0, h, nin, nout, it.id);
         }
+        ItemKind::Cross => {
+            let c = x0 + d.tee;
+            let bd = branch_dir(run.u, it.dir);
+            let (b1, b2) = (branch_size(p, l, it, 0), branch_size(p, l, it, 1));
+            let mut q = Part::new("cross", l);
+            q.nps = nin.into();
+            q.nps2 = if nps_index(&b1) <= nps_index(&b2) { b2.clone() } else { b1.clone() };
+            let cp = run.at(c);
+            q.shapes = vec![Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0), Shape::tube(cp, add(cp, mul(bd, d.tee)), cat.od(&b1) / 2.0), Shape::tube(cp, sub(cp, mul(bd, d.tee)), cat.od(&b2) / 2.0)];
+            q.ports = vec![run.port(x0, true, nin, 0, "BW"), run.port(x0 + 2.0 * d.tee, false, nin, 0, "BW"),
+                Port { p: add(cp, mul(bd, d.tee)), d: bd, nps: b1, rating: 0, end: "BW" }, Port { p: sub(cp, mul(bd, d.tee)), d: mul(bd, -1.0), nps: b2, rating: 0, end: "BW" }];
+            q.length = 2.0 * d.tee;
+            q.corner = Some(cp);
+            run.push(q, it.id);
+        }
         ItemKind::Tee => {
             let c = x0 + d.tee;
             let bd = branch_dir(run.u, it.dir);
-            let bn = branch_size(p, l, it);
+            let bn = branch_size(p, l, it, 0);
             let ob = cat.od(&bn);
             let mut q = Part::new("tee", l);
             q.nps = nin.into();

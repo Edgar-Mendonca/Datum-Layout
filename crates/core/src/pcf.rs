@@ -29,6 +29,7 @@ fn keyword(q: &Part) -> Option<(&'static str, &'static str)> {
         "pipe" => ("PIPE", ""),
         "elbow90" | "elbow45" => ("ELBOW", "ELBW"),
         "tee" => ("TEE", "TEBW"),
+        "cross" => ("CROSS", "CRBW"),
         "reducer" if q.note.starts_with("FLAT") => ("REDUCER-ECCENTRIC", "REBW"),
         "reducer" => ("REDUCER-CONCENTRIC", "RCBW"),
         "flange" => ("FLANGE", "FLWN"),
@@ -64,6 +65,10 @@ pub fn write(p: &Project, cat: &Catalogue, line: Option<u32>) -> Result<String, 
             s += key;
             s += "\n";
             match q.kind {
+                "cross" => {
+                    let c = q.corner.unwrap_or_default();
+                    s += &format!("    END-POINT {}\n    END-POINT {}\n    CENTRE-POINT {:.2} {:.2} {:.2}\n    BRANCH1-POINT {}\n    BRANCH2-POINT {}\n", pt(q.ports[0].p, &q.ports[0].nps), pt(q.ports[1].p, &q.ports[1].nps), c[0] * 1000.0, c[1] * 1000.0, c[2] * 1000.0, pt(q.ports[2].p, &q.ports[2].nps), pt(q.ports[3].p, &q.ports[3].nps));
+                }
                 "tee" => {
                     s += &format!("    END-POINT {}\n    END-POINT {}\n    CENTRE-POINT {:.2} {:.2} {:.2}\n    BRANCH1-POINT {}\n", pt(q.ports[0].p, &q.ports[0].nps), pt(q.ports[1].p, &q.ports[1].nps), q.corner.unwrap_or_default()[0] * 1000.0, q.corner.unwrap_or_default()[1] * 1000.0, q.corner.unwrap_or_default()[2] * 1000.0, pt(q.ports[2].p, &q.ports[2].nps));
                 }
@@ -270,7 +275,7 @@ pub mod import {
     use crate::parts::{add, dist, dot, mul, norm, sub, unit};
 
     #[derive(Default)]
-    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, co: Option<P3>, skey: String, desc: String, name: String, flat: String }
+    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, bp2: Option<(P3, f64)>, co: Option<P3>, skey: String, desc: String, name: String, flat: String }
     #[derive(Default)]
     struct Group { name: String, spec: String, comps: Vec<Comp> }
 
@@ -315,6 +320,7 @@ pub mod import {
                 "END-POINT" => if let Some(p) = pt(&rest) { comp.eps.push(p) },
                 "CENTRE-POINT" => comp.cp = pt(&rest).map(|p| p.0),
                 "BRANCH1-POINT" => comp.bp = pt(&rest),
+                "BRANCH2-POINT" => comp.bp2 = pt(&rest),
                 "SKEY" => comp.skey = rest.join(" ").to_uppercase(),
                 "CO-ORDS" => comp.co = pt(&rest).map(|p| p.0),
                 "NAME" => comp.name = rest.join(" "),
@@ -333,7 +339,7 @@ pub mod import {
         let k = c.kind.as_str();
         Some(if k == "VALVE" {
             if c.skey.starts_with("CK") { ItemKind::Check } else if c.skey.starts_with("VG") { ItemKind::Globe } else if c.skey.starts_with("VB") { ItemKind::Ball } else { ItemKind::Gate }
-        } else if k == "FILTER" { ItemKind::Strainer } else if k.starts_with("TEE") { ItemKind::Tee } else if k.starts_with("REDUCER") { ItemKind::Reducer } else { return None })
+        } else if k == "FILTER" { ItemKind::Strainer } else if k == "CROSS" { ItemKind::Cross } else if k.starts_with("TEE") { ItemKind::Tee } else if k.starts_with("REDUCER") { ItemKind::Reducer } else { return None })
     }
 
     /// Reads the file into new lines (ids from `id`), connecting ends to free nozzles of `p`.
@@ -341,7 +347,7 @@ pub mod import {
         let (gs, _, inch) = groups(text)?;
         let mut out: Vec<Line> = vec![];
         let mut warnings = vec![];
-        let mut tees: Vec<(P3, u32, u32)> = vec![]; // branch point, line, item
+        let mut tees: Vec<(P3, u32, u32, u8)> = vec![]; // branch point, line, item, branch
         let mut skipped = 0usize;
         for g in &gs {
             // The graph of end points (merged to 0.5 mm) and the components between them.
@@ -407,7 +413,7 @@ pub mod import {
                     let c = &g.comps[ci];
                     let Some(kind) = item_kind(c) else { continue };
                     let (a, b) = if fwd { (c.eps[0], c.eps[1]) } else { (c.eps[1], c.eps[0]) };
-                    let centre = if kind == ItemKind::Tee { c.cp.unwrap_or(mul(add(a.0, b.0), 0.5)) } else { mul(add(a.0, b.0), 0.5) };
+                    let centre = if matches!(kind, ItemKind::Tee | ItemKind::Cross) { c.cp.unwrap_or(mul(add(a.0, b.0), 0.5)) } else { mul(add(a.0, b.0), 0.5) };
                     let Some((seg, at)) = place(centre, &l.pts) else { continue };
                     let u = unit(sub(l.pts[seg + 1], l.pts[seg]));
                     let mut it = Item { id: id(), kind, seg, at, dir: if u[2].abs() > 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] }, ..Default::default() };
@@ -415,11 +421,15 @@ pub mod import {
                         it.nps2 = nps_of(b.1, inch).unwrap_or("").to_string();
                         if c.kind == "REDUCER-ECCENTRIC" { it.flat = if c.flat.contains("DOWN") || c.flat.contains("BOT") { crate::model::Flat::Bottom } else { crate::model::Flat::Top }; }
                     }
+                    if kind == ItemKind::Cross {
+                        if let Some((bp, _)) = c.bp { it.dir = unit(sub(bp, centre)); tees.push((bp, l.id, it.id, 0)); }
+                        if let Some((bp, _)) = c.bp2 { tees.push((bp, l.id, it.id, 1)); }
+                    }
                     if kind == ItemKind::Tee {
                         if let Some((bp, bb)) = c.bp {
                             it.dir = unit(sub(bp, centre));
                             it.nps2 = nps_of(bb, inch).filter(|n| *n != l.nps).unwrap_or("").to_string();
-                            tees.push((bp, l.id, it.id));
+                            tees.push((bp, l.id, it.id, 0));
                         }
                     }
                     l.items.push(it);
@@ -475,8 +485,8 @@ pub mod import {
             for start in [true, false] {
                 let q = if start { out[i].pts[0] } else { *out[i].pts.last().unwrap() };
                 if !matches!(if start { &out[i].from } else { &out[i].to }, End::Point { term: Term::Open }) { continue; }
-                if let Some(&(_, line, item)) = tees.iter().find(|t| dist(t.0, q) < 1e-3 && t.1 != out[i].id) {
-                    let e = End::Branch { line, item };
+                if let Some(&(_, line, item, port)) = tees.iter().find(|t| dist(t.0, q) < 1e-3 && t.1 != out[i].id) {
+                    let e = End::Branch { line, item, port };
                     if start { out[i].from = e; } else { out[i].to = e; }
                 }
             }

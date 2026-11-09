@@ -77,7 +77,7 @@ impl B<'_> {
 fn noz(equip: u32, n: &str) -> End { End::Nozzle { equip, nozzle: n.into() } }
 fn blind() -> End { End::Point { term: Term::Blind } }
 fn cap() -> End { End::Point { term: Term::Cap } }
-fn br(line: u32, item: u32) -> End { End::Branch { line, item } }
+fn br(line: u32, item: u32) -> End { End::Branch { line, item, port: 0 } }
 
 fn new_b(cat: &Catalogue) -> B<'_> {
     let mut p = Project::new();
@@ -208,7 +208,7 @@ pub fn repeated(id: &str, copies: usize) -> Option<Project> {
             for pt in &mut l.pts { pt[0] += dx; pt[1] += dy; }
             for it in &mut l.items { it.id += base; it.uid.clear(); }
             for e in [&mut l.from, &mut l.to] {
-                match e { End::Nozzle { equip, .. } => *equip += base, End::Branch { line, item } => { *line += base; *item += base; } _ => {} }
+                match e { End::Nozzle { equip, .. } => *equip += base, End::Branch { line, item, .. } => { *line += base; *item += base; } _ => {} }
             }
         }
         p.equipment.extend(q.equipment);

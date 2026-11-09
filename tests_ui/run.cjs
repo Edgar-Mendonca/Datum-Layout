@@ -322,6 +322,34 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.keyboard.press("Control+z"); await settle(600);
   check("undo makes it concentric again", (await state()).p.lines.find(l => l.id === hdr.id).items.find(i => i.kind === "reducer")?.flat === "none");
 
+  // 7m. Crosses (0.2.5): two branches, the second routed from the properties.
+  await open("pumps");
+  st = await state();
+  const hd = st.p.lines.find(l => l.number.includes("1005"));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(hd.number)})`); await settle(300);
+  await p.click('.tabs > button:has-text("Fittings")'); await p.click('.rb:has-text("Cross")'); await settle(800);
+  check("dropping a cross starts routing its first branch", (await p.textContent(".toolhint")).includes("Click to add a corner"));
+  await p.keyboard.press("Escape"); await settle(300);
+  st = await state();
+  const cx = st.p.lines.find(l => l.id === hd.id).items.find(i => i.kind === "cross");
+  const bports = (await ask("scene")).ok.ports.filter(x => x.kind === "branch" && x.item === cx?.id);
+  check("a cross has two branch ends, opposite", bports.length === 2 && Math.abs(bports[0].d[0] + bports[1].d[0]) + Math.abs(bports[0].d[1] + bports[1].d[1]) + Math.abs(bports[0].d[2] + bports[1].d[2]) < 1e-6, JSON.stringify(bports.map(b => b.d)));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(hd.number)})`); await settle(300);
+  await p.click(`.ipop .ti:has-text("Cross")`).catch(() => {}); await settle(300);
+  if (!(await p.$('.ipop button:has-text("Route the second branch")'))) { await p.click(`.tree .ti:has-text("Cross")`).catch(() => {}); await settle(300); }
+  await p.click('.ipop button:has-text("Route the second branch")'); await settle(400);
+  const b2 = bports.find(x => x.branch === 1);
+  const fp = await screenOf([b2.p[0] + b2.d[0] * 3, b2.p[1] + b2.d[1] * 3, b2.p[2] + b2.d[2] * 3]);
+  await p.mouse.move(fp.x, fp.y); await settle(150); await p.mouse.dblclick(fp.x, fp.y); await settle(800);
+  st = await state();
+  const b2l = st.p.lines.find(l => l.from.kind === "branch" && l.from.item === cx.id && l.from.port === 1);
+  check("the second branch is routed from the cross", !!b2l, JSON.stringify(st.p.lines.map(l => l.from)));
+  check("the cross and its branch route cleanly", !st.issues.some(i => i.kind === "routing" || i.kind === "mismatch" || i.kind === "class"), JSON.stringify(st.issues.map(i => i.text)));
+  check("the cross goes to Datum Pipe with both branch points", (await ask("export_pcf", { line: hd.id })).ok.includes("BRANCH2-POINT"));
+  if (shots) { await p.keyboard.press("Escape"); await settle(200); await shot("cross"); }
+
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
   const nv = (await ask("lists")).ok.valves.length;

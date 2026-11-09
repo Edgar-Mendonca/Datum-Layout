@@ -36,6 +36,8 @@ pub struct PortRef {
     /// For a tee's branch end: the tee.
     pub item: u32,
     pub used: bool,
+    /// A cross's branch: 0 the first, 1 the opposite one.
+    pub branch: u8,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -116,9 +118,9 @@ pub fn scene(p: &Project, cat: &Catalogue, b: &Built, lod: u32) -> Scene {
         for (j, pt) in q.ports.iter().enumerate() {
             let used = conn.contains_key(&(i, j));
             if q.kind == "nozzle" {
-                ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: "nozzle", equip: q.equip, tag: q.note.clone(), line: 0, item: 0, used });
+                ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: "nozzle", equip: q.equip, tag: q.note.clone(), line: 0, item: 0, used, branch: 0 });
             } else if !used && q.line != 0 && !matches!(q.kind, "cap" | "blind" | "bolts") {
-                ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: if q.kind == "tee" && j == 2 { "branch" } else { "end" }, equip: 0, tag: String::new(), line: q.line, item: q.item, used });
+                ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: if (q.kind == "tee" && j == 2) || (q.kind == "cross" && j >= 2) { "branch" } else { "end" }, equip: 0, tag: String::new(), line: q.line, item: q.item, used, branch: if q.kind == "cross" && j == 3 { 1 } else { 0 } });
             }
         }
     }

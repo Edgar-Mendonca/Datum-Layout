@@ -171,7 +171,7 @@ fn a_tee_starts_a_branch_that_meets_it_port_to_port() {
     let cat = Catalogue::builtin();
     let mut d = Doc::new(line("6", vec![[0.0, 0.0, 4.0], [12.0, 0.0, 4.0]], vec![]));
     let tee = d.apply(Op::Drop { line: 1, kind: ItemKind::Tee, at: [6.0, 0.0, 4.0], dir: [0.0, 1.0, 0.0], nps2: String::new() }, &cat).unwrap()[0];
-    let br = d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee }, via: vec![], to: RouteEnd::Point { p: [6.0, 6.0, 4.0] }, nps: Some("3".into()) }, &cat).unwrap()[0];
+    let br = d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee, port: 0 }, via: vec![], to: RouteEnd::Point { p: [6.0, 6.0, 4.0] }, nps: Some("3".into()) }, &cat).unwrap()[0];
     let b = build(&d.p, &cat);
     assert!(b.issues.is_empty(), "{:?}", b.issues);
     let t = b.parts.iter().find(|q| q.kind == "tee").unwrap();
@@ -280,7 +280,7 @@ fn resizing_keeps_reducers_and_an_oversized_branch_is_a_mismatch() {
     joints_ok(&b);
     // A 6" branch on a 4" run part: the tee stays 4" and the joint is reported.
     let tee = d.apply(Op::Drop { line: 1, kind: ItemKind::Tee, at: [10.0, 0.0, 3.0], dir: [0.0, 1.0, 0.0], nps2: String::new() }, &cat).unwrap()[0];
-    d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee }, via: vec![], to: RouteEnd::Point { p: [10.0, 5.0, 3.0] }, nps: Some("6".into()) }, &cat).unwrap();
+    d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee, port: 0 }, via: vec![], to: RouteEnd::Point { p: [10.0, 5.0, 3.0] }, nps: Some("6".into()) }, &cat).unwrap();
     let b = build(&d.p, &cat);
     assert_eq!(b.parts.iter().find(|q| q.kind == "tee").unwrap().nps2, "4");
     assert!(connection_issues(&d.p, &cat, &b).iter().any(|i| i.kind == "mismatch" && i.text.contains("4\"") && i.text.contains("6\"")));
@@ -568,4 +568,45 @@ fn a_pump_suction_reducer_flat_on_top_moves_the_run_before_it() {
     // Route Again makes it concentric and squares the line.
     d.apply(Op::Reroute { line: id }, &cat).unwrap();
     assert!(d.p.line(id).unwrap().items.iter().all(|i| i.flat == Flat::None));
+}
+
+#[test]
+fn a_cross_takes_two_branches_and_goes_to_datum_pipe() {
+    let cat = Catalogue::builtin();
+    // A 6" level header with a cross in the middle of its run, branches north and south.
+    let x = Item { id: 7, kind: ItemKind::Cross, seg: 0, at: 4.0, dir: [0.0, 1.0, 0.0], ..Default::default() };
+    let mut d = Doc::new(line("6", vec![[0.0, 0.0, 3.0], [8.0, 0.0, 3.0]], vec![x]));
+    let mut ends = vec![];
+    for (port, y) in [(0u8, 3.0), (1, -3.0)] {
+        let made = d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: 7, port }, via: vec![], to: RouteEnd::Point { p: [4.0, y, 3.0] }, nps: Some(if port == 0 { "4".into() } else { "3".into() }) }, &cat).unwrap();
+        ends.push(made[0]);
+    }
+    // The two branches leave opposite ways; the second cannot take a line twice.
+    assert!(d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: 7, port: 1 }, via: vec![], to: RouteEnd::Point { p: [4.0, -5.0, 3.0] }, nps: None }, &cat).is_err());
+    let b = build(&d.p, &cat);
+    assert!(b.issues.is_empty(), "{:?}", b.issues);
+    joints_ok(&b);
+    let iss = connection_issues(&d.p, &cat, &b);
+    assert!(iss.iter().all(|i| i.kind == "open"), "{iss:?}");
+    let c = of(&b, "cross");
+    assert_eq!(c.len(), 1);
+    assert_eq!((c[0].ports.len(), c[0].ports[2].nps.as_str(), c[0].ports[3].nps.as_str()), (4, "4", "3"));
+    assert!(c[0].ports[2].d[1] > 0.99 && c[0].ports[3].d[1] < -0.99);
+    // The take-off names it; the class allows it where it allows tees.
+    let mto = crate::lists::lists(&d.p, &cat).mto;
+    assert!(mto.iter().any(|r| r.what.starts_with("Cross, reducing 6\" × 4\"")), "{mto:?}");
+    // To Datum Pipe: a CROSS with both branch points; read back, both branches reconnect.
+    let text = crate::pcf::write(&d.p, &cat, None).unwrap();
+    assert!(text.contains("CROSS") && text.contains("BRANCH2-POINT"));
+    assert!(crate::pcf::reader::pcf(&crate::pcf::write(&d.p, &cat, Some(1)).unwrap()).is_ok());
+    let mut back = Doc::new(Project::new());
+    back.apply(Op::ImportPcf { text }, &cat).unwrap();
+    assert_eq!(back.p.lines.len(), 3);
+    let ports: Vec<u8> = back.p.lines.iter().filter_map(|l| if let End::Branch { port, .. } = l.from { Some(port) } else { None }).collect();
+    assert_eq!(ports.len(), 2, "{:?}", back.p.lines.iter().map(|l| &l.from).collect::<Vec<_>>());
+    assert!(ports.contains(&0) && ports.contains(&1));
+    assert!(build(&back.p, &cat).issues.is_empty());
+    // An old file's branch (no port) reads as the first.
+    let e: End = serde_json::from_str(r#"{"kind":"branch","line":1,"item":7}"#).unwrap();
+    assert_eq!(e, End::Branch { line: 1, item: 7, port: 0 });
 }

@@ -141,8 +141,14 @@ pub enum End {
     Point { term: Term },
     /// An equipment nozzle, by equipment id and nozzle tag.
     Nozzle { equip: u32, nozzle: String },
-    /// The branch of a tee placed on another line.
-    Branch { line: u32, item: u32 },
+    /// The branch of a tee (or one of a cross's two) placed on another line.
+    Branch {
+        line: u32,
+        item: u32,
+        /// A cross's branch: 0 the first (towards its direction), 1 the opposite one.
+        #[serde(default)]
+        port: u8,
+    },
 }
 impl Default for End {
     fn default() -> Self { End::Point { term: Term::Open } }
@@ -160,6 +166,8 @@ pub enum ItemKind {
     FlangePair,
     Tee,
     Reducer,
+    /// A cross: a tee with a second branch opposite the first.
+    Cross,
     /// A pipe support at a point of a run (it takes no length; the pipe is split there so the
     /// stress model has a node).
     Support,
@@ -207,6 +215,7 @@ impl ItemKind {
             ItemKind::FlangePair => "flange",
             ItemKind::Tee => "tee",
             ItemKind::Reducer => "reducer",
+            ItemKind::Cross => "cross",
             ItemKind::Support => "support",
         }
     }
@@ -220,6 +229,7 @@ impl ItemKind {
             ItemKind::FlangePair => "Flange pair",
             ItemKind::Tee => "Tee",
             ItemKind::Reducer => "Concentric reducer",
+            ItemKind::Cross => "Cross",
             ItemKind::Support => "Pipe support",
         }
     }
@@ -483,14 +493,14 @@ impl Project {
         }
         // References: ends at nozzles, tees and lines that exist.
         let nozzles: std::collections::HashSet<(u32, String)> = self.equipment.iter().flat_map(|e| e.nozzles.iter().map(move |n| (e.id, n.tag.clone()))).collect();
-        let tees: std::collections::HashSet<(u32, u32)> = self.lines.iter().flat_map(|l| l.items.iter().filter(|i| i.kind == ItemKind::Tee).map(move |i| (l.id, i.id))).collect();
+        let tees: std::collections::HashSet<(u32, u32, u8)> = self.lines.iter().flat_map(|l| l.items.iter().filter(|i| matches!(i.kind, ItemKind::Tee | ItemKind::Cross)).flat_map(move |i| (0..if i.kind == ItemKind::Cross { 2 } else { 1 }).map(move |k| (l.id, i.id, k)))).collect();
         let mut used_branch = std::collections::HashSet::new();
         for l in &mut self.lines {
             for end in [&mut l.from, &mut l.to] {
                 let ok = match end {
                     End::Point { .. } => true,
                     End::Nozzle { equip, nozzle } => nozzles.contains(&(*equip, nozzle.clone())),
-                    End::Branch { line, item } => *line != l.id && tees.contains(&(*line, *item)) && used_branch.insert((*line, *item)),
+                    End::Branch { line, item, port } => *line != l.id && tees.contains(&(*line, *item, *port)) && used_branch.insert((*line, *item, *port)),
                 };
                 if !ok {
                     w.push(format!("Line {}: an end pointed to something that does not exist (or is already used); it is now a free end.", l.number));

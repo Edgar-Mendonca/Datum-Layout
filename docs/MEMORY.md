@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.4 (2026-11-09) |
+| **Current version** | 0.2.5 (2026-11-09) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -117,6 +117,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.3 | Badges compute their words in one function each: Solid splits chained ternaries in markup into separate memos, and one read a cleared check as a list (the window stopped loading plants) | Found by the UI test |
 | 0.2.4 | An eccentric reducer is a short sloped run of the path between its two ends (offset by half the change in outside diameter), not an offset stored on the item: the path stays the centreline everywhere, the PCF writes its real end points, and a PCF read back gives the same path. The builder draws that run as the reducer and puts no elbows at its ends | One idea of the centreline for routing, checks and exchange |
 | 0.2.4 | The run beyond moves; if the line ends at a nozzle or tee just after (pump suction), the run before moves; Route Again makes eccentric reducers concentric first | The held end never moves |
+| 0.2.5 | A cross is a tee item with a second branch opposite the first: one item kind, the tee's centre-to-end dimension, and a branch number on the line end that leaves it (`port`, 0 by default so earlier files read unchanged) | The fewest new ideas; old files keep working |
+| 0.2.5 (for Datum Pipe) | Pipe's PCF reader takes CROSS but reads only BRANCH1-POINT: a second branch line written in the same file does not join the cross there. Layout writes both points (the format's way); Pipe should read BRANCH2-POINT too | Noted for Pipe's next session |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -142,7 +144,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.2 | Pipe supports (`ItemKind::Support`, `SupportKind`: rest, guide, stop, anchor; zero length, the pipe split at it; PCF `SUPPORT` written and read; rack example supported; proved with Datum Pipe’s real engine) | ✅ |
 | 0.2.3 | Drag selected equipment or groups across the plot (live preview, snap, Esc, lines squared again after), arrow-key nudge relative to the screen, Move to…, view cube and status badges after Datum Mesh; pointer-capture and arrow-picking bugs fixed | ✅ |
 | 0.2.4 | Eccentric reducers (`Flat`, `Op::SetEccentric`: the reducer becomes a short sloped run, the run beyond or before it offset; builder, PCF REDUCER-ECCENTRIC with FLAT-DIRECTION written and read; proved with Datum Pipe’s real engine) | ✅ |
-| 0.2 Pipe classes and fittings | Class editor with branch table; crosses, sloped lines | 🔜 |
+| 0.2.5 | Crosses (`ItemKind::Cross`; `End::Branch` and `RouteEnd::Branch` gain `port` 0/1, default 0 for older files; scene branch ports carry `branch`; PCF CROSS with BRANCH1/2-POINT written and read) | ✅ |
+| 0.2 Pipe classes and fittings | Class editor with branch table; sloped lines | 🔜 |
 | 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
 | 0.5 From Schema | Schema's own export of the package (brief written); round trip with Schema's examples | ⬜ |
@@ -189,6 +192,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 ### 2026-11-08: Session 4 (0.2.x)
 - The user confirmed the family flow (Schema → Layout → Pipe; PCF as the hand-over, a documented plain-text format we read and write with our own code) and asked for a few small 0.2 releases to view in the morning, the look kept in step with Datum Mesh (Datum Pipe is getting the same).
 - 0.2.0: the Library.
+- 0.2.5: crosses; engine test (two branches, PCF both ways, old files), UI check routing the second branch; hardening now drops crosses and supports too.
 - 0.2.4: eccentric reducers; two engine tests (free end, pump suction); Datum Pipe eca6ebb read and solved flat-top and flat-bottom files written by a temporary program (removed).
 - 0.2.3 (2026-11-09, the user: moving equipment felt weird; more from Datum Mesh): drag on the plot, nudge, Move to…, view cube, status badges; three window bugs found by the new checks.
 - 0.2.2: pipe supports; `scripts/verify.sh` with Datum Pipe eca6ebb: every example solved, the rack's lines read with their supports and no warnings.
