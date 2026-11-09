@@ -215,7 +215,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   // 7h. The Library (0.2.0): classes and parts tables with their sources.
   await open("pumps");
   await p.click('.flow button[data-tool="library"]'); await settle(600);
-  check("the Library lists every pipe class and the six parts tables", (await p.$$('.libx .mlist > button')).length === 14, String((await p.$$('.libx .mlist > button')).length));
+  check("the Library lists every pipe class and the seven parts tables", (await p.$$('.libx .mlist > button')).length === 15, String((await p.$$('.libx .mlist > button')).length));
   await p.click('.libx .mlist > button:has-text("CS300")'); await settle(300);
   const lt = await p.textContent(".libpage");
   check("a class page shows its wall by size and allowed components", lt.includes("Class 300") && /½"\s*80/.test(lt) && lt.includes("Gate valve"), lt.slice(0, 300));
@@ -349,6 +349,24 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the cross and its branch route cleanly", !st.issues.some(i => i.kind === "routing" || i.kind === "mismatch" || i.kind === "class"), JSON.stringify(st.issues.map(i => i.text)));
   check("the cross goes to Datum Pipe with both branch points", (await ask("export_pcf", { line: hd.id })).ok.includes("BRANCH2-POINT"));
   if (shots) { await p.keyboard.press("Escape"); await settle(200); await shot("cross"); }
+
+  // 7n. Branch outlets (0.2.7): a 2" branch off the 6" header's tee becomes a weldolet, as the class says.
+  await open("pumps");
+  st = await state();
+  const hdr2 = st.p.lines.find(l => l.number.includes("1005"));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(hdr2.number)})`); await settle(300);
+  await p.click('.tabs > button:has-text("Piping")'); await p.selectOption('select.ctxsize', "2"); await settle(300);
+  await p.click('.tabs > button:has-text("Fittings")'); await p.click('.rb:has-text("Tee")'); await settle(800);
+  const tp2 = (await ask("scene")).ok.ports.filter(x => x.kind === "branch" && !x.used).slice(-1)[0];
+  const fp2 = await screenOf([tp2.p[0] + tp2.d[0] * 2, tp2.p[1] + tp2.d[1] * 2, tp2.p[2] + tp2.d[2] * 2]);
+  await p.mouse.move(fp2.x, fp2.y); await settle(150); await p.mouse.dblclick(fp2.x, fp2.y); await settle(800);
+  st = await state();
+  const olet = st.p.lines.find(l => l.id === hdr2.id).items.find(i => i.kind === "weldolet");
+  check("routing a 2\" branch off the 6\" header's tee makes a weldolet", !!olet, JSON.stringify(st.p.lines.find(l => l.id === hdr2.id).items.map(i => i.kind)));
+  check("the outlet and its branch check cleanly", !st.issues.some(i => ["routing", "mismatch", "class"].includes(i.kind)), JSON.stringify(st.issues.map(i => i.text)));
+  check("it goes to Datum Pipe as an OLET", (await ask("export_pcf", { line: hdr2.id })).ok.includes("OLET"));
+  if (shots) { await p.keyboard.press("Escape"); await settle(200); await shot("weldolet"); }
 
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");

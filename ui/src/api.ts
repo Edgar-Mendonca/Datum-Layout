@@ -17,7 +17,7 @@ export interface Dims { d: number; l: number; h: number; elev: number; d2: numbe
 export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number }
 export type Term = "open" | "cap" | "blind";
 export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number; port?: number };
-export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "cross" | "support";
+export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "cross" | "weldolet" | "sockolet" | "support";
 export type SupportKind = "rest" | "guide" | "stop" | "anchor";
 export const SUPPORTS: [SupportKind, string][] = [["rest", "Rest (shoe)"], ["guide", "Guide"], ["stop", "Line stop"], ["anchor", "Anchor"]];
 export type Flat = "none" | "top" | "bottom";
@@ -35,8 +35,9 @@ export interface PortRef { p: V3; d: V3; nps: string; kind: "nozzle" | "end" | "
 export interface Scene { pos: string; nor: string; idx: string; parts: PartRef[]; ins_pos: string; ins_nor: string; ins_idx: string; ports: PortRef[]; triangles: number }
 
 export interface PipeRow { nps: string; dn: number; od: number; schedule: string; wall: number; source: string }
-export interface PipeClass { name: string; description: string; material: string; ratings: number[]; sizes: string[]; schedules: [string, string][]; elbow: string; components: { kind: string; min: string | null; max: string | null }[]; source: string }
-export interface Catalogue { pipes: PipeRow[]; fittings: any[]; flanges: any[]; valves: any[]; tees: { nps: string; nps_branch: string; c: number; m: number; source: string }[]; reducers: { nps: string; nps_small: string; h: number; source: string }[]; classes: PipeClass[]; packs: string[]; warnings: string[] }
+export interface BranchRule { header_min?: string | null; header_max?: string | null; branch?: string | null; branch_min?: string | null; branch_max?: string | null; fitting: string }
+export interface PipeClass { branches?: BranchRule[]; name: string; description: string; material: string; ratings: number[]; sizes: string[]; schedules: [string, string][]; elbow: string; components: { kind: string; min: string | null; max: string | null }[]; source: string }
+export interface Catalogue { pipes: PipeRow[]; fittings: any[]; flanges: any[]; valves: any[]; tees: { nps: string; nps_branch: string; c: number; m: number; source: string }[]; reducers: { nps: string; nps_small: string; h: number; source: string }[]; olets: { kind: string; same: boolean; nps_branch: string; height: number; base_od: number; top_od: number; weight_lb: number | null; source: string }[]; classes: PipeClass[]; packs: string[]; warnings: string[] }
 export interface CatalogueOut { cat: Catalogue; fields: [EquipKind, string, [string, string][]][] }
 
 export interface LineRow { id: number; number: string; from: string; to: string; nps: string; class: string; rating: number; fluid: string; insulation: number; length: number; components: number }
@@ -64,7 +65,7 @@ export const inch = (n: string) => n.replace("1/2", "½").replace("3/4", "¾").r
 
 export const ITEMS: [ItemKind, string, string][] = [
   ["gate", "Gate valve", "valve"], ["globe", "Globe valve", "globe"], ["check", "Check valve", "chkvalve"], ["ball", "Ball valve", "ball"],
-  ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"], ["cross", "Cross (two branches)", "cross"],
+  ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"], ["cross", "Cross (two branches)", "cross"], ["weldolet", "Weldolet (branch outlet)", "weldolet"], ["sockolet", "Sockolet (small branch)", "sockolet"],
   ["support", "Pipe support", "support"],
 ];
 export const EQUIP: [EquipKind, string, string][] = [

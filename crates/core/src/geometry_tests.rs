@@ -171,11 +171,11 @@ fn a_tee_starts_a_branch_that_meets_it_port_to_port() {
     let cat = Catalogue::builtin();
     let mut d = Doc::new(line("6", vec![[0.0, 0.0, 4.0], [12.0, 0.0, 4.0]], vec![]));
     let tee = d.apply(Op::Drop { line: 1, kind: ItemKind::Tee, at: [6.0, 0.0, 4.0], dir: [0.0, 1.0, 0.0], nps2: String::new() }, &cat).unwrap()[0];
-    let br = d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee, port: 0 }, via: vec![], to: RouteEnd::Point { p: [6.0, 6.0, 4.0] }, nps: Some("3".into()) }, &cat).unwrap()[0];
+    let br = d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee, port: 0 }, via: vec![], to: RouteEnd::Point { p: [6.0, 6.0, 4.0] }, nps: Some("4".into()) }, &cat).unwrap()[0];
     let b = build(&d.p, &cat);
     assert!(b.issues.is_empty(), "{:?}", b.issues);
     let t = b.parts.iter().find(|q| q.kind == "tee").unwrap();
-    assert_eq!(t.nps2, "3", "a reducing tee for the 3\" branch");
+    assert_eq!(t.nps2, "4", "a reducing tee for the 4\" branch");
     joints_ok(&b);
     let conn = connections(&b);
     let ti = b.parts.iter().position(|q| q.kind == "tee").unwrap();
@@ -635,4 +635,58 @@ fn reducing_tees_and_reducers_come_from_their_tables() {
     let t = of(&b, "tee")[0];
     assert!((t.ports[2].p[1] - cat.tee_m("6", "3").unwrap()).abs() < 1e-9, "{:?}", t.ports[2].p);
     assert!((inch(cat.tee_m("6", "3").unwrap()) - 4.88).abs() < 1e-9);
+}
+
+#[test]
+fn branch_outlets_follow_the_class_branch_table() {
+    let cat = Catalogue::builtin();
+    let inch = |v: f64| v / 0.0254;
+    // The outlet rows: heights as the catalogue lists them.
+    assert!((inch(cat.olet("weldolet", "2", false).unwrap().height) - 1.5).abs() < 1e-9);
+    assert!((inch(cat.olet("sockolet", "1", false).unwrap().height) - 1.3125).abs() < 1e-9);
+    let cs1 = cat.class("CS1").unwrap();
+    assert_eq!(cs1.branch_fitting("6", "6"), Some("tee"));
+    assert_eq!(cs1.branch_fitting("6", "4"), Some("reducing_tee"));
+    assert_eq!(cs1.branch_fitting("6", "3"), Some("weldolet"));
+    assert_eq!(cs1.branch_fitting("6", "1"), Some("sockolet"));
+    assert_eq!(cs1.branch_fitting("2", "1"), Some("reducing_tee"));
+    for (branch, want) in [("3", "weldolet"), ("1", "sockolet"), ("4", "tee")] {
+        let mut d = Doc::new(line("6", vec![[0.0, 0.0, 4.0], [12.0, 0.0, 4.0]], vec![]));
+        let tee = d.apply(Op::Drop { line: 1, kind: ItemKind::Tee, at: [6.0, 0.0, 4.0], dir: [0.0, 1.0, 0.0], nps2: String::new() }, &cat).unwrap()[0];
+        d.apply(Op::Route { from: RouteEnd::Branch { line: 1, item: tee, port: 0 }, via: vec![], to: RouteEnd::Point { p: [6.0, 4.0, 4.0] }, nps: Some(branch.into()) }, &cat).unwrap();
+        let b = build(&d.p, &cat);
+        assert!(b.issues.is_empty(), "{branch}: {:?}", b.issues);
+        joints_ok(&b);
+        let iss = connection_issues(&d.p, &cat, &b);
+        assert!(iss.iter().all(|i| i.kind == "open"), "{branch}: {iss:?}");
+        assert!(crate::checks::clashes(&d.p, &b).is_empty(), "{branch}");
+        let part = b.parts.iter().find(|q| matches!(q.kind, "tee" | "weldolet" | "sockolet")).unwrap();
+        assert_eq!(part.kind, want, "a {branch}\" branch off 6\"");
+        if want != "tee" {
+            // Its end: half the header's diameter plus the outlet's height above it.
+            let h = cat.olet(want, branch, false).unwrap().height;
+            assert!((part.ports[0].p[1] - (cat.od("6") / 2.0 + h)).abs() < 1e-9, "{:?}", part.ports[0].p);
+            // The header is split at the outlet (Datum Pipe needs a node there), no weld counted.
+            assert_eq!(of(&b, "pipe").iter().filter(|q| q.line == 1).count(), 2);
+            let text = crate::pcf::write(&d.p, &cat, None).unwrap();
+            assert!(text.contains("OLET") && text.contains(if want == "weldolet" { "SKEY WTBW" } else { "SKEY SKSW" }));
+            assert!(crate::pcf::reader::pcf(&crate::pcf::write(&d.p, &cat, Some(1)).unwrap()).is_ok());
+            let mut back = Doc::new(Project::new());
+            back.apply(Op::ImportPcf { text }, &cat).unwrap();
+            let kinds: Vec<ItemKind> = back.p.lines.iter().flat_map(|l| l.items.iter().map(|i| i.kind)).collect();
+            assert!(kinds.contains(&(if want == "weldolet" { ItemKind::Weldolet } else { ItemKind::Sockolet })), "{kinds:?}");
+            assert!(back.p.lines.iter().any(|l| matches!(l.from, End::Branch { .. })));
+            assert!(build(&back.p, &cat).issues.is_empty());
+            let mto = crate::lists::lists(&d.p, &cat).mto;
+            assert!(mto.iter().any(|r| r.what.to_lowercase().starts_with(want)), "{mto:?}");
+        }
+    }
+    // A tee where the class wants a weldolet is reported (here: made by hand).
+    let tee = Item { id: 5, kind: ItemKind::Tee, seg: 0, at: 6.0, dir: [0.0, 1.0, 0.0], ..Default::default() };
+    let mut p = line("6", vec![[0.0, 0.0, 4.0], [12.0, 0.0, 4.0]], vec![tee]);
+    p.lines.push(Line { id: 9, number: "3\"-P-9-CS1".into(), nps: "3".into(), from: End::Branch { line: 1, item: 5, port: 0 }, pts: vec![[6.0, 0.2, 4.0], [6.0, 4.0, 4.0]], ..Default::default() });
+    p.normalize();
+    let b = build(&p, &cat);
+    let iss = connection_issues(&p, &cat, &b);
+    assert!(iss.iter().any(|i| i.kind == "class" && i.text.contains("with a weldolet, not a reducing tee")), "{iss:?}");
 }

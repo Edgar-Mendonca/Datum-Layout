@@ -44,6 +44,18 @@ pub struct FlangeRow { pub nps: String, pub rating: u32, pub od: f64, pub thick:
 /// A reducing tee: run size, branch size, centre to end of the run (C) and of the branch (M).
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct TeeRow { pub nps: String, pub nps_branch: String, pub c: f64, pub m: f64, pub source: String }
+/// A branch outlet (weldolet, sockolet) by its branch size: height above the header's outside
+/// (A), base and outlet diameters, weight; `same` for size-on-size (branch equal to the header).
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct OletRow { pub kind: String, pub same: bool, pub nps_branch: String, pub height: f64, pub base_od: f64, pub top_od: f64, pub weight_lb: Option<f64>, pub source: String }
+
+/// One rule of a class's branch table: which fitting makes a branch of a header in
+/// `header_min`..`header_max` with a branch in `branch_min`..`branch_max` (sizes, or `half`: half
+/// the header's size or less, `one_smaller`: one size below the header), or `branch: "same"`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct BranchRule { pub header_min: Option<String>, pub header_max: Option<String>, pub branch: Option<String>, pub branch_min: Option<String>, pub branch_max: Option<String>, pub fitting: String }
+
 /// A reducer by its two sizes: end-to-end length (concentric and eccentric alike).
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ReducerRow { pub nps: String, pub nps_small: String, pub h: f64, pub source: String }
@@ -68,6 +80,9 @@ pub struct PipeClass {
     pub schedules: Vec<(String, String)>,
     pub elbow: String,
     pub components: Vec<ClassItem>,
+    /// The branch table: the first rule that matches a header and branch size says the fitting
+    /// (`tee`, `reducing_tee`, `weldolet`, `sockolet`).
+    pub branches: Vec<BranchRule>,
     pub source: String,
 }
 
@@ -75,6 +90,19 @@ impl PipeClass {
     pub fn schedule(&self, nps: &str) -> String {
         let i = nps_index(nps);
         self.schedules.iter().rfind(|(from, _)| nps_index(from) <= i).map(|s| s.1.clone()).unwrap_or_else(|| "STD".into())
+    }
+    /// The fitting the class's branch table gives for a branch off a header (None: no rule).
+    pub fn branch_fitting(&self, header: &str, branch: &str) -> Option<&str> {
+        let (h, b) = (nps_index(header), nps_index(branch));
+        let inch = |s: &str| nps_inches(s).unwrap_or(0.0);
+        let bound = |v: &Option<String>| -> Option<f64> {
+            v.as_deref().map(|s| match s { "half" => inch(header) / 2.0 + 1e-9, "one_smaller" => if h > 0 { inch(NPS[h - 1]) } else { 0.0 }, x => inch(x) })
+        };
+        self.branches.iter().find(|r| {
+            r.header_min.as_deref().is_none_or(|m| nps_index(m) <= h) && r.header_max.as_deref().is_none_or(|m| h <= nps_index(m))
+                && match r.branch.as_deref() { Some("same") => b == h, Some(s) => nps_index(s) == b, None => true }
+                && bound(&r.branch_min).is_none_or(|m| inch(branch) + 1e-9 >= m) && bound(&r.branch_max).is_none_or(|m| inch(branch) <= m + 1e-9)
+        }).map(|r| r.fitting.as_str())
     }
     /// Whether the class allows `kind` in size `nps`.
     pub fn allows(&self, kind: &str, nps: &str) -> bool {
@@ -92,6 +120,7 @@ pub struct Catalogue {
     pub flanges: Vec<FlangeRow>,
     pub valves: Vec<ValveRow>,
     pub tees: Vec<TeeRow>,
+    pub olets: Vec<OletRow>,
     pub reducers: Vec<ReducerRow>,
     pub classes: Vec<PipeClass>,
     pub packs: Vec<String>,
@@ -152,6 +181,7 @@ impl Catalogue {
         c.add_table("valves.csv", include_str!("../../../catalogue/valves.csv"));
         c.add_table("tees_reducing.csv", include_str!("../../../catalogue/tees_reducing.csv"));
         c.add_table("reducers.csv", include_str!("../../../catalogue/reducers.csv"));
+        c.add_table("olets.csv", include_str!("../../../catalogue/olets.csv"));
         c.add_class("classes/CS1.json", include_str!("../../../catalogue/classes/CS1.json"));
         c.add_class("classes/CS150.json", include_str!("../../../catalogue/classes/CS150.json"));
         c.add_class("classes/CS300.json", include_str!("../../../catalogue/classes/CS300.json"));
@@ -223,6 +253,17 @@ impl Catalogue {
                     _ => bad(w, i, "a size or dimension is not valid (the branch must be smaller than the run, and M no longer than C)"),
                 }
             },
+            "olets.csv" => for (i, r) in table(name, text, &["kind", "fit", "nps_branch", "height_in", "base_od_in", "top_od_in", "source"], w).into_iter().enumerate() {
+                let kind = r["kind"].to_lowercase();
+                match (["weldolet", "sockolet"].contains(&kind.as_str()), ["reducing", "size_on_size"].contains(&r["fit"].as_str()), size_ok(&r["nps_branch"]), f(&r, "height_in"), f(&r, "base_od_in"), f(&r, "top_od_in")) {
+                    (true, true, true, Some(h), Some(b), Some(t)) => {
+                        let row = OletRow { kind, same: r["fit"] == "size_on_size", nps_branch: r["nps_branch"].clone(), height: h * IN, base_od: b * IN, top_od: t * IN, weight_lb: f(&r, "weight_lb"), source: r["source"].clone() };
+                        self.olets.retain(|o| !(o.kind == row.kind && o.same == row.same && o.nps_branch == row.nps_branch));
+                        self.olets.push(row);
+                    }
+                    _ => bad(w, i, "the kind, fit, size or a dimension is not valid"),
+                }
+            },
             "reducers.csv" => for (i, r) in table(name, text, &["nps", "nps_small", "h_in", "source"], w).into_iter().enumerate() {
                 match (size_ok(&r["nps"]), size_ok(&r["nps_small"]), f(&r, "h_in")) {
                     (true, true, Some(h)) if nps_index(&r["nps_small"]) < nps_index(&r["nps"]) => {
@@ -233,7 +274,7 @@ impl Catalogue {
                     _ => bad(w, i, "a size or length is not valid (the small end must be smaller)"),
                 }
             },
-            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing or reducers .csv).")),
+            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing, reducers or olets .csv).")),
         }
     }
 
@@ -280,6 +321,12 @@ impl Catalogue {
     /// A reducing tee's branch centre-to-end (M), when the table lists that run and branch.
     pub fn tee_m(&self, run: &str, branch: &str) -> Option<f64> {
         self.tees.iter().find(|t| t.nps == run && t.nps_branch == branch).map(|t| t.m)
+    }
+    /// A branch outlet's row: size-on-size when the branch equals the header, else reducing (either
+    /// table when the other has no row).
+    pub fn olet(&self, kind: &str, branch: &str, same: bool) -> Option<&OletRow> {
+        let find = |s: bool| self.olets.iter().find(|o| o.kind == kind && o.nps_branch == branch && o.same == s);
+        find(same).or_else(|| find(!same))
     }
     /// A reducer's length for its two sizes (either order), when the table lists the pair.
     pub fn reducer_h(&self, a: &str, b: &str) -> Option<f64> {

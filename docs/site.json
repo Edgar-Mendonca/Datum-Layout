@@ -82,9 +82,10 @@
         "Eccentric reducers, flat on top or at the bottom (0.2.4)",
         "Crosses with two branches (0.2.5)",
         "Reducing tees and reducers by size pair, from manufacturers' tables (0.2.6)",
-        "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
+        "Weldolets and sockolets, and a branch table in every pipe class (0.2.7)",
         "Sloped lines",
-        "Design rules for supports and access (with 0.3's steel)"
+        "Design rules for supports and access (with 0.3's steel)",
+        "A pipe class editor (sizes, schedules, components, branch table)"
       ]
     },
     {

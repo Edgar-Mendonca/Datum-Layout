@@ -45,6 +45,8 @@ fn describe(q: &Part, class: &str, sched: &str, material: &str) -> Option<(&'sta
         "elbow45" => ("Fittings", format!("Elbow 45° {}, butt weld, sch {sched}", q.note)),
         "tee" if q.nps2 != q.nps => ("Fittings", format!("Tee, reducing {}\" × {}\", butt weld", q.nps, q.nps2)),
         "tee" => ("Fittings", "Tee, equal, butt weld".to_string()),
+        "weldolet" => ("Fittings", format!("Weldolet {}\" on {}\" header, standard weight, butt weld", q.nps2, q.nps)),
+        "sockolet" => ("Fittings", format!("Sockolet {}\" on {}\" header, class 3000, socket weld", q.nps2, q.nps)),
         "cross" if q.nps2 != q.nps => ("Fittings", format!("Cross, reducing {}\" × {}\", butt weld", q.nps, q.nps2)),
         "cross" => ("Fittings", "Cross, equal, butt weld".to_string()),
         "reducer" if q.note.starts_with("FLAT") => ("Fittings", format!("Reducer, eccentric {}\" × {}\" (flat {}), butt weld", q.nps, q.nps2, if q.note == "FLAT-TOP" { "on top" } else { "at the bottom" })),

@@ -1,6 +1,6 @@
 {
   "name": "LT150",
-  "description": "Low-temperature carbon steel, class 150; the same dimensions as CS150 for services below about -29 \u00b0C",
+  "description": "Low-temperature carbon steel, class 150; the same dimensions as CS150 for services below about -29 °C",
   "material": "Low-temperature carbon steel",
   "ratings": [
     150
@@ -93,6 +93,35 @@
       "kind": "ball",
       "min": "1/2",
       "max": "12"
+    },
+    {
+      "kind": "cross"
+    },
+    {
+      "kind": "weldolet"
+    },
+    {
+      "kind": "sockolet",
+      "max": "1-1/2"
+    }
+  ],
+  "branches": [
+    {
+      "branch": "same",
+      "fitting": "tee"
+    },
+    {
+      "header_min": "3",
+      "branch_max": "1-1/2",
+      "fitting": "sockolet"
+    },
+    {
+      "header_min": "4",
+      "branch_max": "half",
+      "fitting": "weldolet"
+    },
+    {
+      "fitting": "reducing_tee"
     }
   ],
   "source": "Example class written for Datum Layout; not any company's specification. Check against your own piping class before use"

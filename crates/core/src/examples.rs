@@ -170,8 +170,9 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     let b1 = b.port(noz(v2, "N4"));
     let lb = b.line("4\"-P-3002-CS1", "4", noz(v1, "N4"), noz(v2, "N4"), vec![b0, [3.0, 11.6, b0[2]], [3.0, 11.6, 6.0], [25.0, 11.6, 6.0], [25.0, 11.6, b1[2]], b1]);
     b.drop(lb, ItemKind::Globe, [25.0, 11.6, 4.6], [1.0, 0.0, 0.0]);
-    // A 3" branch off line A down to a drain point with a gate valve and a blind flange.
-    let t = b.drop(la, ItemKind::Tee, [14.0, 10.0, 5.0], [0.0, -1.0, 0.0]);
+    // A 3" branch off line A (a weldolet, as the class says for a 6" × 3" branch) down to a drain
+    // point with a gate valve and a blind flange.
+    let t = b.drop(la, ItemKind::Weldolet, [14.0, 10.0, 5.0], [0.0, -1.0, 0.0]);
     let tp = b.port(br(la, t));
     let low = if planted { 0.01 } else { 1.0 };
     let lc = b.line("3\"-D-3003-CS1", "3", br(la, t), blind(), vec![tp, [14.0, 9.2, 5.0], [14.0, 9.2, low]]);

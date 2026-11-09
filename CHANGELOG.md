@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.2.7 — 2026-11-09
+Weldolets and sockolets, and a branch table in every pipe class.
+
+**Branch outlets.** A weldolet (butt weld) or sockolet (socket weld, ½"–2") sits on the header without cutting it into a tee; its height above the header, base and outlet diameters and weight come from the outlet table. Drop one from the catalogue or Fittings › Branch and route its branch.
+
+**The class decides.** Every example class now has a branch table, as a real specification does: a tee for the same size, a sockolet for branches up to 1½" on headers of 3" and up, a weldolet for branches up to half the header on 4" and up, and a reducing tee otherwise. Routing a branch off a tee makes the fitting the class gives; Check reports any branch made otherwise. A branch takes the New lines size when that is smaller than its tee. The Library shows each class's branch table.
+
+**To Datum Pipe.** Written as an OLET with its centre and branch point; the header is split at the outlet so Datum Pipe's model has a node there. Datum Pipe's own engine reads the pipe rack example, whose drain now leaves through a weldolet, and solves it. Files read back keep their outlets.
+
+**Sources.** Outlet dimensions and weights from Bonney Forge's Branch Connections catalogue, every height checked against wermac.org's table.
+
 ## 0.2.6 — 2026-11-09
 Reducing tees and reducers from their own tables, read from manufacturers' catalogues and checked row by row.
 

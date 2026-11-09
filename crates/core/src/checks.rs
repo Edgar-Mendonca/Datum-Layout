@@ -5,7 +5,7 @@
 //! boxes and measured with exact convex distance.
 
 use crate::catalogue::Catalogue;
-use crate::model::{End, EquipKind, Project, P3};
+use crate::model::{End, EquipKind, ItemKind, Project, P3};
 use crate::parts::{add, dist, dot, mul, rotate, unit, Shape};
 use crate::route::{Built, Issue, Part};
 use parry3d_f64::math::{Pose, Vector};
@@ -106,9 +106,30 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
         if !class.ratings.contains(&l.rating) && said.insert((l.id, 0, "rating".to_string())) {
             out.push(Issue { kind: "class", text: format!("Line {}: class {} has no class {} flanges.", l.number, l.class, l.rating), at: l.pts[0], line: l.id, item: 0, equip: 0 });
         }
-        if q.kind != "support" && !class.allows(if q.kind == "cross" { "tee" } else { q.kind }, &q.nps) && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
+        let allowed = match q.kind { "support" => true, "cross" => class.allows("tee", &q.nps), "weldolet" | "sockolet" => class.allows(q.kind, &q.nps) || class.allows("tee", &q.nps), k => class.allows(k, &q.nps) };
+        if !allowed && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
             let pt = q.ports.first().map(|x| x.p).unwrap_or_default();
             out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, kind_name(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0 });
+        }
+    }
+    // The class's branch table: each branch made with the fitting the class gives for its sizes.
+    for l in &p.lines {
+        let Some(class) = cat.class(&l.class) else { continue };
+        if class.branches.is_empty() { continue; }
+        for it in l.items.iter().filter(|i| i.kind.branches() > 0) {
+            let run = crate::route::size_at(l, it.seg, it.at);
+            for k in 0..it.kind.branches() {
+                let connected = p.lines.iter().any(|b| [&b.from, &b.to].iter().any(|e| matches!(e, End::Branch { line, item, port } if *line == l.id && *item == it.id && *port == k)));
+                if !connected { continue; }
+                let br = crate::route::branch_size(p, l, it, k);
+                let Some(want) = class.branch_fitting(&run, &br) else { continue };
+                let have = match it.kind { ItemKind::Weldolet => "weldolet", ItemKind::Sockolet => "sockolet", _ => if br == run { "tee" } else { "reducing_tee" } };
+                let same = want == have || (want == "tee" && have == "reducing_tee") || (want == "reducing_tee" && have == "tee");
+                if !same && it.kind != ItemKind::Cross {
+                    let words = |f: &str| match f { "reducing_tee" => "a reducing tee", "tee" => "a tee", "weldolet" => "a weldolet", "sockolet" => "a sockolet", x => x }.to_string();
+                    out.push(Issue { kind: "class", text: format!("{}: class {} makes a {}\" × {}\" branch with {}, not {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, l.class, run, br, words(want), words(have)), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: it.id, equip: 0 });
+                }
+            }
         }
     }
     for l in p.lines.iter().filter(|l| l.number.trim().is_empty()) {
@@ -312,7 +333,7 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
             if qi.line == 0 && qj.line == 0 { continue; }
             if near[i].contains(&j) { continue; }
             // A support sits on its own line's pipe.
-            if (qi.kind == "support" || qj.kind == "support") && qi.line == qj.line { continue; }
+            if (matches!(qi.kind, "support" | "weldolet" | "sockolet") || matches!(qj.kind, "support" | "weldolet" | "sockolet")) && qi.line == qj.line { continue; }
             if (0..3).any(|k| boxes[j].0[k] > boxes[i].1[k] + c || boxes[i].0[k] > boxes[j].1[k] + c) { continue; }
             for k in [i, j] {
                 solid_cache.entry(k).or_insert_with(|| b.parts[k].shapes.iter().flat_map(|s| { let (lo, hi) = s.aabb(); solids(s).into_iter().map(move |x| (lo, hi, x)) }).collect());

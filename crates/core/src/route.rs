@@ -114,7 +114,7 @@ pub fn item_len(cat: &Catalogue, l: &Line, it: &Item, nps: &str) -> f64 {
         ItemKind::Tee | ItemKind::Cross => 2.0 * d.tee,
         ItemKind::Reducer => red_len(cat, l, nps, &reducer_to(it, nps)),
         ItemKind::FlangePair => 2.0 * d.fl_y + d.gasket,
-        ItemKind::Support => 0.0,
+        ItemKind::Support | ItemKind::Weldolet | ItemKind::Sockolet => 0.0,
         k => f2f(cat, k, nps, l.rating, d.od) + 2.0 * (d.fl_y + d.gasket),
     }
 }
@@ -122,6 +122,11 @@ pub fn item_len(cat: &Catalogue, l: &Line, it: &Item, nps: &str) -> f64 {
 /// A reducer's length between two sizes: from the table of size pairs, else the larger size's row.
 pub fn red_len(cat: &Catalogue, l: &Line, a: &str, b: &str) -> f64 {
     cat.reducer_h(a, b).unwrap_or_else(|| dimens(cat, &larger(a, b), &l.class, l.rating, l.radius).red)
+}
+/// How far a branch outlet's end is from the header's centreline: half the header's outside
+/// diameter plus the outlet's height (A); without a row, the branch's own diameter.
+pub fn olet_reach(cat: &Catalogue, kind: ItemKind, run: &str, branch: &str) -> f64 {
+    cat.od(run) / 2.0 + cat.olet(kind.key(), branch, run == branch).map(|o| o.height).unwrap_or(cat.od(branch))
 }
 /// A tee's (or cross's) branch centre-to-end: M from the reducing-tee table when the branch is
 /// smaller than the run, else C.
@@ -164,7 +169,8 @@ pub fn end_port(p: &Project, cat: &Catalogue, e: &End) -> Option<Port> {
             let bd = if *port == 1 { mul(bd, -1.0) } else { bd };
             let d = dimens(cat, &nps, &l.class, l.rating, l.radius);
             let bn = branch_size(p, l, it, *port);
-            Some(Port { p: add(c, mul(bd, branch_len(cat, &nps, &bn, d.tee))), d: bd, nps: bn, rating: 0, end: "BW" })
+            let reach = if it.kind.olet() { olet_reach(cat, it.kind, &nps, &bn) } else { branch_len(cat, &nps, &bn, d.tee) };
+            Some(Port { p: add(c, mul(bd, reach)), d: bd, nps: bn, rating: 0, end: "BW" })
         }
     }
 }
@@ -528,6 +534,23 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
         ItemKind::Reducer => {
             let h = item_len(cat, l, it, nin);
             reducer(cat, run, x0, h, nin, nout, it.id);
+        }
+        ItemKind::Weldolet | ItemKind::Sockolet => {
+            let bd = branch_dir(run.u, it.dir);
+            let bn = branch_size(p, l, it, 0);
+            let row = cat.olet(it.kind.key(), &bn, bn == nin);
+            let (h, base, top) = row.map(|o| (o.height, o.base_od, o.top_od)).unwrap_or((cat.od(&bn), cat.od(&bn) * 1.4, cat.od(&bn)));
+            let cp = run.at(x0);
+            let r = d.od / 2.0;
+            let mut q = Part::new(it.kind.key(), l);
+            q.nps = nin.into();
+            q.nps2 = bn.clone();
+            // From just inside the header's wall (so it sits on it) to the outlet's end.
+            q.shapes = vec![Shape::Frustum { a: add(cp, mul(bd, r * 0.6)), b: add(cp, mul(bd, r + h * 0.35)), r1: base / 2.0, r2: base / 2.0 * 0.9 }, Shape::Frustum { a: add(cp, mul(bd, r + h * 0.35)), b: add(cp, mul(bd, r + h)), r1: base / 2.0 * 0.9, r2: top / 2.0 }];
+            q.ports = vec![Port { p: add(cp, mul(bd, r + h)), d: bd, nps: bn, rating: 0, end: "BW" }];
+            q.length = h;
+            q.corner = Some(cp);
+            run.push(q, it.id);
         }
         ItemKind::Cross => {
             let c = x0 + d.tee;

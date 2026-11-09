@@ -36,6 +36,7 @@ export const library = (start?: string) => openDialog(() => {
       { k: "flanges", label: "Flanges", group: "Parts tables", sub: `${k.flanges.length} rows` },
       { k: "tees", label: "Reducing tees", group: "Parts tables", sub: `${k.tees.length} pairs` },
       { k: "reducers", label: "Reducers", group: "Parts tables", sub: `${k.reducers.length} pairs` },
+      { k: "olets", label: "Branch outlets", group: "Parts tables", sub: `${k.olets.length} rows` },
       { k: "valves", label: "Valves and strainers", group: "Parts tables", sub: `${k.valves.length} rows` },
     ];
   });
@@ -62,8 +63,11 @@ export const library = (start?: string) => openDialog(() => {
                 <Tbl head={["Size", "Schedule", "OD", "Wall"]} right={[2, 3]} rows={x().sizes.filter(s => has(s, inch(s))).map(s => { const sch = schedOf(x(), s); const p = cat()!.pipes.find(r => r.nps === s && r.schedule === sch); return [inch(s), sch, p ? mm(p.od) : "—", p ? mm(p.wall) : "not in the pipe table"]; })} /></section>
               <section><h4>Components allowed</h4>
                 <Tbl head={["Component", "From", "To"]} rows={x().components.filter(k => has(k.kind, IT_NAME[k.kind] ?? "")).map(k => [IT_NAME[k.kind] ?? k.kind, k.min ? inch(k.min) : inch(x().sizes[0] ?? ""), k.max ? inch(k.max) : inch(x().sizes[x().sizes.length - 1] ?? "")])} />
-                <h4>Branches</h4>
-                <p class="small muted">A branch is a tee off the header: an equal tee for the same size, a reducing tee for a smaller one. A branch larger than its header is reported by the checks.</p></section>
+                <h4>Branch table</h4>
+                <Show when={x().branches?.length} fallback={<p class="small muted">No branch table: any tee is accepted. A branch larger than its header is reported by the checks.</p>}>
+                  <Tbl head={["Header", "Branch", "Fitting"]} rows={x().branches!.map(r => [r.header_min || r.header_max ? `${r.header_min ? inch(r.header_min) : "any"} to ${r.header_max ? inch(r.header_max) : "any"}` : "any", r.branch === "same" ? "the same size" : r.branch_min || r.branch_max ? `${r.branch_min ? (r.branch_min === "half" ? "over half the header" : inch(r.branch_min)) : "any"} to ${r.branch_max ? (r.branch_max === "half" ? "half the header" : r.branch_max === "one_smaller" ? "one size smaller" : inch(r.branch_max)) : "any"}` : "any other", ({ tee: "Tee", reducing_tee: "Reducing tee", weldolet: "Weldolet", sockolet: "Sockolet" } as Record<string, string>)[r.fitting] ?? r.fitting])} />
+                  <p class="small muted">The first row that fits gives the fitting. Routing a branch off a tee makes that fitting; the checks report any branch made otherwise.</p>
+                </Show></section>
             </div>
             <p class="small libsrc"><b>Source:</b> {x().source}</p>
             <p class="ibtns"><button class="btn pri" disabled={!project()} onClick={() => { const p = project(); if (p) act({ SetSettings: { ...p.settings, class: x().name, rating: x().ratings.includes(p.settings.rating) ? p.settings.rating : x().ratings[0] } }); }}>Use for new lines</button></p>
@@ -83,6 +87,9 @@ export const library = (start?: string) => openDialog(() => {
           <Show when={page() === "reducers"}>
             <h3>Reducers <small class="muted">large × small: end-to-end length, concentric and eccentric alike</small></h3>
             <Tbl head={["Large end", "Small end", "Length", "Source"]} right={[2]} rows={(cat()?.reducers ?? []).filter(r => has(r.nps, inch(r.nps), r.nps_small, inch(r.nps_small))).map(r => [inch(r.nps), inch(r.nps_small), mm(r.h), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
+          <Show when={page() === "olets"}>
+            <h3>Branch outlets <small class="muted">weldolets (standard weight) and sockolets (class 3000): height above the header (A), base and outlet diameters, weight</small></h3>
+            <Tbl head={["Kind", "Fits", "Branch", "Height", "Base", "Outlet", "Weight", "Source"]} right={[3, 4, 5, 6]} rows={(cat()?.olets ?? []).filter(r => has(r.kind, r.nps_branch, inch(r.nps_branch))).map(r => [r.kind === "weldolet" ? "Weldolet" : "Sockolet", r.same ? "size on size" : "smaller than the header", inch(r.nps_branch), mm(r.height), mm(r.base_od), mm(r.top_od), r.weight_lb != null ? fmt("mass", r.weight_lb * 0.45359237) : "—", <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
           <Show when={page() === "valves"}>
             <h3>Valves and strainers <small class="muted">face to face, flanged, by size and class</small></h3>
             <Tbl head={["Type", "Size", "Class", "Face to face", "Source"]} right={[3]} rows={[...(cat()?.valves ?? [])].sort((a: any, b: any) => a.kind.localeCompare(b.kind) || a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.kind, VALVE[r.kind] ?? "", r.nps, inch(r.nps), r.rating)).map((r: any) => [VALVE[r.kind] ?? r.kind, inch(r.nps), String(r.rating), mm(r.f2f), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>

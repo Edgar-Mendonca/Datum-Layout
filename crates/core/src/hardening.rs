@@ -18,7 +18,7 @@ impl Rng {
     fn pick<T: Copy>(&mut self, v: &[T]) -> T { v[(self.next() % v.len() as u64) as usize] }
 }
 
-const KINDS: [ItemKind; 10] = [ItemKind::Gate, ItemKind::Globe, ItemKind::Check, ItemKind::Ball, ItemKind::Strainer, ItemKind::FlangePair, ItemKind::Tee, ItemKind::Reducer, ItemKind::Cross, ItemKind::Support];
+const KINDS: [ItemKind; 12] = [ItemKind::Weldolet, ItemKind::Sockolet, ItemKind::Gate, ItemKind::Globe, ItemKind::Check, ItemKind::Ball, ItemKind::Strainer, ItemKind::FlangePair, ItemKind::Tee, ItemKind::Reducer, ItemKind::Cross, ItemKind::Support];
 
 fn random_op(r: &mut Rng, p: &Project) -> Op {
     let lines: Vec<u32> = p.lines.iter().map(|l| l.id).collect();

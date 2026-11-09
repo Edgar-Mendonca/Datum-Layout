@@ -1,6 +1,6 @@
 [package]
 name = "datum-core"
-version = "0.2.6"
+version = "0.2.7"
 license = "MIT"
 edition = "2021"
 description = "Datum Layout engine: the plant model and its edits, the generated parts catalogue, parametric equipment, pipe routing, clash and spec checks, lists, and PCF and glTF exports."

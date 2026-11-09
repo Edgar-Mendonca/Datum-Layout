@@ -30,6 +30,8 @@ fn keyword(q: &Part) -> Option<(&'static str, &'static str)> {
         "elbow90" | "elbow45" => ("ELBOW", "ELBW"),
         "tee" => ("TEE", "TEBW"),
         "cross" => ("CROSS", "CRBW"),
+        "weldolet" => ("OLET", "WTBW"),
+        "sockolet" => ("OLET", "SKSW"),
         "reducer" if q.note.starts_with("FLAT") => ("REDUCER-ECCENTRIC", "REBW"),
         "reducer" => ("REDUCER-CONCENTRIC", "RCBW"),
         "flange" => ("FLANGE", "FLWN"),
@@ -65,6 +67,10 @@ pub fn write(p: &Project, cat: &Catalogue, line: Option<u32>) -> Result<String, 
             s += key;
             s += "\n";
             match q.kind {
+                "weldolet" | "sockolet" => {
+                    let c = q.corner.unwrap_or_default();
+                    s += &format!("    CENTRE-POINT {:.2} {:.2} {:.2}\n    BRANCH1-POINT {}\n", c[0] * 1000.0, c[1] * 1000.0, c[2] * 1000.0, pt(q.ports[0].p, &q.ports[0].nps));
+                }
                 "cross" => {
                     let c = q.corner.unwrap_or_default();
                     s += &format!("    END-POINT {}\n    END-POINT {}\n    CENTRE-POINT {:.2} {:.2} {:.2}\n    BRANCH1-POINT {}\n    BRANCH2-POINT {}\n", pt(q.ports[0].p, &q.ports[0].nps), pt(q.ports[1].p, &q.ports[1].nps), c[0] * 1000.0, c[1] * 1000.0, c[2] * 1000.0, pt(q.ports[2].p, &q.ports[2].nps), pt(q.ports[3].p, &q.ports[3].nps));
@@ -205,6 +211,13 @@ pub mod reader {
                     let m = node_at(ctr, &mut nodes);
                     for e in &ends { let a = node_at(e.0, &mut nodes); pieces.push(Piece { a, b: m, nps: n0, to_nps: None, rigid: None }); }
                     if let Some((bp, bb)) = branch { let b = node_at(bp, &mut nodes); pieces.push(Piece { a: m, b, nps: nps_of(bb).or(n0), to_nps: None, rigid: None }); }
+                    tees.push(m);
+                }
+                // Datum Pipe 0.6 (copied from its import.rs): a branch outlet is a branch from a node on the header.
+                "OLET" | "WELDOLET" | "SOCKOLET" | "THREDOLET" if centre.is_some() && branch.is_some() => {
+                    let (ctr, (bp, bb)) = (centre.unwrap().0, branch.unwrap());
+                    let (m, b) = (node_at(ctr, &mut nodes), node_at(bp, &mut nodes));
+                    pieces.push(Piece { a: m, b, nps: nps_of(bb).or(last_nps), to_nps: None, rigid: None });
                     tees.push(m);
                 }
                 _ if k.starts_with("REDUCER") && ends.len() == 2 => {
@@ -355,7 +368,7 @@ pub mod import {
             let node = |q: P3, nodes: &mut Vec<P3>| -> usize { if let Some(i) = nodes.iter().position(|x| dist(*x, q) < 5e-4) { i } else { nodes.push(q); nodes.len() - 1 } };
             let mut edges: Vec<(usize, usize, usize)> = vec![];
             for (ci, c) in g.comps.iter().enumerate() {
-                if c.kind.starts_with("SUPPORT") { continue; }
+                if c.kind.starts_with("SUPPORT") || (c.kind.ends_with("OLET") && c.eps.len() < 2) { continue; }
                 if c.eps.len() < 2 { skipped += 1; continue; }
                 let (a, b) = (node(c.eps[0].0, &mut nodes), node(c.eps[1].0, &mut nodes));
                 if a != b { edges.push((a, b, ci)); }
@@ -432,6 +445,15 @@ pub mod import {
                             tees.push((bp, l.id, it.id, 0));
                         }
                     }
+                    l.items.push(it);
+                }
+                // Branch outlets of this pipeline on this run.
+                for c in g.comps.iter().filter(|c| c.kind.ends_with("OLET") && c.eps.len() < 2) {
+                    let (Some(cp), Some((bp, bb))) = (c.cp, c.bp) else { continue };
+                    let Some((seg, at)) = place(cp, &l.pts) else { continue };
+                    let kind = if c.kind == "SOCKOLET" || c.skey.starts_with("SK") { ItemKind::Sockolet } else { ItemKind::Weldolet };
+                    let it = Item { id: id(), kind, seg, at, dir: unit(sub(bp, cp)), nps2: nps_of(bb, inch).unwrap_or("").to_string(), ..Default::default() };
+                    tees.push((bp, l.id, it.id, 0));
                     l.items.push(it);
                 }
                 // Supports of this pipeline that lie on this run.

@@ -19,6 +19,9 @@ export const pickText = (accept: string) => new Promise<string | null>(ok => {
 });
 export const setStdView = (f: (v: string) => void) => { viewHook = f; };
 
+/** A new branch's size: the New lines size when it is smaller than the branch end, else the end's. */
+export const branchSize = (end: string) => { const s = project()?.settings.nps ?? end; return NPS.indexOf(s) >= 0 && NPS.indexOf(s) < NPS.indexOf(end) ? s : end; };
+
 /** Ends the route being drawn at a nozzle, a tee's branch or a free point, and adds the line. */
 export const finishRoute = async (to: RouteFrom, keepLast = false) => {
   const r = route(); if (!r?.from) return;
@@ -216,10 +219,10 @@ export const C = {
       return toast(`${SUPPORTS.find(s => s[0] === (support ?? "rest"))?.[1]} placed on the pipe: it goes to Datum Pipe with the line for the stress analysis.`, true);
     }
     setSel({ kind: "item", id, line });
-    if (kind === "tee" || kind === "cross") {
+    if (kind === "tee" || kind === "cross" || kind === "weldolet" || kind === "sockolet") {
       // A tee (or cross) starts a branch: route from its (first) branch end.
       await C.routeBranch(line, id, 0);
-      toast(kind === "cross" ? "Cross placed. Route its first branch now; the second is in its properties (Esc leaves both for later)." : "Tee placed. Route the branch: click its corners, then a nozzle or a free point (Esc leaves the branch for later).", true);
+      toast(kind === "weldolet" || kind === "sockolet" ? `${kind === "weldolet" ? "Weldolet" : "Sockolet"} placed on the header: route its branch now (Esc leaves it for later).` : kind === "cross" ? "Cross placed. Route its first branch now; the second is in its properties (Esc leaves both for later)." : "Tee placed. Route the branch: click its corners, then a nozzle or a free point (Esc leaves the branch for later).", true);
     } else toast(`${kind === "flange_pair" ? "Flange pair" : kind[0].toUpperCase() + kind.slice(1)} placed: it took the line's size and class and split the pipe.`, true);
   },
   /** Starts routing a branch line from a tee's branch end. */
@@ -228,7 +231,7 @@ export const C = {
     const pt = s?.ports.find((x: any) => x.kind === "branch" && x.item === item && (x.branch ?? 0) === port && !x.used);
     if (!pt) return toast("That branch already has a line.");
     setPlacing(null);
-    setRoute({ from: { kind: "branch", line, item, port }, start: pt.p, via: [], nps: pt.nps });
+    setRoute({ from: { kind: "branch", line, item, port }, start: pt.p, via: [], nps: branchSize(pt.nps) });
     setMode("route");
   },
   /** Drops a component on the selected line or run, near its middle. */
@@ -293,7 +296,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Rotate the equipment 90°", () => C.rotate(90)], ["Select everything", () => C.selectAll(), "Ctrl+A"], ["Copy the selection", () => C.copyGroup(), "Ctrl+D"],
   ["Turn the selection 90°", () => C.rotateGroup(90)], ["Turn the selection −90°", () => C.rotateGroup(-90)], ["Mirror the selection east–west", () => C.mirrorGroup(false)], ["Mirror the selection north–south", () => C.mirrorGroup(true)], ["Route a line", C.route, "R"],
   ["Add a gate valve to the selected line", () => C.dropOnSelected("gate")], ["Add a globe valve", () => C.dropOnSelected("globe")], ["Add a check valve", () => C.dropOnSelected("check")], ["Add a ball valve", () => C.dropOnSelected("ball")],
-  ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a cross (two branches)", () => C.dropOnSelected("cross")], ["Add a reducer", () => C.dropOnSelected("reducer")], ["Make the selected reducer eccentric, flat on top", () => { const s = sel(); const l = selLine(); if (s?.kind === "item" && l) act({ SetEccentric: { line: l.id, item: s.id, flat: "top" } }); else toast("Select a reducer first."); }], ["Add a rest (pipe support)", () => C.support("rest")], ["Add a guide", () => C.support("guide")], ["Add a line stop", () => C.support("stop")], ["Add an anchor", () => C.support("anchor")],
+  ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a cross (two branches)", () => C.dropOnSelected("cross")], ["Add a weldolet (branch outlet)", () => C.dropOnSelected("weldolet")], ["Add a sockolet (small branch)", () => C.dropOnSelected("sockolet")], ["Add a reducer", () => C.dropOnSelected("reducer")], ["Make the selected reducer eccentric, flat on top", () => { const s = sel(); const l = selLine(); if (s?.kind === "item" && l) act({ SetEccentric: { line: l.id, item: s.id, flat: "top" } }); else toast("Select a reducer first."); }], ["Add a rest (pipe support)", () => C.support("rest")], ["Add a guide", () => C.support("guide")], ["Add a line stop", () => C.support("stop")], ["Add an anchor", () => C.support("anchor")],
   ["Route the selected line again", () => C.reroute()], ["Make the line one size larger", () => C.step(true)], ["Make the line one size smaller", () => C.step(false)],
   ["Check clashes and errors", C.check, "F5"], ["Export the plant for Datum Pipe (.pcf)", () => C.exportPcf()], ["Export the selected line for Datum Pipe", () => { const l = selLine(); if (l) C.exportPcf(l.id); else toast("Select a line first."); }],
   ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")],

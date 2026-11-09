@@ -168,6 +168,10 @@ pub enum ItemKind {
     Reducer,
     /// A cross: a tee with a second branch opposite the first.
     Cross,
+    /// A butt-weld branch outlet on the header (it does not cut the header into a tee).
+    Weldolet,
+    /// A socket-weld branch outlet (class 3000) for small branches.
+    Sockolet,
     /// A pipe support at a point of a run (it takes no length; the pipe is split there so the
     /// stress model has a node).
     Support,
@@ -216,6 +220,8 @@ impl ItemKind {
             ItemKind::Tee => "tee",
             ItemKind::Reducer => "reducer",
             ItemKind::Cross => "cross",
+            ItemKind::Weldolet => "weldolet",
+            ItemKind::Sockolet => "sockolet",
             ItemKind::Support => "support",
         }
     }
@@ -230,9 +236,16 @@ impl ItemKind {
             ItemKind::Tee => "Tee",
             ItemKind::Reducer => "Concentric reducer",
             ItemKind::Cross => "Cross",
+            ItemKind::Weldolet => "Weldolet",
+            ItemKind::Sockolet => "Sockolet",
             ItemKind::Support => "Pipe support",
         }
     }
+    /// How many branches it has: tees and outlets one, a cross two.
+    pub fn branches(self) -> u8 {
+        match self { ItemKind::Tee | ItemKind::Weldolet | ItemKind::Sockolet => 1, ItemKind::Cross => 2, _ => 0 }
+    }
+    pub fn olet(self) -> bool { matches!(self, ItemKind::Weldolet | ItemKind::Sockolet) }
     pub fn valve(self) -> bool {
         matches!(self, ItemKind::Gate | ItemKind::Globe | ItemKind::Check | ItemKind::Ball | ItemKind::Strainer)
     }
@@ -493,7 +506,7 @@ impl Project {
         }
         // References: ends at nozzles, tees and lines that exist.
         let nozzles: std::collections::HashSet<(u32, String)> = self.equipment.iter().flat_map(|e| e.nozzles.iter().map(move |n| (e.id, n.tag.clone()))).collect();
-        let tees: std::collections::HashSet<(u32, u32, u8)> = self.lines.iter().flat_map(|l| l.items.iter().filter(|i| matches!(i.kind, ItemKind::Tee | ItemKind::Cross)).flat_map(move |i| (0..if i.kind == ItemKind::Cross { 2 } else { 1 }).map(move |k| (l.id, i.id, k)))).collect();
+        let tees: std::collections::HashSet<(u32, u32, u8)> = self.lines.iter().flat_map(|l| l.items.iter().filter(|i| i.kind.branches() > 0).flat_map(move |i| (0..i.kind.branches()).map(move |k| (l.id, i.id, k)))).collect();
         let mut used_branch = std::collections::HashSet::new();
         for l in &mut self.lines {
             for end in [&mut l.from, &mut l.to] {

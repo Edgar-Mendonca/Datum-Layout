@@ -120,7 +120,7 @@ pub fn scene(p: &Project, cat: &Catalogue, b: &Built, lod: u32) -> Scene {
             if q.kind == "nozzle" {
                 ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: "nozzle", equip: q.equip, tag: q.note.clone(), line: 0, item: 0, used, branch: 0 });
             } else if !used && q.line != 0 && !matches!(q.kind, "cap" | "blind" | "bolts") {
-                ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: if (q.kind == "tee" && j == 2) || (q.kind == "cross" && j >= 2) { "branch" } else { "end" }, equip: 0, tag: String::new(), line: q.line, item: q.item, used, branch: if q.kind == "cross" && j == 3 { 1 } else { 0 } });
+                ports.push(PortRef { p: pt.p, d: pt.d, nps: pt.nps.clone(), kind: if (q.kind == "tee" && j == 2) || (q.kind == "cross" && j >= 2) || (matches!(q.kind, "weldolet" | "sockolet") && j == 0) { "branch" } else { "end" }, equip: 0, tag: String::new(), line: q.line, item: q.item, used, branch: if q.kind == "cross" && j == 3 { 1 } else { 0 } });
             }
         }
     }

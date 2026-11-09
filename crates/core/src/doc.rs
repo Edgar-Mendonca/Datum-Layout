@@ -507,6 +507,21 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             let l0 = lead(fd).max(lead(td));
             let pts = route::orthogonal((fp, fd), &via, (tp, td), l0);
             if pts.len() < 2 { return Err("The route has no length.".into()); }
+            // A branch from a tee becomes the fitting the header's class gives for its sizes.
+            if let RouteEnd::Branch { line, item, port: 0 } = &from {
+                if let Some(hl) = p.line(*line).cloned() {
+                    let hit = hl.items.iter().find(|i| i.id == *item).cloned();
+                    if let (Some(it), Some(hc)) = (hit, cat.class(&hl.class)) {
+                        let run = route::size_at(&hl, it.seg, it.at);
+                        let kind = match hc.branch_fitting(&run, &nps) { Some("weldolet") => Some(ItemKind::Weldolet), Some("sockolet") => Some(ItemKind::Sockolet), Some("tee") | Some("reducing_tee") if it.kind.olet() => Some(ItemKind::Tee), _ => None };
+                        if let Some(k) = kind.filter(|k| *k != it.kind && it.kind != ItemKind::Cross) {
+                            // A tee becomes an outlet at its centre (an outlet takes no length), and back.
+                            let len = route::item_len(cat, &hl, &it, &run);
+                            if let Some(x) = line_mut(p, *line)?.items.iter_mut().find(|x| x.id == *item) { x.kind = k; let _ = len; }
+                        }
+                    }
+                }
+            }
             let id = p.id();
             let number = next_number(p, &nps, "P", &class);
             p.lines.push(Line { id, number, nps, class, rating: p.settings.rating, from: fe, to: te, pts, ..Default::default() });

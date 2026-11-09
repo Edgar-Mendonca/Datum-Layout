@@ -62,12 +62,14 @@ pub fn item_kind(k: &str) -> Option<ItemKind> {
         "reducer" | "concentric_reducer" => ItemKind::Reducer,
         "tee" => ItemKind::Tee,
         "cross" => ItemKind::Cross,
+        "weldolet" => ItemKind::Weldolet,
+        "sockolet" => ItemKind::Sockolet,
         "flange_pair" | "flanged_joint" | "spectacle_blind" => ItemKind::FlangePair,
         _ => return None,
     })
 }
 pub fn kind_word(k: ItemKind) -> &'static str {
-    match k { ItemKind::Gate => "gate", ItemKind::Globe => "globe", ItemKind::Check => "check", ItemKind::Ball => "ball", ItemKind::Strainer => "strainer", ItemKind::Reducer => "reducer", ItemKind::Tee => "tee", ItemKind::Cross => "cross", ItemKind::FlangePair => "flange_pair", ItemKind::Support => "support" }
+    match k { ItemKind::Gate => "gate", ItemKind::Globe => "globe", ItemKind::Check => "check", ItemKind::Ball => "ball", ItemKind::Strainer => "strainer", ItemKind::Reducer => "reducer", ItemKind::Tee => "tee", ItemKind::Cross => "cross", ItemKind::Weldolet => "weldolet", ItemKind::Sockolet => "sockolet", ItemKind::FlangePair => "flange_pair", ItemKind::Support => "support" }
 }
 
 fn size(s: &str) -> Option<&'static str> {

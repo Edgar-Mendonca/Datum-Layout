@@ -33,7 +33,7 @@ fn each_examples_pcf_reads_in_datum_pipe_with_the_same_nodes_sizes_and_component
                 for pt in &q.ports { add(pt.p); }
                 if let Some(c) = q.corner { add(c); }
                 // A one-port part (cap, blind) is written with its closed end as a second point.
-                if q.ports.len() == 1 { add(crate::parts::sub(q.ports[0].p, crate::parts::mul(q.ports[0].d, q.length))); }
+                if q.ports.len() == 1 && !matches!(q.kind, "weldolet" | "sockolet") { add(crate::parts::sub(q.ports[0].p, crate::parts::mul(q.ports[0].d, q.length))); }
             }
             assert_eq!(r.nodes.len(), pts.len(), "{} {}: nodes", ex.name, l.number);
             for n in &r.nodes { assert!(pts.iter().any(|x| (0..3).all(|k| (x[k] - n[k]).abs() < 2e-5)), "{} {}: node {n:?} not ours", ex.name, l.number); }
@@ -44,7 +44,7 @@ fn each_examples_pcf_reads_in_datum_pipe_with_the_same_nodes_sizes_and_component
                 let want = crate::parts::dist(e.ports[0].p, e.corner.unwrap()) / (std::f64::consts::FRAC_PI_4 * if e.kind == "elbow90" { 1.0 } else { 0.5 }).tan();
                 assert!((rr - want).abs() < 1e-4, "bend radius {rr} vs {want}");
             }
-            assert_eq!(r.tees.len(), ours.iter().filter(|q| q.kind == "tee").count());
+            assert_eq!(r.tees.len(), ours.iter().filter(|q| matches!(q.kind, "tee" | "cross" | "weldolet" | "sockolet")).count());
             let count = |k: reader::Rigid| r.pieces.iter().filter(|x| x.rigid == Some(k)).count();
             assert_eq!(count(reader::Rigid::Valve), ours.iter().filter(|q| matches!(q.kind, "gate" | "globe" | "check" | "ball")).count());
             assert_eq!(count(reader::Rigid::Flange), ours.iter().filter(|q| matches!(q.kind, "flange" | "blind")).count());
