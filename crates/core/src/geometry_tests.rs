@@ -738,3 +738,31 @@ fn every_part_has_its_weight() {
         assert!(pcf.contains("    WEIGHT "), "{}", ex.id);
     }
 }
+
+#[test]
+fn butterfly_valves_are_short_and_go_to_datum_pipe() {
+    let cat = Catalogue::builtin();
+    assert!(cat.warnings.is_empty(), "{:?}", cat.warnings);
+    // Short pattern from the table; every long-pattern length in its source equals the gate valve's.
+    assert!((cat.valve_length("butterfly", "6", 150).unwrap() / 0.0254 - 5.51).abs() < 1e-9);
+    assert!(cat.valve_length("butterfly", "6", 150).unwrap() < cat.valve_length("gate", "6", 150).unwrap() * 0.6);
+    let mut p = line("6", vec![[0.0, 0.0, 3.0], [8.0, 0.0, 3.0]], vec![Item { dir: [0.0, 0.0, 1.0], ..item(5, ItemKind::Butterfly, 0, 4.0) }]);
+    p.lines[0].from = End::Point { term: Term::Blind };
+    p.lines[0].to = End::Point { term: Term::Blind };
+    let b = build(&p, &cat);
+    joints_ok(&b);
+    let v = of(&b, "butterfly");
+    assert_eq!(v.len(), 1);
+    assert!((v[0].length - 5.51 * 0.0254).abs() < 1e-6, "{}", v[0].length);
+    assert!(crate::checks::run(&p, &cat, &build(&p, &cat)).iter().all(|i| i.kind != "class"), "CS1 allows 6\" butterfly valves");
+    // Stem down is reported, as for other valves with a stem.
+    let mut q = p.clone();
+    q.lines[0].items[0].dir = [0.0, 0.0, -1.0];
+    assert!(crate::checks::run(&q, &cat, &build(&q, &cat)).iter().any(|i| i.text.contains("butterfly valve's stem points down")));
+    // PCF: a VALVE with SKEY VYFL, read back as a butterfly valve.
+    let pcf = crate::pcf::write(&p, &cat, None).unwrap();
+    assert!(pcf.contains("VALVE\n") && pcf.contains("SKEY VYFL"), "{pcf}");
+    let mut n = 100;
+    let (lines, _) = crate::pcf::import::read(&pcf, &Project::new(), &cat, &mut || { n += 1; n }).unwrap();
+    assert!(lines.iter().flat_map(|l| &l.items).any(|i| i.kind == ItemKind::Butterfly));
+}

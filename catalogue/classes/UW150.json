@@ -85,6 +85,11 @@
       "max": "8"
     },
     {
+      "kind": "butterfly",
+      "min": "3",
+      "max": "24"
+    },
+    {
       "kind": "cross"
     },
     {

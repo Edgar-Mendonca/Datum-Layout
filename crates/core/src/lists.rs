@@ -60,7 +60,7 @@ pub fn part_kg(cat: &Catalogue, q: &Part, sched: &str, material: &str) -> Option
         "weldolet" | "sockolet" => cat.olet(q.kind, &q.nps2, q.nps2 == q.nps)?.weight_lb.map(|lb| (lb * crate::catalogue::LB, false)),
         "flange" => cat.rated_kg("flange_wn", &q.nps, r).map(|k| (k, false)),
         "blind" => cat.rated_kg("flange_blind", &q.nps, r).map(|k| (k, false)),
-        "gate" | "globe" | "check" | "ball" => cat.rated_kg(q.kind, &q.nps, r).map(|k| (k, false)),
+        "gate" | "globe" | "check" | "ball" | "butterfly" => cat.rated_kg(q.kind, &q.nps, r).map(|k| (k, false)),
         _ => None,
     }
 }
@@ -89,6 +89,7 @@ fn describe(q: &Part, class: &str, sched: &str, material: &str) -> Option<(&'sta
         "globe" => ("Valves", format!("Globe valve, class {r}, flanged RF")),
         "check" => ("Valves", format!("Check valve, swing, class {r}, flanged RF")),
         "ball" => ("Valves", format!("Ball valve, class {r}, flanged RF")),
+        "butterfly" => ("Valves", format!("Butterfly valve, triple offset, class {r}, double flanged RF, short pattern")),
         "strainer" => ("Valves", format!("Strainer, Y-type, class {r}, flanged RF")),
         "support" => ("Supports", match q.note.as_str() { "ANC" => "Pipe support: anchor", "GUI" => "Pipe support: guide", "LST" => "Pipe support: line stop", _ => "Pipe support: rest (shoe)" }.to_string()),
         _ => { let _ = class; return None }
@@ -109,7 +110,7 @@ pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
             *welds.entry((line, x.ports[j].nps.clone())).or_default() += 1.0;
         }
     }
-    for q in b.parts.iter().filter(|q| matches!(q.kind, "gate" | "globe" | "check" | "ball" | "strainer") && q.item != 0) {
+    for q in b.parts.iter().filter(|q| matches!(q.kind, "gate" | "globe" | "check" | "ball" | "butterfly" | "strainer") && q.item != 0) {
         let Some(l) = p.line(q.line) else { continue };
         let it = l.items.iter().find(|i| i.id == q.item);
         let at = if q.ports.len() >= 2 { crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5) } else { q.ports.first().map(|x| x.p).unwrap_or_default() };

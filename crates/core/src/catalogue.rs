@@ -63,7 +63,7 @@ pub struct ReducerRow { pub nps: String, pub nps_small: String, pub h: f64, pub 
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct WeightRow { pub kind: String, pub nps: String, pub nps_small: String, pub wall: String, pub rating: u32, pub kg: f64, pub source: String }
 /// The kinds the weight table may hold.
-pub const WEIGHT_KINDS: &[&str] = &["elbow90_lr", "elbow90_sr", "elbow45_lr", "tee", "reducing_tee", "reducer", "flange_wn", "flange_blind", "gate", "globe", "check", "ball"];
+pub const WEIGHT_KINDS: &[&str] = &["elbow90_lr", "elbow90_sr", "elbow45_lr", "tee", "reducing_tee", "reducer", "flange_wn", "flange_blind", "gate", "globe", "check", "ball", "butterfly"];
 /// Pound (mass) in kilograms.
 pub const LB: f64 = 0.453_592_37;
 #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -243,7 +243,7 @@ impl Catalogue {
             },
             "valves.csv" => for (i, r) in table(name, text, &["kind", "rating", "nps", "face_to_face_in", "source"], w).into_iter().enumerate() {
                 let kind = r["kind"].to_lowercase();
-                match (["gate", "globe", "check", "ball"].contains(&kind.as_str()), r["rating"].parse::<u32>().ok(), size_ok(&r["nps"]), f(&r, "face_to_face_in")) {
+                match (["gate", "globe", "check", "ball", "butterfly"].contains(&kind.as_str()), r["rating"].parse::<u32>().ok(), size_ok(&r["nps"]), f(&r, "face_to_face_in")) {
                     (true, Some(rating), true, Some(l)) => {
                         let row = ValveRow { kind, rating, nps: r["nps"].clone(), f2f: l * IN, source: r["source"].clone() };
                         self.valves.retain(|v| !(v.kind == row.kind && v.rating == row.rating && v.nps == row.nps));

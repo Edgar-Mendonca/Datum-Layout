@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.2.9 — 2026-11-09
+Butterfly valves.
+
+**The valve.** A triple-offset butterfly valve, double flanged, short pattern, class 150, 300 and 600 from 3" (4" in class 600) to 24". It is less than half the length of a gate valve: 140 mm against 267 mm for a 6" class 150. Drop it from Fittings › Valves or the catalogue, as with any valve. It has a stem and a gearbox with a handwheel, turned the way you set; Check reports a stem pointing down.
+
+**Where it goes.** The valve list, the take-off and the plant package (`butterfly`). Datum Pipe gets a `VALVE` with SKEY `VYFL`, and a PCF read back keeps it a butterfly valve. Every example class rated to 600 allows it from 3" to 24".
+
+**Source.** Face-to-face lengths come from a manufacturer's dimension table as tabulated on wermac.org. The same table gives long-pattern lengths, and all 27 of those equal the gate valve lengths already in the catalogue, which come from a different manufacturer.
+
+Spectacle blinds, spades and spacers are not in this release. The only public tables found reproduce a standard, which the catalogue does not copy; they wait for a manufacturer's table.
+
 ## 0.2.8 — 2026-11-09
 Weights for every pipe, fitting, flange and gate valve, in the lists and in the file for Datum Pipe.
 

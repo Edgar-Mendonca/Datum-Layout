@@ -664,6 +664,16 @@ fn valve_shapes(run: &Run, k: ItemKind, v0: f64, len: f64, d: &Dimens, want: P3)
             let lever = rotate(run.u, stem, 0.0);
             s.push(Shape::Cuboid { centre: add(add(c, mul(stem, r * 1.65)), mul(lever, r * 1.6)), axes: [lever, stem, cross(lever, stem)], half: [r * 1.8, (r * 0.06).max(0.004), (r * 0.15).max(0.006)] });
         }
+        ItemKind::Butterfly => {
+            // The disc's stem and a gearbox with its handwheel.
+            let h = (r * 2.2).max(0.12);
+            s.push(Shape::tube(add(c, mul(stem, r * 1.5)), add(c, mul(stem, h)), (r * 0.12).max(0.008)));
+            let side = cross(run.u, stem);
+            s.push(Shape::Cuboid { centre: add(c, mul(stem, h + r * 0.35)), axes: [run.u, stem, side], half: [r * 0.45, r * 0.35, r * 0.5] });
+            let wheel = add(add(c, mul(stem, h + r * 0.35)), mul(side, r * 0.75));
+            let (u1, _) = frame(side);
+            s.push(Shape::Torus { centre: wheel, axis: side, start: mul(u1, (r * 0.7).max(0.05)), angle: std::f64::consts::TAU, r: (r * 0.06).max(0.005) });
+        }
         ItemKind::Check => {
             s.push(Shape::Cuboid { centre: add(c, mul(stem, r * 1.4)), axes: [run.u, stem, cross(run.u, stem)], half: [len * 0.22, r * 0.25, r * 0.9] });
         }

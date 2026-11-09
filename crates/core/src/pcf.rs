@@ -42,6 +42,7 @@ fn keyword(q: &Part) -> Option<(&'static str, &'static str)> {
         "globe" => ("VALVE", "VGFL"),
         "check" => ("VALVE", "CKFL"),
         "ball" => ("VALVE", "VBFL"),
+        "butterfly" => ("VALVE", "VYFL"),
         "strainer" => ("FILTER", "FYFL"),
         _ => return None,
     })
@@ -357,7 +358,7 @@ pub mod import {
     fn item_kind(c: &Comp) -> Option<ItemKind> {
         let k = c.kind.as_str();
         Some(if k == "VALVE" {
-            if c.skey.starts_with("CK") { ItemKind::Check } else if c.skey.starts_with("VG") { ItemKind::Globe } else if c.skey.starts_with("VB") { ItemKind::Ball } else { ItemKind::Gate }
+            if c.skey.starts_with("CK") { ItemKind::Check } else if c.skey.starts_with("VG") { ItemKind::Globe } else if c.skey.starts_with("VB") { ItemKind::Ball } else if c.skey.starts_with("VY") { ItemKind::Butterfly } else { ItemKind::Gate }
         } else if k == "FILTER" { ItemKind::Strainer } else if k == "CROSS" { ItemKind::Cross } else if k.starts_with("TEE") { ItemKind::Tee } else if k.starts_with("REDUCER") { ItemKind::Reducer } else { return None })
     }
 

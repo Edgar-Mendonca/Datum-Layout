@@ -368,6 +368,23 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("it goes to Datum Pipe as an OLET", (await ask("export_pcf", { line: hdr2.id })).ok.includes("OLET"));
   if (shots) { await p.keyboard.press("Escape"); await settle(200); await shot("weldolet"); }
 
+  // 7o. Butterfly valves (0.2.9): from the ribbon onto the selected 6" line; short, stem up, written as VYFL.
+  await open("pumps");
+  st = await state();
+  const bl = st.p.lines.find(l => l.number.includes("1005"));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(bl.number)})`); await settle(300);
+  await p.click('.tabs > button:has-text("Fittings")'); await p.click('.rb:has-text("Butterfly")'); await settle(800);
+  st = await state();
+  const bfv = st.p.lines.find(l => l.id === bl.id).items.find(i => i.kind === "butterfly");
+  check("a butterfly valve drops onto the selected line from the ribbon", !!bfv, JSON.stringify(st.p.lines.find(l => l.id === bl.id).items.map(i => i.kind)));
+  const bpcf = (await ask("export_pcf", { line: bl.id })).ok;
+  const vb = /VALVE\n    END-POINT (\S+) (\S+) (\S+) \S+\n    END-POINT (\S+) (\S+) (\S+) \S+\n    SKEY VYFL/.exec(bpcf);
+  const blen = vb ? Math.hypot(vb[4] - vb[1], vb[5] - vb[2], vb[6] - vb[3]) : 0;
+  check("it is short pattern (140 mm for 6\" class 150) and checks cleanly", Math.abs(blen - 140) < 1 && !st.issues.some(i => ["class", "routing"].includes(i.kind)), `${blen} ${JSON.stringify(st.issues.map(i => i.text))}`);
+  check("it goes to Datum Pipe as a butterfly VALVE", bpcf.includes("SKEY VYFL"));
+  if (shots) { await p.keyboard.press("Escape"); await settle(200); await shot("butterfly"); }
+
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
   const nv = (await ask("lists")).ok.valves.length;

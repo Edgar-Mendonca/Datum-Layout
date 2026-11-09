@@ -46,7 +46,7 @@ fn each_examples_pcf_reads_in_datum_pipe_with_the_same_nodes_sizes_and_component
             }
             assert_eq!(r.tees.len(), ours.iter().filter(|q| matches!(q.kind, "tee" | "cross" | "weldolet" | "sockolet")).count());
             let count = |k: reader::Rigid| r.pieces.iter().filter(|x| x.rigid == Some(k)).count();
-            assert_eq!(count(reader::Rigid::Valve), ours.iter().filter(|q| matches!(q.kind, "gate" | "globe" | "check" | "ball")).count());
+            assert_eq!(count(reader::Rigid::Valve), ours.iter().filter(|q| matches!(q.kind, "gate" | "globe" | "check" | "ball" | "butterfly")).count());
             assert_eq!(count(reader::Rigid::Flange), ours.iter().filter(|q| matches!(q.kind, "flange" | "blind")).count());
             assert_eq!(count(reader::Rigid::Rigid), ours.iter().filter(|q| q.kind == "strainer").count());
             assert_eq!(r.pieces.iter().filter(|x| x.to_nps.is_some()).count(), ours.iter().filter(|q| q.kind == "reducer").count());

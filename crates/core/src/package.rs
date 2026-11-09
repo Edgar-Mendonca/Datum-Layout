@@ -58,6 +58,7 @@ pub fn item_kind(k: &str) -> Option<ItemKind> {
         "globe" | "globe_valve" | "globevalve" => ItemKind::Globe,
         "check" | "check_valve" | "checkvalve" | "swing_check_valve" => ItemKind::Check,
         "ball" | "ball_valve" | "ballvalve" => ItemKind::Ball,
+        "butterfly" | "butterfly_valve" | "butterflyvalve" => ItemKind::Butterfly,
         "strainer" | "y_strainer" | "ystrainer" => ItemKind::Strainer,
         "reducer" | "concentric_reducer" => ItemKind::Reducer,
         "tee" => ItemKind::Tee,
@@ -69,7 +70,7 @@ pub fn item_kind(k: &str) -> Option<ItemKind> {
     })
 }
 pub fn kind_word(k: ItemKind) -> &'static str {
-    match k { ItemKind::Gate => "gate", ItemKind::Globe => "globe", ItemKind::Check => "check", ItemKind::Ball => "ball", ItemKind::Strainer => "strainer", ItemKind::Reducer => "reducer", ItemKind::Tee => "tee", ItemKind::Cross => "cross", ItemKind::Weldolet => "weldolet", ItemKind::Sockolet => "sockolet", ItemKind::FlangePair => "flange_pair", ItemKind::Support => "support" }
+    match k { ItemKind::Gate => "gate", ItemKind::Globe => "globe", ItemKind::Check => "check", ItemKind::Ball => "ball", ItemKind::Butterfly => "butterfly", ItemKind::Strainer => "strainer", ItemKind::Reducer => "reducer", ItemKind::Tee => "tee", ItemKind::Cross => "cross", ItemKind::Weldolet => "weldolet", ItemKind::Sockolet => "sockolet", ItemKind::FlangePair => "flange_pair", ItemKind::Support => "support" }
 }
 
 fn size(s: &str) -> Option<&'static str> {

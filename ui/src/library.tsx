@@ -10,7 +10,7 @@ import { fmt } from "./units";
 type Page = { k: string; label: string; group: string; sub?: string };
 const mm = (m: number) => fmt("dim", m);
 const IT_NAME = { pipe: "Pipe", elbow90: "Elbow 90°", elbow45: "Elbow 45°", cap: "Cap", flange: "Weld-neck flange", blind: "Blind flange", gasket: "Gasket", bolts: "Stud bolts", ...Object.fromEntries(ITEMS.map(([k, l]) => [k, l.replace(/ \(.*\)$/, "")])) } as Record<string, string>;
-const VALVE: Record<string, string> = { gate: "Gate", globe: "Globe", check: "Check (swing)", ball: "Ball", strainer: "Strainer (Y)" };
+const VALVE: Record<string, string> = { gate: "Gate", globe: "Globe", check: "Check (swing)", ball: "Ball", butterfly: "Butterfly (triple offset, short pattern)", strainer: "Strainer (Y)" };
 /** The class's schedule for a size: the last "from this size" entry not above it (the engine's rule). */
 const schedOf = (c: PipeClass, s: string) => [...c.schedules].reverse().find(([from]) => NPS.indexOf(from) <= NPS.indexOf(s))?.[1] ?? "STD";
 const byNps = (a: { nps: string }, b: { nps: string }) => NPS.indexOf(a.nps) - NPS.indexOf(b.nps);

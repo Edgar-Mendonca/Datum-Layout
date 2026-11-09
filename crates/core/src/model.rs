@@ -175,6 +175,8 @@ pub enum ItemKind {
     /// A pipe support at a point of a run (it takes no length; the pipe is split there so the
     /// stress model has a node).
     Support,
+    /// A butterfly valve (double flanged, short pattern): a short body, a disc on a stem, a gearbox.
+    Butterfly,
 }
 
 /// A reducer's flat side: none (concentric), on top or at the bottom (eccentric).
@@ -223,6 +225,7 @@ impl ItemKind {
             ItemKind::Weldolet => "weldolet",
             ItemKind::Sockolet => "sockolet",
             ItemKind::Support => "support",
+            ItemKind::Butterfly => "butterfly",
         }
     }
     pub fn name(self) -> &'static str {
@@ -239,6 +242,7 @@ impl ItemKind {
             ItemKind::Weldolet => "Weldolet",
             ItemKind::Sockolet => "Sockolet",
             ItemKind::Support => "Pipe support",
+            ItemKind::Butterfly => "Butterfly valve",
         }
     }
     /// How many branches it has: tees and outlets one, a cross two.
@@ -247,7 +251,7 @@ impl ItemKind {
     }
     pub fn olet(self) -> bool { matches!(self, ItemKind::Weldolet | ItemKind::Sockolet) }
     pub fn valve(self) -> bool {
-        matches!(self, ItemKind::Gate | ItemKind::Globe | ItemKind::Check | ItemKind::Ball | ItemKind::Strainer)
+        matches!(self, ItemKind::Gate | ItemKind::Globe | ItemKind::Check | ItemKind::Ball | ItemKind::Butterfly | ItemKind::Strainer)
     }
     pub fn flanged(self) -> bool {
         self.valve() || self == ItemKind::FlangePair

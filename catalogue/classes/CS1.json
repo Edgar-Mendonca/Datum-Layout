@@ -99,6 +99,11 @@
       "max": "12"
     },
     {
+      "kind": "butterfly",
+      "min": "3",
+      "max": "24"
+    },
+    {
       "kind": "cross"
     },
     {

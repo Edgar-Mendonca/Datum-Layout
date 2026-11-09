@@ -45,7 +45,7 @@ pub fn connections(b: &Built) -> HashMap<(usize, usize), (usize, usize)> {
 fn kind_name(kind: &str) -> &str {
     match kind {
         "elbow90" => "90° elbow", "elbow45" => "45° elbow", "flange" => "flange", "gasket" => "gasket", "pipe" => "pipe", "tee" => "tee", "reducer" => "reducer",
-        "cap" => "cap", "blind" => "blind flange", "gate" => "gate valve", "globe" => "globe valve", "check" => "check valve", "ball" => "ball valve", "strainer" => "strainer",
+        "cap" => "cap", "blind" => "blind flange", "gate" => "gate valve", "globe" => "globe valve", "check" => "check valve", "ball" => "ball valve", "butterfly" => "butterfly valve", "strainer" => "strainer",
         "nozzle" => "nozzle", "equipment" => "", k => k,
     }
 }
@@ -152,7 +152,7 @@ pub fn design_rules(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
         let mid = if q.ports.len() >= 2 { crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5) } else { q.ports.first().map(|x| x.p).unwrap_or_default() };
         let iss = |text: String| Issue { kind: "rule", text, at: mid, line: q.line, item: q.item, equip: 0 };
         match q.kind {
-            "gate" | "globe" | "ball" if q.item != 0 => {
+            "gate" | "globe" | "ball" | "butterfly" if q.item != 0 => {
                 let it = p.line(q.line).and_then(|l| l.items.iter().find(|i| i.id == q.item));
                 if it.is_some_and(|i| i.dir[2] < -0.5) {
                     out.push(iss(format!("Line {}: the {} valve's stem points down; turn it up or sideways, where it can be reached and its bonnet stays clean.", name(q.line), q.kind)));

@@ -17,7 +17,7 @@ export interface Dims { d: number; l: number; h: number; elev: number; d2: numbe
 export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number }
 export type Term = "open" | "cap" | "blind";
 export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number; port?: number };
-export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "cross" | "weldolet" | "sockolet" | "support";
+export type ItemKind = "gate" | "globe" | "check" | "ball" | "butterfly" | "strainer" | "flange_pair" | "tee" | "reducer" | "cross" | "weldolet" | "sockolet" | "support";
 export type SupportKind = "rest" | "guide" | "stop" | "anchor";
 export const SUPPORTS: [SupportKind, string][] = [["rest", "Rest (shoe)"], ["guide", "Guide"], ["stop", "Line stop"], ["anchor", "Anchor"]];
 export type Flat = "none" | "top" | "bottom";
@@ -65,7 +65,7 @@ export const NPS = ["1/2", "3/4", "1", "1-1/4", "1-1/2", "2", "2-1/2", "3", "3-1
 export const inch = (n: string) => n.replace("1/2", "½").replace("3/4", "¾").replace("1/4", "¼").replace("-", " ") + "\"";
 
 export const ITEMS: [ItemKind, string, string][] = [
-  ["gate", "Gate valve", "valve"], ["globe", "Globe valve", "globe"], ["check", "Check valve", "chkvalve"], ["ball", "Ball valve", "ball"],
+  ["gate", "Gate valve", "valve"], ["globe", "Globe valve", "globe"], ["check", "Check valve", "chkvalve"], ["ball", "Ball valve", "ball"], ["butterfly", "Butterfly valve", "butterfly"],
   ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"], ["cross", "Cross (two branches)", "cross"], ["weldolet", "Weldolet (branch outlet)", "weldolet"], ["sockolet", "Sockolet (small branch)", "sockolet"],
   ["support", "Pipe support", "support"],
 ];

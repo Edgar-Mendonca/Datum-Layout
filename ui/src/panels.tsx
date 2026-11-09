@@ -37,9 +37,9 @@ export const CataloguePanel = () => {
         <h4>Equipment</h4>
         <div class="catgrid"><For each={EQUIP}>{([k, l, i]) => <Tile type="equip" kind={k} label={l} icon={i} hint={`${l}: drag onto the plot, or click and then click the plot`} run={() => C.place(k)} />}</For></div>
         <h4>Valves</h4>
-        <div class="catgrid"><For each={ITEMS.slice(0, 5)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe; it snaps, takes the line's size and class and splits the pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
+        <div class="catgrid"><For each={ITEMS.slice(0, 6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe; it snaps, takes the line's size and class and splits the pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
         <h4>Fittings</h4>
-        <div class="catgrid"><For each={ITEMS.slice(5)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
+        <div class="catgrid"><For each={ITEMS.slice(6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
         <Show when={!q()}>
           <h4>Pipe classes <Help k="spec" /></h4>
           <For each={catalogue()?.cat.classes ?? []}>{c => <div class="catclass" role="button" title="Open in the Library" onClick={() => import("./library").then(k => k.library(`class:${c.name}`))}><b>{c.name}</b><span>{c.description}</span><small>{inch(c.sizes[0] ?? "")}–{inch(c.sizes[c.sizes.length - 1] ?? "")} · class {c.ratings.join(", ")}</small></div>}</For>
@@ -267,7 +267,7 @@ export const BottomPanel = () => {
         <Show when={bottom() === "valves"}>
           <table class="tbl lst"><thead><tr><th>Tag</th><th>Type</th><th>Size</th><th>Class</th><th>Line</th><th class="r">E</th><th class="r">N</th><th class="r">EL</th><th>Stem</th></tr></thead><tbody>
             <For each={lists()?.valves ?? []} fallback={<tr><td colSpan={9} class="muted">No valves yet: drag them from the catalogue onto a pipe.</td></tr>}>{v => <tr class="f" classList={{ on: sel()?.kind === "item" && (sel() as { id: number }).id === v.item }} onClick={() => setSel({ kind: "item", id: v.item, line: v.line_id })}>
-              <td>{v.tag || <i class="muted">no tag</i>}</td><td>{({ gate: "Gate", globe: "Globe", check: "Check (swing)", ball: "Ball", strainer: "Strainer (Y)" } as Record<string, string>)[v.kind] ?? v.kind}</td><td>{inch(v.nps)}</td><td>{v.rating}</td><td>{v.line}</td>
+              <td>{v.tag || <i class="muted">no tag</i>}</td><td>{({ gate: "Gate", globe: "Globe", check: "Check (swing)", ball: "Ball", butterfly: "Butterfly", strainer: "Strainer (Y)" } as Record<string, string>)[v.kind] ?? v.kind}</td><td>{inch(v.nps)}</td><td>{v.rating}</td><td>{v.line}</td>
               <For each={[0, 1, 2]}>{k => <td class="r mono">{toU("coord", v.at[k]).toFixed(3)}</td>}</For><td>{v.stem}</td></tr>}</For>
           </tbody></table>
         </Show>
