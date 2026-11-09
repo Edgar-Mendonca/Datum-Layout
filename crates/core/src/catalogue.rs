@@ -59,6 +59,13 @@ pub struct BranchRule { pub header_min: Option<String>, pub header_max: Option<S
 /// A reducer by its two sizes: end-to-end length (concentric and eccentric alike).
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ReducerRow { pub nps: String, pub nps_small: String, pub h: f64, pub source: String }
+/// A part's weight (kg) by kind, size, wall (fittings: STD or XS) and rating (flanges, valves).
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct WeightRow { pub kind: String, pub nps: String, pub nps_small: String, pub wall: String, pub rating: u32, pub kg: f64, pub source: String }
+/// The kinds the weight table may hold.
+pub const WEIGHT_KINDS: &[&str] = &["elbow90_lr", "elbow90_sr", "elbow45_lr", "tee", "reducing_tee", "reducer", "flange_wn", "flange_blind", "gate", "globe", "check", "ball"];
+/// Pound (mass) in kilograms.
+pub const LB: f64 = 0.453_592_37;
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ValveRow { pub kind: String, pub rating: u32, pub nps: String, pub f2f: f64, pub source: String }
 
@@ -122,6 +129,7 @@ pub struct Catalogue {
     pub tees: Vec<TeeRow>,
     pub olets: Vec<OletRow>,
     pub reducers: Vec<ReducerRow>,
+    pub weights: Vec<WeightRow>,
     pub classes: Vec<PipeClass>,
     pub packs: Vec<String>,
     pub warnings: Vec<String>,
@@ -182,6 +190,7 @@ impl Catalogue {
         c.add_table("tees_reducing.csv", include_str!("../../../catalogue/tees_reducing.csv"));
         c.add_table("reducers.csv", include_str!("../../../catalogue/reducers.csv"));
         c.add_table("olets.csv", include_str!("../../../catalogue/olets.csv"));
+        c.add_table("weights.csv", include_str!("../../../catalogue/weights.csv"));
         c.add_class("classes/CS1.json", include_str!("../../../catalogue/classes/CS1.json"));
         c.add_class("classes/CS150.json", include_str!("../../../catalogue/classes/CS150.json"));
         c.add_class("classes/CS300.json", include_str!("../../../catalogue/classes/CS300.json"));
@@ -274,7 +283,21 @@ impl Catalogue {
                     _ => bad(w, i, "a size or length is not valid (the small end must be smaller)"),
                 }
             },
-            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing, reducers or olets .csv).")),
+            "weights.csv" => for (i, r) in table(name, text, &["kind", "nps", "weight_kg", "source"], w).into_iter().enumerate() {
+                let kind = r["kind"].to_lowercase();
+                let small = r.get("nps_small").cloned().unwrap_or_default();
+                let wall = r.get("wall").map(|s| s.to_uppercase()).unwrap_or_default();
+                let rating = r.get("rating").and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+                match (WEIGHT_KINDS.contains(&kind.as_str()), size_ok(&r["nps"]), small.is_empty() || (size_ok(&small) && nps_index(&small) < nps_index(&r["nps"])), f(&r, "weight_kg")) {
+                    (true, true, true, Some(kg)) if kg < 100_000.0 => {
+                        let row = WeightRow { kind, nps: r["nps"].clone(), nps_small: small, wall, rating, kg, source: r["source"].clone() };
+                        self.weights.retain(|x| !(x.kind == row.kind && x.nps == row.nps && x.nps_small == row.nps_small && x.wall == row.wall && x.rating == row.rating));
+                        self.weights.push(row);
+                    }
+                    _ => bad(w, i, "the kind, size or weight is not valid"),
+                }
+            },
+            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing, reducers, olets or weights .csv).")),
         }
     }
 
@@ -332,6 +355,34 @@ impl Catalogue {
     pub fn reducer_h(&self, a: &str, b: &str) -> Option<f64> {
         let (big, small) = if nps_index(a) >= nps_index(b) { (a, b) } else { (b, a) };
         self.reducers.iter().find(|t| t.nps == big && t.nps_small == small).map(|t| t.h)
+    }
+    /// The wall of a size in a schedule (m).
+    pub fn wall(&self, nps: &str, schedule: &str) -> Option<f64> {
+        self.pipes.iter().find(|p| p.nps == nps && p.schedule == schedule).map(|p| p.wall)
+    }
+    /// Pipe mass per metre (kg/m) from its outside diameter and wall: π (D − t) t ρ.
+    pub fn pipe_kg_m(&self, nps: &str, schedule: &str, density: f64) -> Option<f64> {
+        let p = self.pipes.iter().find(|p| p.nps == nps && p.schedule == schedule)?;
+        Some(std::f64::consts::PI * (p.od - p.wall) * p.wall * density)
+    }
+    /// A butt-weld fitting's weight (kg) in a schedule, and whether it is estimated: the STD or XS
+    /// row when the schedule's wall is that wall; otherwise the nearest of the two scaled by the wall.
+    pub fn fitting_kg(&self, kind: &str, nps: &str, small: &str, schedule: &str) -> Option<(f64, bool)> {
+        let row = |wall: &str| self.weights.iter().find(|x| x.kind == kind && x.nps == nps && x.nps_small == small && x.wall == wall).map(|x| x.kg);
+        let t = self.wall(nps, schedule);
+        let (ts, tx) = (self.wall(nps, "STD"), self.wall(nps, "XS"));
+        let same = |a: Option<f64>, b: Option<f64>| matches!((a, b), (Some(a), Some(b)) if (a - b).abs() < 1e-5);
+        if (same(t, ts) || schedule == "STD") && row("STD").is_some() { return Some((row("STD")?, false)); }
+        if (same(t, tx) || schedule == "XS") && row("XS").is_some() { return Some((row("XS")?, false)); }
+        let t = t?;
+        let mut options: Vec<(f64, f64)> = [(ts, row("STD")), (tx, row("XS"))].into_iter().filter_map(|(w, kg)| Some((w?, kg?))).collect();
+        options.sort_by(|a, b| (a.0 - t).abs().total_cmp(&(b.0 - t).abs()));
+        let (w, kg) = *options.first()?;
+        Some((kg * t / w, true))
+    }
+    /// A flange's or valve's weight (kg) by kind, size and rating, when the table lists it.
+    pub fn rated_kg(&self, kind: &str, nps: &str, rating: u32) -> Option<f64> {
+        self.weights.iter().find(|x| x.kind == kind && x.nps == nps && x.rating == rating).map(|x| x.kg)
     }
     pub fn fitting(&self, nps: &str) -> Option<&FittingRow> {
         self.fittings.iter().find(|p| p.nps == nps)

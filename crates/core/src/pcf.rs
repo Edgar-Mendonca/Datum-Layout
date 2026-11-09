@@ -54,6 +54,8 @@ pub fn write(p: &Project, cat: &Catalogue, line: Option<u32>) -> Result<String, 
     if lines.is_empty() { return Err(if line.is_some() { "That line no longer exists.".into() } else { "The plant has no lines yet.".into() }); }
     let mut s = String::from("ISOGEN-FILES ISOGEN.FLS\nUNITS-BORE MM\nUNITS-CO-ORDS MM\nUNITS-WEIGHT KGS\nUNITS-BOLT-DIA MM\nUNITS-BOLT-LENGTH MM\n");
     for l in lines {
+        let class = cat.class(&l.class);
+        let material = class.map(|c| c.material.clone()).unwrap_or_default();
         let number = if l.number.trim().is_empty() { format!("LINE-{}", l.id) } else { l.number.replace(char::is_whitespace, "_") };
         s += &format!("PIPELINE-REFERENCE {number}\n    PIPING-SPEC {}\n", l.class);
         for q in b.parts.iter().filter(|q| q.line == l.id) {
@@ -93,6 +95,10 @@ pub fn write(p: &Project, cat: &Catalogue, line: Option<u32>) -> Result<String, 
             if q.kind.starts_with("elbow") { s += &format!("    ANGLE {:.0}\n", if q.kind == "elbow90" { 90 } else { 45 }); }
             if q.note.starts_with("FLAT") { s += &format!("    FLAT-DIRECTION {}\n", if q.note == "FLAT-TOP" { "UP" } else { "DOWN" }); }
             if q.rating > 0 { s += &format!("    ITEM-DESCRIPTION CLASS {} {}\n", q.rating, q.kind.to_uppercase()); }
+            if q.kind != "pipe" {
+                let sched = class.map(|c| c.schedule(&q.nps)).unwrap_or_else(|| "STD".into());
+                if let Some((kg, _)) = crate::lists::part_kg(cat, q, &sched, &material) { s += &format!("    WEIGHT {kg:.2}\n"); }
+            }
         }
     }
     Ok(s)

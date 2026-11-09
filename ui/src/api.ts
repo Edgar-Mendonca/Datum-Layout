@@ -37,13 +37,14 @@ export interface Scene { pos: string; nor: string; idx: string; parts: PartRef[]
 export interface PipeRow { nps: string; dn: number; od: number; schedule: string; wall: number; source: string }
 export interface BranchRule { header_min?: string | null; header_max?: string | null; branch?: string | null; branch_min?: string | null; branch_max?: string | null; fitting: string }
 export interface PipeClass { branches?: BranchRule[]; name: string; description: string; material: string; ratings: number[]; sizes: string[]; schedules: [string, string][]; elbow: string; components: { kind: string; min: string | null; max: string | null }[]; source: string }
-export interface Catalogue { pipes: PipeRow[]; fittings: any[]; flanges: any[]; valves: any[]; tees: { nps: string; nps_branch: string; c: number; m: number; source: string }[]; reducers: { nps: string; nps_small: string; h: number; source: string }[]; olets: { kind: string; same: boolean; nps_branch: string; height: number; base_od: number; top_od: number; weight_lb: number | null; source: string }[]; classes: PipeClass[]; packs: string[]; warnings: string[] }
+export interface Catalogue { pipes: PipeRow[]; fittings: any[]; flanges: any[]; valves: any[]; tees: { nps: string; nps_branch: string; c: number; m: number; source: string }[]; reducers: { nps: string; nps_small: string; h: number; source: string }[]; olets: { kind: string; same: boolean; nps_branch: string; height: number; base_od: number; top_od: number; weight_lb: number | null; source: string }[]; weights: WeightRow[]; classes: PipeClass[]; packs: string[]; warnings: string[] }
 export interface CatalogueOut { cat: Catalogue; fields: [EquipKind, string, [string, string][]][] }
 
-export interface LineRow { id: number; number: string; from: string; to: string; nps: string; class: string; rating: number; fluid: string; insulation: number; length: number; components: number }
+export interface LineRow { id: number; number: string; from: string; to: string; nps: string; class: string; rating: number; fluid: string; insulation: number; length: number; components: number; weight: number; unweighed: number }
 export interface NozzleRow { tag: string; nps: string; rating: number; facing: string; service: string; at: V3; dir: V3; line: string }
 export interface EquipRow { id: number; tag: string; kind: string; at: V3; rot: number; sizes: [string, number][]; data: [string, string][]; nozzles: NozzleRow[] }
-export interface MtoRow { line: string; group: string; what: string; nps: string; qty: number; unit: string }
+export interface MtoRow { line: string; group: string; what: string; nps: string; qty: number; unit: string; unit_kg: number | null; kg: number | null; est: boolean }
+export interface WeightRow { kind: string; nps: string; nps_small: string; wall: string; rating: number; kg: number; source: string }
 export interface ValveRow { line_id: number; item: number; tag: string; kind: string; nps: string; rating: number; line: string; at: V3; stem: string }
 export interface Lists { lines: LineRow[]; equipment: EquipRow[]; mto: MtoRow[]; valves: ValveRow[] }
 

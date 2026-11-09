@@ -215,7 +215,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   // 7h. The Library (0.2.0): classes and parts tables with their sources.
   await open("pumps");
   await p.click('.flow button[data-tool="library"]'); await settle(600);
-  check("the Library lists every pipe class and the seven parts tables", (await p.$$('.libx .mlist > button')).length === 15, String((await p.$$('.libx .mlist > button')).length));
+  check("the Library lists every pipe class and the eight parts tables", (await p.$$('.libx .mlist > button')).length === 16, String((await p.$$('.libx .mlist > button')).length));
   await p.click('.libx .mlist > button:has-text("CS300")'); await settle(300);
   const lt = await p.textContent(".libpage");
   check("a class page shows its wall by size and allowed components", lt.includes("Class 300") && /½"\s*80/.test(lt) && lt.includes("Gate valve"), lt.slice(0, 300));
@@ -497,7 +497,15 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   if (shots) { await p.click(".bbody tr.f >> nth=0"); await settle(400); await p.click(".tabs > button:has-text(\"Lists\")"); await shot("line-list"); }
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(400);
   check("example 1: the equipment list shows every nozzle", (await p.textContent(".bbody")).includes("P-101A") && (await p.$$(".bbody tr.f")).length >= 7);
-  await p.click("label:has-text(\"Material take-off\") >> nth=0").catch(() => {});
+  // 8b. Weights (0.2.8): the line list and the take-off show them; the PCF carries them to Datum Pipe.
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);
+  check("the line list shows each line's empty weight", /Weight \(kg\)/.test(await p.textContent(".bbody thead")) && (await p.$$eval(".bbody tr.f", rs => rs.every(r => Number(r.lastElementChild.textContent.replace("+", "")) > 0))));
+  await p.click("label:has-text(\"Material take-off\") >> nth=0"); await settle(300);
+  const mtoText = await p.textContent(".bbody");
+  check("the take-off weighs pipe, elbows, flanges and gate valves", (await p.$$eval(".bbody tbody tr", rs => rs.filter(r => /^(Pipe|Elbow|Flange, weld|Gate)/.test(r.children[2].textContent) && r.lastElementChild.textContent === "—").length)) === 0 && mtoText.includes("Gate valve"));
+  if (shots) await shot("take-off-weights");
+  await p.click("label:has-text(\"Material take-off\") >> nth=0"); await settle(200);
+  check("valves and flanges go to Datum Pipe with their weight", /VALVE\n(?:    .*\n)*?    WEIGHT \d/.test((await ask("export_pcf", {})).ok));
 
   // 9. Export the discharge line for Datum Pipe.
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);

@@ -22,6 +22,8 @@ const Tbl = (p: { head: string[]; rows: (string | JSX.Element)[][]; right?: numb
 );
 
 /** Help › Library (or the steps bar's Library): the pipe classes and the parts tables. */
+const WKIND: Record<string, string> = { elbow90_lr: "Elbow 90° long radius", elbow90_sr: "Elbow 90° short radius", elbow45_lr: "Elbow 45°", tee: "Tee, equal", reducing_tee: "Tee, reducing", reducer: "Reducer", flange_wn: "Flange, weld neck", flange_blind: "Flange, blind", gate: "Gate valve", globe: "Globe valve", check: "Check valve", ball: "Ball valve" };
+
 export const library = (start?: string) => openDialog(() => {
   const [c] = createResource(() => call<CatalogueOut>("catalogue"));
   const [q, setQ] = createSignal("");
@@ -38,6 +40,7 @@ export const library = (start?: string) => openDialog(() => {
       { k: "reducers", label: "Reducers", group: "Parts tables", sub: `${k.reducers.length} pairs` },
       { k: "olets", label: "Branch outlets", group: "Parts tables", sub: `${k.olets.length} rows` },
       { k: "valves", label: "Valves and strainers", group: "Parts tables", sub: `${k.valves.length} rows` },
+      { k: "weights", label: "Weights", group: "Parts tables", sub: `${k.weights.length} rows` },
     ];
   });
   const shownPages = () => { const t = q().toLowerCase(); return pages().filter(x => !t || `${x.label} ${x.sub ?? ""} ${x.group}`.toLowerCase().includes(t) || !x.k.startsWith("class:")); };
@@ -93,6 +96,10 @@ export const library = (start?: string) => openDialog(() => {
           <Show when={page() === "valves"}>
             <h3>Valves and strainers <small class="muted">face to face, flanged, by size and class</small></h3>
             <Tbl head={["Type", "Size", "Class", "Face to face", "Source"]} right={[3]} rows={[...(cat()?.valves ?? [])].sort((a: any, b: any) => a.kind.localeCompare(b.kind) || a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.kind, VALVE[r.kind] ?? "", r.nps, inch(r.nps), r.rating)).map((r: any) => [VALVE[r.kind] ?? r.kind, inch(r.nps), String(r.rating), mm(r.f2f), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
+          <Show when={page() === "weights"}>
+            <h3>Weights <small class="muted">fittings by wall (STD, XS), flanges and valves by class; pipe is weighed from its diameter and wall</small></h3>
+            <p class="small muted">A schedule whose wall is neither STD nor XS is scaled by its wall from the nearer of the two (marked ≈ in the take-off). Weights are the makers' approximate figures: check them with your supplier.</p>
+            <Tbl head={["Part", "Size", "Wall or class", "Weight", "Source"]} right={[3]} rows={(cat()?.weights ?? []).filter(r => has(WKIND[r.kind] ?? r.kind, r.nps, inch(r.nps), r.nps_small, r.wall, r.rating || "")).map(r => [WKIND[r.kind] ?? r.kind, r.nps_small ? `${inch(r.nps)} × ${inch(r.nps_small)}` : inch(r.nps), r.wall || `class ${r.rating}`, fmt("mass", r.kg), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
           <p class="muted small">Every part is generated from these tables: nothing is downloaded or bundled, and no standard's tables or text are reproduced. Check dimensions against your supplier's data before ordering or building.</p>
         </div>
       </div>

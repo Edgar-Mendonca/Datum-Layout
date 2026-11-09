@@ -690,3 +690,51 @@ fn branch_outlets_follow_the_class_branch_table() {
     let iss = connection_issues(&p, &cat, &b);
     assert!(iss.iter().any(|i| i.kind == "class" && i.text.contains("with a weldolet, not a reducing tee")), "{iss:?}");
 }
+
+#[test]
+fn every_part_has_its_weight() {
+    let cat = Catalogue::builtin();
+    assert!(cat.warnings.is_empty(), "{:?}", cat.warnings);
+    assert!(cat.weights.len() >= 700, "{}", cat.weights.len());
+    // Pipe from its diameter and wall agrees with the published weight per metre (wermac.org's
+    // B36.10 weight table, kg/m, STD and XS, 1/2" to 2") within 1.5 %.
+    for (nps, std, xs) in [("1/2", 1.27, 1.62), ("3/4", 1.69, 2.20), ("1", 2.50, 3.24), ("1-1/4", 3.39, 4.47), ("1-1/2", 4.05, 5.41), ("2", 5.44, 7.48)] {
+        for (sch, want) in [("STD", std), ("XS", xs)] {
+            let got = cat.pipe_kg_m(nps, sch, 7850.0).unwrap();
+            assert!((got / want - 1.0).abs() < 0.015, "{nps} {sch}: {got} vs {want}");
+        }
+    }
+    // Fittings: the STD row for a schedule with the STD wall; others scaled by the wall.
+    let lb = crate::catalogue::LB;
+    let near = |got: Option<(f64, bool)>, lbs: f64| got.is_some_and(|(k, e)| !e && (k - lbs * lb).abs() < 0.001);
+    assert!(near(cat.fitting_kg("elbow90_lr", "6", "", "40"), 24.5));
+    assert!(near(cat.fitting_kg("elbow90_lr", "6", "", "80"), 35.0));
+    let (thin, est) = cat.fitting_kg("elbow90_lr", "6", "", "10").unwrap();
+    assert!(est && thin < 24.5 * lb * 0.6, "{thin}");
+    assert!(cat.rated_kg("flange_wn", "6", 150).unwrap() > 11.0 && cat.rated_kg("flange_wn", "6", 300).unwrap() > cat.rated_kg("flange_wn", "6", 150).unwrap());
+    // Heavier walls and higher classes weigh more; every row grows with size within its kind.
+    for k in crate::catalogue::WEIGHT_KINDS {
+        let mut rows: Vec<_> = cat.weights.iter().filter(|w| w.kind == *k && w.nps_small.is_empty()).collect();
+        rows.sort_by_key(|w| (w.wall.clone(), w.rating, crate::catalogue::nps_index(&w.nps)));
+        for p in rows.windows(2) {
+            if p[0].wall == p[1].wall && p[0].rating == p[1].rating { assert!(p[1].kg >= p[0].kg * 0.95, "{k}: {} {} then {} {}", p[0].nps, p[0].kg, p[1].nps, p[1].kg); }
+        }
+    }
+    // In the examples, every pipe, fitting, flange and gate valve has a weight, and the take-off adds up.
+    for ex in crate::examples::list() {
+        let p = crate::examples::get(ex.id).unwrap();
+        let l = crate::lists::lists(&p, &cat);
+        for r in &l.mto {
+            if matches!(r.group, "Pipe" | "Flanges") || r.what.starts_with("Elbow") || r.what.starts_with("Tee") || r.what.starts_with("Reducer") || r.what.starts_with("Gate") {
+                assert!(r.kg.is_some_and(|k| k > 0.0), "{}: {} {} has no weight", ex.id, r.what, r.nps);
+            }
+        }
+        for line in &l.lines {
+            let sum: f64 = l.mto.iter().filter(|r| r.line == line.number).filter_map(|r| r.kg).sum();
+            assert!((sum - line.weight).abs() < 0.05 * l.mto.iter().filter(|r| r.line == line.number).count() as f64 + 1e-6, "{}: {} vs {}", line.number, sum, line.weight);
+            assert!(line.weight > 0.0);
+        }
+        let pcf = crate::pcf::write(&p, &cat, None).unwrap();
+        assert!(pcf.contains("    WEIGHT "), "{}", ex.id);
+    }
+}

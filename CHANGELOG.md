@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.2.8 — 2026-11-09
+Weights for every pipe, fitting, flange and gate valve, in the lists and in the file for Datum Pipe.
+
+**Where they show.** The line list has each line's empty (dry) weight; the material take-off has each row's, in the CSV and printed too. The PCF gives every component its `WEIGHT`, so Datum Pipe's analysis carries valves and flanges at their real weight.
+
+**Where they come from.** Pipe is weighed from its own diameter and wall. Its weights match the published B36.10 weights to within 1.5 %. Fittings (elbows, tees, reducers in standard weight and extra strong), weld-neck and blind flanges (class 150 to 2500) and flanged gate valves (class 150 to 600) come from a new weight table with 763 rows, each naming its source. Every row was checked: reducers against a second maker's table, and elbows, tees and blinds against the weight of their own steel. A schedule whose wall is neither STD nor XS is scaled by its wall; the take-off marks it ≈. The Library has the table under **Weights**.
+
+**Not yet weighed.** Globe, check and ball valves, gaskets, bolts and caps have no weight source yet; a + after a line's weight says so. Contents and insulation are not included: Datum Layout models geometry, not the process.
+
 ## 0.2.7 — 2026-11-09
 Weldolets and sockolets, and a branch table in every pipe class.
 

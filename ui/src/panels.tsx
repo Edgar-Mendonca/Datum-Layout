@@ -248,13 +248,13 @@ export const BottomPanel = () => {
       </nav>
       <div class="bbody">
         <Show when={bottom() === "lines" && !mto()}>
-          <table class="tbl lst"><thead><tr><th>Line number</th><th>From</th><th>To</th><th>Size</th><th>Class</th><th>Fluid</th><th class="r">Length ({unit("len")})</th><th class="r">Components</th></tr></thead><tbody>
-            <For each={lists()?.lines ?? []} fallback={<tr><td colSpan={8} class="muted">No lines yet: Piping › Route Line, then click a nozzle and the corners.</td></tr>}>{r => <tr class="f" classList={{ on: selLine()?.id === r.id }} onClick={() => setSel({ kind: "line", id: r.id })}><td>{r.number || <i class="muted">no number</i>}</td><td>{r.from}</td><td>{r.to}</td><td>{inch(r.nps)}</td><td>{r.class} / {r.rating}</td><td>{r.fluid}</td><td class="r mono">{toU("len", r.length).toFixed(2)}</td><td class="r mono">{r.components}</td></tr>}</For>
+          <table class="tbl lst"><thead><tr><th>Line number</th><th>From</th><th>To</th><th>Size</th><th>Class</th><th>Fluid</th><th class="r">Length ({unit("len")})</th><th class="r">Components</th><th class="r" title="Empty (dry) weight of pipe, fittings, flanges and valves that have a weight in the catalogue">Weight ({unit("mass")})</th></tr></thead><tbody>
+            <For each={lists()?.lines ?? []} fallback={<tr><td colSpan={9} class="muted">No lines yet: Piping › Route Line, then click a nozzle and the corners.</td></tr>}>{r => <tr class="f" classList={{ on: selLine()?.id === r.id }} onClick={() => setSel({ kind: "line", id: r.id })}><td>{r.number || <i class="muted">no number</i>}</td><td>{r.from}</td><td>{r.to}</td><td>{inch(r.nps)}</td><td>{r.class} / {r.rating}</td><td>{r.fluid}</td><td class="r mono">{toU("len", r.length).toFixed(2)}</td><td class="r mono">{r.components}</td><td class="r mono" title={r.unweighed ? `${r.unweighed} part${r.unweighed === 1 ? "" : "s"} (gaskets, bolts, caps or valves without a catalogue weight) not included` : "Every part included"}>{toU("mass", r.weight).toFixed(0)}{r.unweighed ? "+" : ""}</td></tr>}</For>
           </tbody></table>
         </Show>
         <Show when={bottom() === "lines" && mto()}>
-          <table class="tbl lst"><thead><tr><th>Line</th><th>Group</th><th>Description</th><th>Size</th><th class="r">Quantity</th><th>Unit</th></tr></thead><tbody>
-            <For each={lists()?.mto ?? []}>{r => <tr><td>{r.line}</td><td>{r.group}</td><td>{r.what}</td><td>{inch(r.nps)}</td><td class="r mono">{r.unit === "m" ? toU("len", r.qty).toFixed(2) : r.qty}</td><td>{r.unit === "m" ? unit("len") : r.unit}</td></tr>}</For>
+          <table class="tbl lst"><thead><tr><th>Line</th><th>Group</th><th>Description</th><th>Size</th><th class="r">Quantity</th><th>Unit</th><th class="r">Weight ({unit("mass")})</th></tr></thead><tbody>
+            <For each={lists()?.mto ?? []}>{r => <tr><td>{r.line}</td><td>{r.group}</td><td>{r.what}</td><td>{inch(r.nps)}</td><td class="r mono">{r.unit === "m" ? toU("len", r.qty).toFixed(2) : r.qty}</td><td>{r.unit === "m" ? unit("len") : r.unit}</td><td class="r mono" title={r.est ? "Estimated: scaled by the wall from the nearest listed wall" : r.kg == null ? "No catalogue weight" : ""}>{r.kg == null ? "—" : `${r.est ? "≈ " : ""}${toU("mass", r.kg).toFixed(1)}`}</td></tr>}</For>
           </tbody></table>
         </Show>
         <Show when={bottom() === "equipment"}>

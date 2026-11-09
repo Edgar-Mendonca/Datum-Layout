@@ -8,13 +8,17 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 #[derive(Serialize, Clone, Debug)]
-pub struct LineRow { pub id: u32, pub number: String, pub from: String, pub to: String, pub nps: String, pub class: String, pub rating: u32, pub fluid: String, pub insulation: f64, pub length: f64, pub components: usize }
+pub struct LineRow { pub id: u32, pub number: String, pub from: String, pub to: String, pub nps: String, pub class: String, pub rating: u32, pub fluid: String, pub insulation: f64, pub length: f64, pub components: usize,
+    /// Empty (dry) weight of the parts that have one (kg), and how many parts have none.
+    pub weight: f64, pub unweighed: usize }
 #[derive(Serialize, Clone, Debug)]
 pub struct NozzleRow { pub tag: String, pub nps: String, pub rating: u32, pub facing: String, pub service: String, pub at: P3, pub dir: P3, pub line: String }
 #[derive(Serialize, Clone, Debug)]
 pub struct EquipRow { pub id: u32, pub tag: String, pub kind: String, pub at: P3, pub rot: f64, pub sizes: Vec<(String, f64)>, pub data: Vec<(String, String)>, pub nozzles: Vec<NozzleRow> }
 #[derive(Serialize, Clone, Debug)]
-pub struct MtoRow { pub line: String, pub group: &'static str, pub what: String, pub nps: String, pub qty: f64, pub unit: &'static str }
+pub struct MtoRow { pub line: String, pub group: &'static str, pub what: String, pub nps: String, pub qty: f64, pub unit: &'static str,
+    /// Weight per unit (kg each, or kg/m for pipe) and in all (kg); `est`: scaled from another wall.
+    pub unit_kg: Option<f64>, pub kg: Option<f64>, pub est: bool }
 #[derive(Serialize, Clone, Debug)]
 pub struct ValveRow { pub line_id: u32, pub item: u32, pub tag: String, pub kind: String, pub nps: String, pub rating: u32, pub line: String, pub at: P3, pub stem: String }
 #[derive(Serialize, Clone, Debug, Default)]
@@ -33,6 +37,31 @@ fn end_text(p: &Project, e: &End) -> String {
         End::Point { term: Term::Blind } => "Blind flange".into(),
         End::Nozzle { equip, nozzle } => format!("{} / {nozzle}", p.equip(*equip).map(|e| e.tag.clone()).unwrap_or_default()),
         End::Branch { line, .. } => format!("Branch of {}", p.line(*line).map(|l| l.number.clone()).unwrap_or_default()),
+    }
+}
+
+/// Steel density (kg/m³) for a class's material.
+pub fn density(material: &str) -> f64 {
+    if material.to_lowercase().contains("stainless") { 8000.0 } else { 7850.0 }
+}
+
+/// A part's empty weight (kg) and whether it is estimated, from the weight tables: pipe from its
+/// diameter and wall, fittings by the class's schedule, flanges and valves by rating, outlets from
+/// their table. None where no table gives one (gaskets, bolts, caps, crosses, supports).
+pub fn part_kg(cat: &Catalogue, q: &Part, sched: &str, material: &str) -> Option<(f64, bool)> {
+    let r = q.rating;
+    match q.kind {
+        "pipe" => Some((cat.pipe_kg_m(&q.nps, sched, density(material))? * q.length, false)),
+        "elbow90" => cat.fitting_kg(if q.note == "SR" { "elbow90_sr" } else { "elbow90_lr" }, &q.nps, "", sched),
+        "elbow45" => cat.fitting_kg("elbow45_lr", &q.nps, "", sched),
+        "tee" if q.nps2 == q.nps || q.nps2.is_empty() => cat.fitting_kg("tee", &q.nps, "", sched),
+        "tee" => cat.fitting_kg("reducing_tee", &q.nps, &q.nps2, sched),
+        "reducer" => cat.fitting_kg("reducer", &q.nps, &q.nps2, sched),
+        "weldolet" | "sockolet" => cat.olet(q.kind, &q.nps2, q.nps2 == q.nps)?.weight_lb.map(|lb| (lb * crate::catalogue::LB, false)),
+        "flange" => cat.rated_kg("flange_wn", &q.nps, r).map(|k| (k, false)),
+        "blind" => cat.rated_kg("flange_blind", &q.nps, r).map(|k| (k, false)),
+        "gate" | "globe" | "check" | "ball" => cat.rated_kg(q.kind, &q.nps, r).map(|k| (k, false)),
+        _ => None,
     }
 }
 
@@ -90,28 +119,35 @@ pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
     for q in b.parts.iter().filter(|q| q.line != 0) { by_line.entry(q.line).or_default().push(q); }
     for l in &p.lines {
         let parts = by_line.get(&l.id).cloned().unwrap_or_default();
+        let class = cat.class(&l.class);
+        let material = class.map(|c| c.material.to_lowercase()).unwrap_or_else(|| "carbon steel".into());
+        let sched_of = |nps: &str| class.map(|c| c.schedule(nps)).unwrap_or_else(|| "STD".into());
+        let weighed: Vec<Option<(f64, bool)>> = parts.iter().map(|q| part_kg(cat, q, &sched_of(&q.nps), &material)).collect();
         out.lines.push(LineRow {
             id: l.id, number: l.number.clone(), from: end_text(p, &l.from), to: end_text(p, &l.to), nps: l.nps.clone(), class: l.class.clone(), rating: l.rating, fluid: l.fluid.clone(), insulation: l.insulation,
             length: parts.iter().map(|q| q.length).sum(),
             components: parts.iter().filter(|q| !matches!(q.kind, "pipe" | "bolts")).count(),
+            weight: weighed.iter().flatten().map(|w| w.0).sum::<f64>(),
+            unweighed: parts.iter().zip(&weighed).filter(|(q, w)| w.is_none() && !matches!(q.kind, "support")).count(),
         });
         // Take-off: pipe by length per size, everything else counted by description and size.
-        let class = cat.class(&l.class);
-        let material = class.map(|c| c.material.to_lowercase()).unwrap_or_else(|| "carbon steel".into());
-        let mut rows: BTreeMap<(usize, &'static str, String, usize), (f64, &'static str)> = BTreeMap::new();
+        let mut rows: BTreeMap<(usize, &'static str, String, usize), (f64, &'static str, Option<f64>, bool)> = BTreeMap::new();
         let group_order = |g: &str| ["Pipe", "Fittings", "Flanges", "Valves", "Gaskets", "Bolts", "Supports", "Welds"].iter().position(|x| *x == g).unwrap_or(9);
-        for q in &parts {
-            let sched = class.map(|c| c.schedule(&q.nps)).unwrap_or_else(|| "STD".into());
+        for (q, w) in parts.iter().zip(&weighed) {
+            let sched = sched_of(&q.nps);
             let Some((g, what)) = describe(q, &l.class, &sched, &material) else { continue };
-            let e = rows.entry((group_order(g), g, what, crate::catalogue::nps_index(&q.nps))).or_insert((0.0, if g == "Pipe" { "m" } else if g == "Bolts" { "set" } else { "ea" }));
+            let e = rows.entry((group_order(g), g, what, crate::catalogue::nps_index(&q.nps))).or_insert((0.0, if g == "Pipe" { "m" } else if g == "Bolts" { "set" } else { "ea" }, Some(0.0), false));
             e.0 += if g == "Pipe" { q.length } else { 1.0 };
+            e.2 = match (e.2, w) { (Some(a), Some((b, _))) => Some(a + b), _ => None };
+            e.3 |= w.is_some_and(|w| w.1);
         }
         for ((line, nps), n) in welds.iter().filter(|((line, _), _)| *line == l.id) {
             let _ = line;
-            rows.insert((group_order("Welds"), "Welds", "Butt weld (shop or field)".into(), crate::catalogue::nps_index(nps)), (*n, "ea"));
+            rows.insert((group_order("Welds"), "Welds", "Butt weld (shop or field)".into(), crate::catalogue::nps_index(nps)), (*n, "ea", None, false));
         }
-        for ((_, g, what, k), (qty, unit)) in rows {
-            out.mto.push(MtoRow { line: l.number.clone(), group: g, what, nps: crate::catalogue::NPS.get(k).map(|s| s.to_string()).unwrap_or_default(), qty: if unit == "m" { (qty * 1000.0).round() / 1000.0 } else { qty }, unit });
+        for ((_, g, what, k), (qty, unit, kg, est)) in rows {
+            let kg = kg.filter(|_| g != "Welds").map(|k| (k * 1000.0).round() / 1000.0);
+            out.mto.push(MtoRow { line: l.number.clone(), group: g, what, nps: crate::catalogue::NPS.get(k).map(|s| s.to_string()).unwrap_or_default(), qty: if unit == "m" { (qty * 1000.0).round() / 1000.0 } else { qty }, unit, unit_kg: kg.filter(|_| qty > 0.0).map(|k| (k / qty * 1000.0).round() / 1000.0), kg, est });
         }
     }
     for e in &p.equipment {
@@ -148,8 +184,8 @@ pub fn csv(l: &Lists, kind: &str) -> Result<String, String> {
     let mut s = String::new();
     match kind {
         "lines" => {
-            s += &row(&["Line number", "From", "To", "Size (in)", "Class", "Rating", "Fluid", "Insulation (mm)", "Length (m)", "Components"].map(String::from));
-            for r in &l.lines { s += &row(&[r.number.clone(), r.from.clone(), r.to.clone(), r.nps.clone(), r.class.clone(), r.rating.to_string(), r.fluid.clone(), f(r.insulation * 1000.0, 0), f(r.length, 3), r.components.to_string()]); }
+            s += &row(&["Line number", "From", "To", "Size (in)", "Class", "Rating", "Fluid", "Insulation (mm)", "Length (m)", "Components", "Empty weight (kg)", "Parts without a weight"].map(String::from));
+            for r in &l.lines { s += &row(&[r.number.clone(), r.from.clone(), r.to.clone(), r.nps.clone(), r.class.clone(), r.rating.to_string(), r.fluid.clone(), f(r.insulation * 1000.0, 0), f(r.length, 3), r.components.to_string(), f(r.weight, 1), r.unweighed.to_string()]); }
         }
         "equipment" => {
             s += &row(&["Tag", "Type", "E (m)", "N (m)", "EL (m)", "Nozzle", "Size (in)", "Rating", "Facing", "Service", "Nozzle E (m)", "Nozzle N (m)", "Nozzle EL (m)", "Line"].map(String::from));
@@ -161,8 +197,11 @@ pub fn csv(l: &Lists, kind: &str) -> Result<String, String> {
             }
         }
         "mto" => {
-            s += &row(&["Line", "Group", "Description", "Size (in)", "Quantity", "Unit"].map(String::from));
-            for r in &l.mto { s += &row(&[r.line.clone(), r.group.into(), r.what.clone(), r.nps.clone(), if r.unit == "m" { f(r.qty, 3) } else { f(r.qty, 0) }, r.unit.into()]); }
+            s += &row(&["Line", "Group", "Description", "Size (in)", "Quantity", "Unit", "Unit weight (kg)", "Weight (kg)", "Weight estimated"].map(String::from));
+            for r in &l.mto {
+                let kg = |v: Option<f64>| v.map(|v| f(v, 2)).unwrap_or_default();
+                s += &row(&[r.line.clone(), r.group.into(), r.what.clone(), r.nps.clone(), if r.unit == "m" { f(r.qty, 3) } else { f(r.qty, 0) }, r.unit.into(), kg(r.unit_kg), kg(r.kg), if r.est { "yes".into() } else { String::new() }]);
+            }
         }
         "valves" => {
             s += &row(&["Tag", "Type", "Size (in)", "Rating", "Line", "E (m)", "N (m)", "EL (m)", "Stem"].map(String::from));

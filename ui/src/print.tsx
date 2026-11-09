@@ -91,7 +91,7 @@ export const PrintPage = () => {
     const b: (() => JSX.Element)[] = [];
     if (ps.lines) b.push(...tableBlocks("Line list", ["Line number", "From", "To", "Size", "Class", "Fluid", `Length (${unit("len")})`, "Components"], l.lines.map(r => [r.number, r.from, r.to, inch(r.nps), `${r.class} / ${r.rating}`, r.fluid, toU("len", r.length).toFixed(2), String(r.components)])));
     if (ps.equipment) b.push(...tableBlocks("Equipment and nozzles", ["Tag", "Type", "Nozzle", "Size", "Class", "Service", "E", "N", "EL", "Line"], l.equipment.flatMap(e => (e.nozzles.length ? e.nozzles : [null]).map((n, i) => [i ? "" : e.tag, i ? "" : e.kind, n?.tag ?? "", n ? inch(n.nps) : "", n ? String(n.rating) : "", n?.service ?? "", ...[0, 1, 2].map(k => toU("coord", (n ? n.at : e.at)[k]).toFixed(3)), n?.line ?? ""]))));
-    if (ps.mto) b.push(...tableBlocks("Material take-off", ["Line", "Group", "Description", "Size", "Quantity", "Unit"], l.mto.map(r => [r.line, r.group, r.what, inch(r.nps), r.unit === "m" ? toU("len", r.qty).toFixed(2) : String(r.qty), r.unit === "m" ? unit("len") : r.unit])));
+    if (ps.mto) b.push(...tableBlocks("Material take-off", ["Line", "Group", "Description", "Size", "Quantity", "Unit", `Weight (${unit("mass")})`], l.mto.map(r => [r.line, r.group, r.what, inch(r.nps), r.unit === "m" ? toU("len", r.qty).toFixed(2) : String(r.qty), r.unit === "m" ? unit("len") : r.unit, r.kg == null ? "—" : `${r.est ? "≈ " : ""}${toU("mass", r.kg).toFixed(1)}`])));
     return b;
   });
   createEffect(on(blocks, relayout, { defer: true }));

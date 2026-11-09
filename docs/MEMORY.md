@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.7 (2026-11-09) |
+| **Current version** | 0.2.8 (2026-11-09) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -47,7 +47,7 @@ Coordinates: metres, X east, Y north, Z up, in the engine, the file and PCF; the
 | `src-tauri/src/main.rs` | Commands (state, apply, history, scene, check, lists, examples, catalogue, packs, exports, files, options, recovery, recent, open_url, updates); `guard` (a panic becomes a message), crash.log, atomic saves, read limits |
 | `src-tauri/src/update.rs` | Plan's updater (`REPO` = Datum-Layout; requires SHA256SUMS.txt) |
 | `ui/src/view3d.tsx` | The 3D view: plot (ground, grid, coordinates, plant north), areas, parts from one buffer with colours per part, picking, selection colours, labels, ports and the route preview, snap marker while dragging, axis arrows (gizmo), standard views and fit, the orbit speed check |
-| `catalogue/tees_reducing.csv`, `reducers.csv`, `olets.csv` | Researched tables (Texas Flange, Bonney Forge, Wermac) with sources on every row |
+| `catalogue/tees_reducing.csv`, `reducers.csv`, `olets.csv`, `weights.csv` | Researched tables (Texas Flange, Bonney Forge, Wermac) with sources on every row |
 | `crates/core/src/package.rs`, `docs/formats/` | The plant package (P&ID → layout): read, import (place/update equipment, list lines), route listed lines; the format document and a worked example |
 | `ui/src/library.tsx` | The Library: pipe classes and parts tables with sources |
 | `ui/src/shell.tsx` | The workspace after Datum Mesh: steps bar (`Flow`), plant tree (`Tree`: steps, branches, counts, marks, eyes, filter, menus), context bar (`CtxBar`), tool strip (`ToolStrip`), pane grips and the properties card |
@@ -125,6 +125,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.7 | Outlets take no length on the header and split it at their centre (as supports do): Datum Pipe needs a node there. The class's branch table is applied when a branch is routed off a tee (the tee becomes a weldolet or sockolet, or back); Check reports branches made otherwise. Example classes share one table (tee same size; sockolet ≤ 1½" on ≥ 3"; weldolet ≤ half on ≥ 4"; reducing tee otherwise) | A specification's branch table, applied where the designer makes the branch |
 | 0.2.7 | Bonney Forge (the trademark owner) over Wermac where their outlet base diameters differ; heights agree everywhere; sockolets kept to ½"–2" (above that the two sources disagree, and socket-weld branches are small bore). Pipe shoes left out: no public table found on the allowed sites | Never invent a dimension |
 | 0.2.7 | A new branch takes the New lines size when that is smaller than its tee | Otherwise every branch started at the header's size |
+| 0.2.8 | Weights: pipe computed (π (D − t) t ρ, 7850 kg/m³, 8000 for stainless), everything else from `weights.csv` in kg; a fitting in a schedule whose wall is neither STD nor XS is the nearer row scaled by the wall, flagged `est` (≈ in the window). Parts with no source (globe/check/ball valves, gaskets, bolts, caps, crosses) have no weight rather than a guess; the line list counts them (`unweighed`). Weights are empty: no contents or insulation (geometry, not process) | A missing weight is honest; an invented one is not. Datum Pipe reads `WEIGHT` for valves and flanges (`import.rs`), so those matter most |
+| 0.2.8 | Weight checks are in the build script (scratchpad), recorded per row in `source`: reducers vs a second maker; elbows, tees, blinds vs their own steel from the dimension tables | One published source per kind exists on the allowed sites; geometry is the independent check |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -153,6 +155,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.5 | Crosses (`ItemKind::Cross`; `End::Branch` and `RouteEnd::Branch` gain `port` 0/1, default 0 for older files; scene branch ports carry `branch`; PCF CROSS with BRANCH1/2-POINT written and read) | ✅ |
 | 0.2.6 | Reducing tees (`tees_reducing.csv`, `Catalogue::tee_m`, `route::branch_len`) and reducers by size pair (`reducers.csv`, `Catalogue::reducer_h`, `route::red_len`), researched in-session from public catalogues and cross-checked | ✅ |
 | 0.2.7 | Weldolets and sockolets (`olets.csv` from Bonney Forge, checked with Wermac; `ItemKind::Weldolet`, `Sockolet`; zero length on the header, PCF OLET written and read); class branch tables (`PipeClass::branches`, `branch_fitting`; routing a branch applies it; Check reports others) | ✅ |
+| 0.2.8 | Weights: `weights.csv` (763 rows: fittings STD/XS, WN and blind flanges 150–2500, gate valves 150–600, every row checked against a second source or its own steel); pipe from π(D−t)tρ; `lists::part_kg`; line and take-off weights (CSV, print); PCF `WEIGHT` | ✅ |
 | 0.2 Pipe classes and fittings | Class editor with branch table; sloped lines | 🔜 |
 | 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -200,6 +203,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 ### 2026-11-08: Session 4 (0.2.x)
 - The user confirmed the family flow (Schema → Layout → Pipe; PCF as the hand-over, a documented plain-text format we read and write with our own code) and asked for a few small 0.2 releases to view in the morning, the look kept in step with Datum Mesh (Datum Pipe is getting the same).
 - 0.2.0: the Library.
+- 0.2.8: weights (763-row table, pipe computed), line and take-off weights, PCF WEIGHT; Datum Pipe reads them.
 - 0.2.7: weldolets and sockolets (46 rows, all checked against a second source), class branch tables, rack example's drain on a weldolet; verify.sh with Pipe 6cbb95a: all solved.
 - 0.2.6 (2026-11-09): the user asked for in-session research instead of waiting for the outside helper; plan in docs/PLAN-0.2-NEXT.md (0.2.6–0.2.10). The default network blocked catalogue sites; a research environment was created (approved by the user). Reducing tees (84 rows) and reducers (91 pairs) read from Texas Flange, cross-checked with Wermac (all agree); verify.sh with Datum Pipe 6cbb95a: all examples solved.
 - 0.2.5: crosses; engine test (two branches, PCF both ways, old files), UI check routing the second branch; hardening now drops crosses and supports too.
