@@ -1,5 +1,14 @@
 # What's new in Datum Layout
 
+## 0.2.6 — 2026-11-09
+Reducing tees and reducers from their own tables, read from manufacturers' catalogues and checked row by row.
+
+**Reducing tees.** Every run × branch listed from ¾" to 24": the branch now ends at its own centre-to-end (M) instead of the run's, so a 6" × 3" tee's branch starts 124 mm from the run's centreline, not 143 mm. Crosses use the same table for each branch.
+
+**Reducers.** Every large × small pair listed from ¾" to 24", end to end, for concentric and eccentric reducers and for the reducers at nozzles.
+
+**Sources.** Read from Texas Flange's public tables in the app's own session; every reducing tee to 4" and 73 reducer pairs checked against wermac.org's table in millimetres, all agreeing; the 22" reducer pairs taken from it. Both tables are in the Library with their sources.
+
 ## 0.2.5 — 2026-11-09
 Crosses.
 

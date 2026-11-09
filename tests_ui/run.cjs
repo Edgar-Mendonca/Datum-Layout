@@ -215,7 +215,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   // 7h. The Library (0.2.0): classes and parts tables with their sources.
   await open("pumps");
   await p.click('.flow button[data-tool="library"]'); await settle(600);
-  check("the Library lists every pipe class and the four parts tables", (await p.$$('.libx .mlist > button')).length === 12, String((await p.$$('.libx .mlist > button')).length));
+  check("the Library lists every pipe class and the six parts tables", (await p.$$('.libx .mlist > button')).length === 14, String((await p.$$('.libx .mlist > button')).length));
   await p.click('.libx .mlist > button:has-text("CS300")'); await settle(300);
   const lt = await p.textContent(".libpage");
   check("a class page shows its wall by size and allowed components", lt.includes("Class 300") && /½"\s*80/.test(lt) && lt.includes("Gate valve"), lt.slice(0, 300));

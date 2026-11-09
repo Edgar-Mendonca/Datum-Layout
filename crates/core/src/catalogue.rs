@@ -41,6 +41,12 @@ pub struct FlangeRow { pub nps: String, pub rating: u32, pub od: f64, pub thick:
     /// The blind flange's thickness where it differs from the weld-neck's.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub blind_thick: Option<f64> }
+/// A reducing tee: run size, branch size, centre to end of the run (C) and of the branch (M).
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct TeeRow { pub nps: String, pub nps_branch: String, pub c: f64, pub m: f64, pub source: String }
+/// A reducer by its two sizes: end-to-end length (concentric and eccentric alike).
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct ReducerRow { pub nps: String, pub nps_small: String, pub h: f64, pub source: String }
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ValveRow { pub kind: String, pub rating: u32, pub nps: String, pub f2f: f64, pub source: String }
 
@@ -85,6 +91,8 @@ pub struct Catalogue {
     pub fittings: Vec<FittingRow>,
     pub flanges: Vec<FlangeRow>,
     pub valves: Vec<ValveRow>,
+    pub tees: Vec<TeeRow>,
+    pub reducers: Vec<ReducerRow>,
     pub classes: Vec<PipeClass>,
     pub packs: Vec<String>,
     pub warnings: Vec<String>,
@@ -142,6 +150,8 @@ impl Catalogue {
         c.add_table("fittings.csv", include_str!("../../../catalogue/fittings.csv"));
         c.add_table("flanges.csv", include_str!("../../../catalogue/flanges.csv"));
         c.add_table("valves.csv", include_str!("../../../catalogue/valves.csv"));
+        c.add_table("tees_reducing.csv", include_str!("../../../catalogue/tees_reducing.csv"));
+        c.add_table("reducers.csv", include_str!("../../../catalogue/reducers.csv"));
         c.add_class("classes/CS1.json", include_str!("../../../catalogue/classes/CS1.json"));
         c.add_class("classes/CS150.json", include_str!("../../../catalogue/classes/CS150.json"));
         c.add_class("classes/CS300.json", include_str!("../../../catalogue/classes/CS300.json"));
@@ -203,7 +213,27 @@ impl Catalogue {
                     _ => bad(w, i, "the kind, rating, size or length is not valid"),
                 }
             },
-            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges or valves .csv).")),
+            "tees_reducing.csv" => for (i, r) in table(name, text, &["nps", "nps_branch", "c_in", "m_in", "source"], w).into_iter().enumerate() {
+                match (size_ok(&r["nps"]), size_ok(&r["nps_branch"]), f(&r, "c_in"), f(&r, "m_in")) {
+                    (true, true, Some(c), Some(m)) if nps_index(&r["nps_branch"]) < nps_index(&r["nps"]) && m <= c + 1e-9 => {
+                        let row = TeeRow { nps: r["nps"].clone(), nps_branch: r["nps_branch"].clone(), c: c * IN, m: m * IN, source: r["source"].clone() };
+                        self.tees.retain(|t| !(t.nps == row.nps && t.nps_branch == row.nps_branch));
+                        self.tees.push(row);
+                    }
+                    _ => bad(w, i, "a size or dimension is not valid (the branch must be smaller than the run, and M no longer than C)"),
+                }
+            },
+            "reducers.csv" => for (i, r) in table(name, text, &["nps", "nps_small", "h_in", "source"], w).into_iter().enumerate() {
+                match (size_ok(&r["nps"]), size_ok(&r["nps_small"]), f(&r, "h_in")) {
+                    (true, true, Some(h)) if nps_index(&r["nps_small"]) < nps_index(&r["nps"]) => {
+                        let row = ReducerRow { nps: r["nps"].clone(), nps_small: r["nps_small"].clone(), h: h * IN, source: r["source"].clone() };
+                        self.reducers.retain(|t| !(t.nps == row.nps && t.nps_small == row.nps_small));
+                        self.reducers.push(row);
+                    }
+                    _ => bad(w, i, "a size or length is not valid (the small end must be smaller)"),
+                }
+            },
+            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing or reducers .csv).")),
         }
     }
 
@@ -246,6 +276,15 @@ impl Catalogue {
     }
     pub fn od(&self, nps: &str) -> f64 {
         self.pipes.iter().find(|p| p.nps == nps).map(|p| p.od).unwrap_or_else(|| nps_inches(nps).unwrap_or(6.0) * IN * 1.1)
+    }
+    /// A reducing tee's branch centre-to-end (M), when the table lists that run and branch.
+    pub fn tee_m(&self, run: &str, branch: &str) -> Option<f64> {
+        self.tees.iter().find(|t| t.nps == run && t.nps_branch == branch).map(|t| t.m)
+    }
+    /// A reducer's length for its two sizes (either order), when the table lists the pair.
+    pub fn reducer_h(&self, a: &str, b: &str) -> Option<f64> {
+        let (big, small) = if nps_index(a) >= nps_index(b) { (a, b) } else { (b, a) };
+        self.reducers.iter().find(|t| t.nps == big && t.nps_small == small).map(|t| t.h)
     }
     pub fn fitting(&self, nps: &str) -> Option<&FittingRow> {
         self.fittings.iter().find(|p| p.nps == nps)

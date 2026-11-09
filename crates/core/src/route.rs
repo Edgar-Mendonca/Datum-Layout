@@ -112,11 +112,21 @@ pub fn item_len(cat: &Catalogue, l: &Line, it: &Item, nps: &str) -> f64 {
     let d = dimens(cat, nps, &l.class, l.rating, l.radius);
     match it.kind {
         ItemKind::Tee | ItemKind::Cross => 2.0 * d.tee,
-        ItemKind::Reducer => dimens(cat, &larger(nps, &reducer_to(it, nps)), &l.class, l.rating, l.radius).red,
+        ItemKind::Reducer => red_len(cat, l, nps, &reducer_to(it, nps)),
         ItemKind::FlangePair => 2.0 * d.fl_y + d.gasket,
         ItemKind::Support => 0.0,
         k => f2f(cat, k, nps, l.rating, d.od) + 2.0 * (d.fl_y + d.gasket),
     }
+}
+
+/// A reducer's length between two sizes: from the table of size pairs, else the larger size's row.
+pub fn red_len(cat: &Catalogue, l: &Line, a: &str, b: &str) -> f64 {
+    cat.reducer_h(a, b).unwrap_or_else(|| dimens(cat, &larger(a, b), &l.class, l.rating, l.radius).red)
+}
+/// A tee's (or cross's) branch centre-to-end: M from the reducing-tee table when the branch is
+/// smaller than the run, else C.
+pub fn branch_len(cat: &Catalogue, run: &str, branch: &str, c: f64) -> f64 {
+    if run == branch { c } else { cat.tee_m(run, branch).unwrap_or(c) }
 }
 
 fn larger(a: &str, b: &str) -> String {
@@ -153,7 +163,8 @@ pub fn end_port(p: &Project, cat: &Catalogue, e: &End) -> Option<Port> {
             let bd = branch_dir(u, it.dir);
             let bd = if *port == 1 { mul(bd, -1.0) } else { bd };
             let d = dimens(cat, &nps, &l.class, l.rating, l.radius);
-            Some(Port { p: add(c, mul(bd, d.tee)), d: bd, nps: branch_size(p, l, it, *port), rating: 0, end: "BW" })
+            let bn = branch_size(p, l, it, *port);
+            Some(Port { p: add(c, mul(bd, branch_len(cat, &nps, &bn, d.tee))), d: bd, nps: bn, rating: 0, end: "BW" })
         }
     }
 }
@@ -334,7 +345,7 @@ fn line(p: &Project, cat: &Catalogue, l: &Line, b: &mut Built) {
             End::Point { term: Term::Cap } => d.cap,
             End::Point { term: Term::Blind } => d.blind_t + d.gasket + d.fl_y,
             End::Nozzle { .. } => match end_port(p, cat, e) {
-                Some(np) => { let dn = dim(&np.nps); dn.gasket + dn.fl_y + if np.nps != nps { dim(&larger(&np.nps, nps)).red } else { 0.0 } }
+                Some(np) => { let dn = dim(&np.nps); dn.gasket + dn.fl_y + if np.nps != nps { red_len(cat, l, &np.nps, nps) } else { 0.0 } }
                 None => 0.0,
             },
         }
@@ -489,7 +500,7 @@ fn start_end(p: &Project, cat: &Catalogue, run: &mut Run, e: &End, nps: &str, _b
             run.flange(dn.gasket, &dn, &np.nps, true, 0);
             let mut s = dn.gasket + dn.fl_y;
             if np.nps != nps {
-                let h = dimens(cat, &larger(&np.nps, nps), &l.class, l.rating, l.radius).red;
+                let h = red_len(cat, l, &np.nps, nps);
                 reducer(cat, run, s, h, &np.nps, nps, 0);
                 s += h;
             }
@@ -526,9 +537,10 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
             q.nps = nin.into();
             q.nps2 = if nps_index(&b1) <= nps_index(&b2) { b2.clone() } else { b1.clone() };
             let cp = run.at(c);
-            q.shapes = vec![Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0), Shape::tube(cp, add(cp, mul(bd, d.tee)), cat.od(&b1) / 2.0), Shape::tube(cp, sub(cp, mul(bd, d.tee)), cat.od(&b2) / 2.0)];
+            let (m1, m2) = (branch_len(cat, nin, &b1, d.tee), branch_len(cat, nin, &b2, d.tee));
+            q.shapes = vec![Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0), Shape::tube(cp, add(cp, mul(bd, m1)), cat.od(&b1) / 2.0), Shape::tube(cp, sub(cp, mul(bd, m2)), cat.od(&b2) / 2.0)];
             q.ports = vec![run.port(x0, true, nin, 0, "BW"), run.port(x0 + 2.0 * d.tee, false, nin, 0, "BW"),
-                Port { p: add(cp, mul(bd, d.tee)), d: bd, nps: b1, rating: 0, end: "BW" }, Port { p: sub(cp, mul(bd, d.tee)), d: mul(bd, -1.0), nps: b2, rating: 0, end: "BW" }];
+                Port { p: add(cp, mul(bd, m1)), d: bd, nps: b1, rating: 0, end: "BW" }, Port { p: sub(cp, mul(bd, m2)), d: mul(bd, -1.0), nps: b2, rating: 0, end: "BW" }];
             q.length = 2.0 * d.tee;
             q.corner = Some(cp);
             run.push(q, it.id);
@@ -542,8 +554,9 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
             q.nps = nin.into();
             q.nps2 = bn.clone();
             let cp = run.at(c);
-            q.shapes = vec![Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0), Shape::tube(cp, add(cp, mul(bd, d.tee)), ob / 2.0)];
-            q.ports = vec![run.port(x0, true, nin, 0, "BW"), run.port(x0 + 2.0 * d.tee, false, nin, 0, "BW"), Port { p: add(cp, mul(bd, d.tee)), d: bd, nps: bn, rating: 0, end: "BW" }];
+            let m = branch_len(cat, nin, &bn, d.tee);
+            q.shapes = vec![Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0), Shape::tube(cp, add(cp, mul(bd, m)), ob / 2.0)];
+            q.ports = vec![run.port(x0, true, nin, 0, "BW"), run.port(x0 + 2.0 * d.tee, false, nin, 0, "BW"), Port { p: add(cp, mul(bd, m)), d: bd, nps: bn, rating: 0, end: "BW" }];
             q.length = 2.0 * d.tee;
             q.corner = Some(cp);
             run.push(q, it.id);

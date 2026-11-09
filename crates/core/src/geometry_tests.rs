@@ -610,3 +610,29 @@ fn a_cross_takes_two_branches_and_goes_to_datum_pipe() {
     let e: End = serde_json::from_str(r#"{"kind":"branch","line":1,"item":7}"#).unwrap();
     assert_eq!(e, End::Branch { line: 1, item: 7, port: 0 });
 }
+
+#[test]
+fn reducing_tees_and_reducers_come_from_their_tables() {
+    let cat = Catalogue::builtin();
+    assert!(cat.warnings.is_empty(), "{:?}", cat.warnings);
+    assert!(cat.tees.len() >= 80 && cat.reducers.len() >= 90, "{} {}", cat.tees.len(), cat.reducers.len());
+    let inch = |v: f64| v / 0.0254;
+    // Spot values as the catalogue lists them.
+    assert!((inch(cat.tee_m("8", "6").unwrap()) - 6.62).abs() < 1e-9);
+    assert!((inch(cat.tee_m("24", "18").unwrap()) - 16.50).abs() < 1e-9);
+    assert!((inch(cat.reducer_h("6", "4").unwrap()) - 5.50).abs() < 1e-9);
+    assert!((inch(cat.reducer_h("22", "24").unwrap()) - 20.0).abs() < 1e-9, "either order");
+    // Every reducing tee's run C equals the equal tee's C, M is no longer than C, and both grow with size.
+    for t in &cat.tees {
+        let c = cat.fitting(&t.nps).unwrap().tee_c;
+        assert!((t.c - c).abs() < 0.002, "{} x {}: C {} vs {}", t.nps, t.nps_branch, inch(t.c), inch(c));
+        assert!(t.m <= t.c + 1e-9);
+    }
+    // A 6" × 3" tee: its branch end is M from the run's centreline, not C.
+    let tee = Item { id: 5, kind: ItemKind::Tee, seg: 0, at: 3.0, nps2: "3".into(), dir: [0.0, 1.0, 0.0], ..Default::default() };
+    let p = line("6", vec![[0.0, 0.0, 3.0], [6.0, 0.0, 3.0]], vec![tee]);
+    let b = build(&p, &cat);
+    let t = of(&b, "tee")[0];
+    assert!((t.ports[2].p[1] - cat.tee_m("6", "3").unwrap()).abs() < 1e-9, "{:?}", t.ports[2].p);
+    assert!((inch(cat.tee_m("6", "3").unwrap()) - 4.88).abs() < 1e-9);
+}

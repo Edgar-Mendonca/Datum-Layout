@@ -34,6 +34,8 @@ export const library = (start?: string) => openDialog(() => {
       { k: "pipe", label: "Pipe", group: "Parts tables", sub: `${k.pipes.length} sizes` },
       { k: "fittings", label: "Butt-weld fittings", group: "Parts tables", sub: `${k.fittings.length} sizes` },
       { k: "flanges", label: "Flanges", group: "Parts tables", sub: `${k.flanges.length} rows` },
+      { k: "tees", label: "Reducing tees", group: "Parts tables", sub: `${k.tees.length} pairs` },
+      { k: "reducers", label: "Reducers", group: "Parts tables", sub: `${k.reducers.length} pairs` },
       { k: "valves", label: "Valves and strainers", group: "Parts tables", sub: `${k.valves.length} rows` },
     ];
   });
@@ -75,6 +77,12 @@ export const library = (start?: string) => openDialog(() => {
           <Show when={page() === "flanges"}>
             <h3>Flanges <small class="muted">weld-neck and blind, by size and class</small></h3>
             <Tbl head={["Size", "Class", "OD", "Thickness", "Blind", "Length", "Bolts", "Gasket", "Source"]} right={[2, 3, 4, 5, 7]} rows={[...(cat()?.flanges ?? [])].sort((a: any, b: any) => a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.nps, inch(r.nps), r.rating, `class ${r.rating}`)).map((r: any) => [inch(r.nps), String(r.rating), mm(r.od), mm(r.thick), r.blind_thick ? mm(r.blind_thick) : "—", mm(r.wn_length), `${r.bolts} × ${mm(r.bolt)}`, mm(r.gasket), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
+          <Show when={page() === "tees"}>
+            <h3>Reducing tees <small class="muted">run × branch: centre to end of the run (C) and of the branch (M)</small></h3>
+            <Tbl head={["Run", "Branch", "C", "M", "Source"]} right={[2, 3]} rows={(cat()?.tees ?? []).filter(r => has(r.nps, inch(r.nps), r.nps_branch, inch(r.nps_branch))).map(r => [inch(r.nps), inch(r.nps_branch), mm(r.c), mm(r.m), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
+          <Show when={page() === "reducers"}>
+            <h3>Reducers <small class="muted">large × small: end-to-end length, concentric and eccentric alike</small></h3>
+            <Tbl head={["Large end", "Small end", "Length", "Source"]} right={[2]} rows={(cat()?.reducers ?? []).filter(r => has(r.nps, inch(r.nps), r.nps_small, inch(r.nps_small))).map(r => [inch(r.nps), inch(r.nps_small), mm(r.h), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
           <Show when={page() === "valves"}>
             <h3>Valves and strainers <small class="muted">face to face, flanged, by size and class</small></h3>
             <Tbl head={["Type", "Size", "Class", "Face to face", "Source"]} right={[3]} rows={[...(cat()?.valves ?? [])].sort((a: any, b: any) => a.kind.localeCompare(b.kind) || a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.kind, VALVE[r.kind] ?? "", r.nps, inch(r.nps), r.rating)).map((r: any) => [VALVE[r.kind] ?? r.kind, inch(r.nps), String(r.rating), mm(r.f2f), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>

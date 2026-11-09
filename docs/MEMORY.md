@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.5 (2026-11-09) |
+| **Current version** | 0.2.6 (2026-11-09) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -119,6 +119,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.4 | The run beyond moves; if the line ends at a nozzle or tee just after (pump suction), the run before moves; Route Again makes eccentric reducers concentric first | The held end never moves |
 | 0.2.5 | A cross is a tee item with a second branch opposite the first: one item kind, the tee's centre-to-end dimension, and a branch number on the line end that leaves it (`port`, 0 by default so earlier files read unchanged) | The fewest new ideas; old files keep working |
 | 0.2.5 (for Datum Pipe) | Pipe's PCF reader takes CROSS but reads only BRANCH1-POINT: a second branch line written in the same file does not join the cross there. Layout writes both points (the format's way); Pipe should read BRANCH2-POINT too | Noted for Pipe's next session |
+| 0.2.6 (user) | Parts data is researched in the app's own session when the network allows: the session environment "Datum-Layout (catalogue research)" allows texasflange.com, wermac.org, bonneyforge.com and weldbend.com. Pages are downloaded into the scratchpad, tables read by a script, and every row cross-checked against a second source where one exists; rows from memory are never used (two research agents that could not reach the sites wrote tables from memory; they were discarded) | The user: "do it by yourself… let us not waste time"; numbers must still be traceable |
+| 0.2.6 | A reducing tee's run keeps the equal tee's C (the tables agree for every row); its branch ends at M. A reducer's length comes from its size pair, else the larger size's row | One table each, fallbacks unchanged |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -145,6 +147,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.3 | Drag selected equipment or groups across the plot (live preview, snap, Esc, lines squared again after), arrow-key nudge relative to the screen, Move to…, view cube and status badges after Datum Mesh; pointer-capture and arrow-picking bugs fixed | ✅ |
 | 0.2.4 | Eccentric reducers (`Flat`, `Op::SetEccentric`: the reducer becomes a short sloped run, the run beyond or before it offset; builder, PCF REDUCER-ECCENTRIC with FLAT-DIRECTION written and read; proved with Datum Pipe’s real engine) | ✅ |
 | 0.2.5 | Crosses (`ItemKind::Cross`; `End::Branch` and `RouteEnd::Branch` gain `port` 0/1, default 0 for older files; scene branch ports carry `branch`; PCF CROSS with BRANCH1/2-POINT written and read) | ✅ |
+| 0.2.6 | Reducing tees (`tees_reducing.csv`, `Catalogue::tee_m`, `route::branch_len`) and reducers by size pair (`reducers.csv`, `Catalogue::reducer_h`, `route::red_len`), researched in-session from public catalogues and cross-checked | ✅ |
 | 0.2 Pipe classes and fittings | Class editor with branch table; sloped lines | 🔜 |
 | 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -192,6 +195,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 ### 2026-11-08: Session 4 (0.2.x)
 - The user confirmed the family flow (Schema → Layout → Pipe; PCF as the hand-over, a documented plain-text format we read and write with our own code) and asked for a few small 0.2 releases to view in the morning, the look kept in step with Datum Mesh (Datum Pipe is getting the same).
 - 0.2.0: the Library.
+- 0.2.6 (2026-11-09): the user asked for in-session research instead of waiting for the outside helper; plan in docs/PLAN-0.2-NEXT.md (0.2.6–0.2.10). The default network blocked catalogue sites; a research environment was created (approved by the user). Reducing tees (84 rows) and reducers (91 pairs) read from Texas Flange, cross-checked with Wermac (all agree); verify.sh with Datum Pipe 6cbb95a: all examples solved.
 - 0.2.5: crosses; engine test (two branches, PCF both ways, old files), UI check routing the second branch; hardening now drops crosses and supports too.
 - 0.2.4: eccentric reducers; two engine tests (free end, pump suction); Datum Pipe eca6ebb read and solved flat-top and flat-bottom files written by a temporary program (removed).
 - 0.2.3 (2026-11-09, the user: moving equipment felt weird; more from Datum Mesh): drag on the plot, nudge, Move to…, view cube, status badges; three window bugs found by the new checks.
