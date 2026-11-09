@@ -20,7 +20,8 @@ export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: numbe
 export type ItemKind = "gate" | "globe" | "check" | "ball" | "strainer" | "flange_pair" | "tee" | "reducer" | "support";
 export type SupportKind = "rest" | "guide" | "stop" | "anchor";
 export const SUPPORTS: [SupportKind, string][] = [["rest", "Rest (shoe)"], ["guide", "Guide"], ["stop", "Line stop"], ["anchor", "Anchor"]];
-export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string; support: SupportKind }
+export type Flat = "none" | "top" | "bottom";
+export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string; support: SupportKind; flat: Flat }
 export interface Line { id: number; uid: string; number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; radius: "long" | "short"; from: End; to: End; pts: V3[]; items: Item[]; area: number }
 export interface Settings { clearance: number; nps: string; class: string; rating: number }
 export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[] }

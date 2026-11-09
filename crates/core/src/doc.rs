@@ -4,7 +4,7 @@
 
 use crate::catalogue::{Catalogue, NPS};
 use crate::equipment;
-use crate::model::{Area, End, EquipKind, Equipment, Item, ItemKind, Line, ListedLine, Plot, Project, SavedView, Settings, Term, P3};
+use crate::model::{Area, End, EquipKind, Equipment, Flat, Item, ItemKind, Line, ListedLine, Plot, Project, SavedView, Settings, Term, P3};
 use crate::parts::{add, dot, mul, norm, sub, unit};
 use crate::route;
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,10 @@ pub enum Op {
     /// Mirrors equipment and lines in a vertical plane through `about`: across north–south
     /// (east becomes west) when `east_west` is false, across east–west otherwise.
     MirrorGroup { ids: Vec<u32>, about: P3, east_west: bool },
+    /// Makes a reducer eccentric (flat side on top or at the bottom) or concentric again. The run
+    /// beyond it moves up or down by half the change in diameter (or the run before it, when the
+    /// line ends at a nozzle just after).
+    SetEccentric { line: u32, item: u32, flat: Flat },
     /// The plant's saved views (replaces the list).
     SetViews(Vec<SavedView>),
     /// Reads a line list (CSV text with a header row) and keeps it with the plant, replacing any
@@ -299,6 +303,72 @@ fn csv_rows(s: &str) -> Vec<Vec<String>> {
     row.push(cell);
     if row.iter().any(|c| !c.trim().is_empty()) { rows.push(row); }
     rows
+}
+
+/// Whether a line's end is held by a nozzle or a tee (a free point can move).
+fn held(e: &End) -> bool { !matches!(e, End::Point { .. }) }
+
+/// Makes a concentric reducer eccentric: its run is split at the reducer's two ends, the reducer
+/// becomes the short sloped piece between them, and the run beyond it (or before it, when the line
+/// ends at a nozzle or tee just after) moves by the offset.
+fn eccentric(l: &mut Line, cat: &Catalogue, item: u32, flat: Flat) -> Result<(), String> {
+    let it = l.items.iter().find(|i| i.id == item).ok_or("That component no longer exists.")?.clone();
+    let (k, a) = (it.seg, it.at);
+    let n = l.pts.len() - 1;
+    if k >= n { return Err("That run no longer exists.".into()); }
+    let (pa, pb) = (l.pts[k], l.pts[k + 1]);
+    let u = unit(sub(pb, pa));
+    if u[2].abs() > 0.5 { return Err("An eccentric reducer goes in a level run (its flat side is on top or at the bottom).".into()); }
+    let nin = route::size_at(l, k, a);
+    let nout = route::reducer_to(&it, &nin);
+    let h = route::item_len(cat, l, &it, &nin);
+    let e = (cat.od(&nin) - cat.od(&nout)) / 2.0;
+    let d: P3 = [0.0, 0.0, if flat == Flat::Top { e } else { -e }];
+    let len = norm(sub(pb, pa));
+    if a - h / 2.0 < 1e-6 || a + h / 2.0 > len - 1e-6 { return Err("The reducer needs straight pipe on both sides to be made eccentric; move it along its run.".into()); }
+    let (v1, v2) = (add(pa, mul(u, a - h / 2.0)), add(pa, mul(u, a + h / 2.0)));
+    // The run beyond moves, unless the line ends there at a nozzle or tee; then the run before.
+    let down = !(k + 1 == n && held(&l.to));
+    if !down && k == 0 && held(&l.from) { return Err("Both ends of this run are held by nozzles or tees: add a corner first (Piping › Add Jog).".into()); }
+    let mut pts = l.pts[..k].to_vec();
+    if down {
+        pts.extend([pa, v1, add(v2, d), add(pb, d)]);
+    } else {
+        pts.extend([sub(pa, d), sub(v1, d), v2, pb]);
+    }
+    pts.extend_from_slice(&l.pts[k + 2..]);
+    let slope = norm(sub(pts[k + 2], pts[k + 1]));
+    for x in l.items.iter_mut() {
+        if x.id == item { x.seg = k + 1; x.at = slope / 2.0; x.flat = flat; }
+        else if x.seg > k { x.seg += 2; }
+        else if x.seg == k && x.at > a { x.seg = k + 2; x.at -= a + h / 2.0; }
+    }
+    l.pts = pts;
+    Ok(())
+}
+
+/// Makes an eccentric reducer concentric again: the offset is taken out on the side it was put in,
+/// and the straight corners left are merged.
+fn concentric(l: &mut Line, item: u32) -> Result<(), String> {
+    let it = l.items.iter().find(|i| i.id == item).ok_or("That component no longer exists.")?.clone();
+    let j = it.seg;
+    let n = l.pts.len() - 1;
+    if j == 0 || j + 1 >= n { if let Some(x) = l.items.iter_mut().find(|x| x.id == item) { x.flat = Flat::None; } return Ok(()); }
+    let u = unit(sub(l.pts[j], l.pts[j - 1]));
+    let s = sub(l.pts[j + 1], l.pts[j]);
+    let along = dot(s, u);
+    let d = sub(s, mul(u, along));
+    if j + 2 == n && held(&l.to) {
+        l.pts[j - 1] = add(l.pts[j - 1], d);
+        l.pts[j] = add(l.pts[j], d);
+    } else {
+        l.pts[j + 1] = sub(l.pts[j + 1], d);
+        l.pts[j + 2] = sub(l.pts[j + 2], d);
+    }
+    tidy(l);
+    // `tidy` kept its place from the start of the merged run; the reducer's own half is now straight.
+    if let Some(x) = l.items.iter_mut().find(|x| x.id == item) { x.flat = Flat::None; x.at += along / 2.0 - it.at; }
+    Ok(())
 }
 
 /// Removes zero-length runs and corners in a straight line; components keep their place.
@@ -573,6 +643,14 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             *e = End::Point { term };
         }
         Op::Reroute { line } => {
+            // Eccentric reducers become concentric first: a new route has no offset to keep.
+            let ecc: Vec<u32> = p.line(line).ok_or("That line no longer exists.")?.items.iter().filter(|i| i.flat != Flat::None).map(|i| i.id).collect();
+            if !ecc.is_empty() {
+                let pts = route::path(p, cat, p.line(line).ok_or("That line no longer exists.")?);
+                let lm = line_mut(p, line)?;
+                lm.pts = pts;
+                for id in ecc { concentric(lm, id)?; }
+            }
             let l = p.line(line).ok_or("That line no longer exists.")?.clone();
             let (a, b) = (route::end_port(p, cat, &l.from), route::end_port(p, cat, &l.to));
             let n = l.pts.len();
@@ -651,6 +729,16 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             }
         }
         Op::SetViews(v) => { p.views = v; }
+        Op::SetEccentric { line, item, flat } => {
+            let pts = route::path(p, cat, p.line(line).ok_or("That line no longer exists.")?);
+            let l = line_mut(p, line)?;
+            l.pts = pts;
+            let it = l.items.iter().find(|i| i.id == item).ok_or("That component no longer exists.")?.clone();
+            if it.kind != ItemKind::Reducer { return Err("Only a reducer can be eccentric.".into()); }
+            if it.flat == flat { return Ok(()); }
+            if it.flat != Flat::None { concentric(l, item)?; }
+            if flat != Flat::None { eccentric(l, cat, item, flat)?; }
+        }
         Op::ImportPackage { json } => {
             let pk = crate::package::read(&json)?;
             crate::package::import(p, &pk, created)?;

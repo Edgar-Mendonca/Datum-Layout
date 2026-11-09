@@ -493,3 +493,79 @@ fn the_take_off_counts_butt_welds_and_the_valve_list_lists_valves() {
     let n: usize = p.lines.iter().map(|l| l.items.iter().filter(|i| matches!(i.kind, ItemKind::Gate | ItemKind::Globe | ItemKind::Check | ItemKind::Ball | ItemKind::Strainer)).count()).sum();
     assert_eq!(crate::lists::lists(&p, &cat).valves.len(), n);
 }
+
+#[test]
+fn eccentric_reducers_offset_the_run_and_switch_back() {
+    use crate::model::Flat;
+    let cat = Catalogue::builtin();
+    // An 8" level line with a reducer to 6" in its first run, then a turn down.
+    let red = Item { id: 7, kind: ItemKind::Reducer, seg: 0, at: 3.0, nps2: "6".into(), ..Default::default() };
+    let base = line("8", vec![[0.0, 0.0, 3.0], [6.0, 0.0, 3.0], [6.0, 0.0, 0.5]], vec![red]);
+    let e = (cat.od("8") - cat.od("6")) / 2.0;
+    for (flat, sign) in [(Flat::Top, 1.0), (Flat::Bottom, -1.0)] {
+        let mut d = Doc::new(base.clone());
+        d.apply(Op::SetEccentric { line: 1, item: 7, flat }, &cat).unwrap();
+        let l = d.p.line(1).unwrap().clone();
+        assert_eq!(l.pts.len(), 5, "{:?}", l.pts);
+        // The run beyond is offset; the corner below takes it up.
+        assert!((l.pts[3][2] - (3.0 + sign * e)).abs() < 1e-9, "{:?}", l.pts);
+        let b = build(&d.p, &cat);
+        assert!(b.issues.is_empty(), "{:?}", b.issues);
+        joints_ok(&b);
+        let r = of(&b, "reducer");
+        assert_eq!(r.len(), 1);
+        // Flat side: the tops (or bottoms) of the two ends line up.
+        let (pa, pb) = (r[0].ports[0].p, r[0].ports[1].p);
+        let (ra, rb) = (cat.od("8") / 2.0, cat.od("6") / 2.0);
+        if flat == Flat::Top { assert!((pa[2] + ra - (pb[2] + rb)).abs() < 1e-9); } else { assert!((pa[2] - ra - (pb[2] - rb)).abs() < 1e-9); }
+        // It goes to Datum Pipe as an eccentric reducer and reads back the same.
+        let text = crate::pcf::write(&d.p, &cat, None).unwrap();
+        assert!(text.contains("REDUCER-ECCENTRIC") && text.contains(if flat == Flat::Top { "FLAT-DIRECTION UP" } else { "FLAT-DIRECTION DOWN" }));
+        assert!(crate::pcf::reader::pcf(&text).is_ok());
+        let mut back = Doc::new(Project::new());
+        back.apply(Op::ImportPcf { text }, &cat).unwrap();
+        let bl = &back.p.lines[0];
+        assert_eq!(bl.pts.len(), l.pts.len());
+        assert!(bl.items.iter().any(|i| i.kind == ItemKind::Reducer && i.flat == flat), "{:?}", bl.items);
+        assert!(build(&back.p, &cat).issues.is_empty());
+        // Concentric again: the line as it was.
+        d.apply(Op::SetEccentric { line: 1, item: 7, flat: Flat::None }, &cat).unwrap();
+        let l2 = d.p.line(1).unwrap();
+        assert_eq!(l2.pts, base.lines[0].pts);
+        assert!((l2.items[0].at - 3.0).abs() < 1e-9 && l2.items[0].seg == 0, "{:?}", l2.items);
+    }
+    // In a vertical run it cannot be eccentric.
+    let mut d = Doc::new(line("8", vec![[0.0, 0.0, 6.0], [0.0, 0.0, 0.5]], vec![Item { id: 7, kind: ItemKind::Reducer, seg: 0, at: 3.0, nps2: "6".into(), ..Default::default() }]));
+    assert!(d.apply(Op::SetEccentric { line: 1, item: 7, flat: Flat::Top }, &cat).is_err());
+}
+
+#[test]
+fn a_pump_suction_reducer_flat_on_top_moves_the_run_before_it() {
+    use crate::model::Flat;
+    let cat = Catalogue::builtin();
+    let mut d = Doc::new(Project::new());
+    let pump = d.apply(Op::AddEquipment { kind: EquipKind::Pump, pos: [10.0, 10.0, 0.0] }, &cat).unwrap()[0];
+    let s = route::end_port(&d.p, &cat, &End::Nozzle { equip: pump, nozzle: "S".into() }).unwrap();
+    // An 8" line down from 4 m to the 6" suction: the last run is level into the nozzle.
+    let made = d.apply(Op::Route { from: RouteEnd::Point { p: [2.0, 10.0, 4.0] }, via: vec![[2.0, 10.0, s.p[2]]], to: RouteEnd::Nozzle { equip: pump, nozzle: "S".into() }, nps: Some("8".into()) }, &cat).unwrap();
+    let id = made[0];
+    let l = d.p.line(id).unwrap().clone();
+    let k = l.pts.len() - 2;
+    let r = d.apply(Op::Drop { line: id, kind: ItemKind::Reducer, at: [4.5, 10.0, s.p[2]], dir: [0.0; 3], nps2: "6".into() }, &cat).unwrap()[0];
+    let before = d.p.line(id).unwrap().clone();
+    assert_eq!(before.items[0].seg, k);
+    d.apply(Op::SetEccentric { line: id, item: r, flat: Flat::Top }, &cat).unwrap();
+    let after = d.p.line(id).unwrap();
+    // The nozzle end stays; the run before the reducer drops by the offset.
+    assert!(dist(*after.pts.last().unwrap(), *before.pts.last().unwrap()) < 1e-9);
+    let e = (cat.od("8") - cat.od("6")) / 2.0;
+    assert!((after.pts[k][2] - (before.pts[k][2] - e)).abs() < 1e-9, "{:?}", after.pts);
+    let b = build(&d.p, &cat);
+    assert!(b.issues.iter().all(|i| i.kind != "routing"), "{:?}", b.issues);
+    // Only the line's free start is open; the reducer, flanges and nozzle all meet.
+    assert!(connection_issues(&d.p, &cat, &b).iter().all(|i| i.kind == "open"), "{:?}", connection_issues(&d.p, &cat, &b));
+    joints_ok(&b);
+    // Route Again makes it concentric and squares the line.
+    d.apply(Op::Reroute { line: id }, &cat).unwrap();
+    assert!(d.p.line(id).unwrap().items.iter().all(|i| i.flat == Flat::None));
+}

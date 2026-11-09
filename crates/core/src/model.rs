@@ -165,6 +165,16 @@ pub enum ItemKind {
     Support,
 }
 
+/// A reducer's flat side: none (concentric), on top or at the bottom (eccentric).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum Flat {
+    #[default]
+    None,
+    Top,
+    Bottom,
+}
+
 /// What a pipe support holds: a rest carries the weight, a guide also stops sideways movement,
 /// a line stop stops movement along the pipe, an anchor holds it fixed.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default, Hash)]
@@ -238,6 +248,10 @@ pub struct Item {
     pub tag: String,
     /// Supports: what it holds.
     pub support: SupportKind,
+    /// Reducers: concentric, or eccentric with its flat side on top or at the bottom. An eccentric
+    /// reducer is its own short sloped run of the path (its ends are offset by half the change
+    /// in outside diameter).
+    pub flat: Flat,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]

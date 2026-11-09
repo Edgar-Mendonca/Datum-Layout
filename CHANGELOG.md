@@ -1,5 +1,12 @@
 # What's new in Datum Layout
 
+## 0.2.4 — 2026-11-09
+Eccentric reducers.
+
+**Flat on top or at the bottom.** Select a reducer in a level run and choose its flat side in the properties: flat on top for a pump suction (no vapour pocket), flat at the bottom for a rack or a line that must drain. The run beyond it moves up or down by half the change in diameter and the next corner takes it up; when the line ends at a nozzle just after (a pump suction), the run before it moves instead. Concentric puts it back exactly.
+
+**To Datum Pipe.** Written as an eccentric reducer with its flat direction; Datum Pipe's own engine reads it and solves the line. Piping component files read back keep it eccentric. The take-off names it, flat side and all.
+
 ## 0.2.3 — 2026-11-09
 Moving equipment made easy, the view cube, and status badges.
 

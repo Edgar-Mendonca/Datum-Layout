@@ -29,6 +29,7 @@ fn keyword(q: &Part) -> Option<(&'static str, &'static str)> {
         "pipe" => ("PIPE", ""),
         "elbow90" | "elbow45" => ("ELBOW", "ELBW"),
         "tee" => ("TEE", "TEBW"),
+        "reducer" if q.note.starts_with("FLAT") => ("REDUCER-ECCENTRIC", "REBW"),
         "reducer" => ("REDUCER-CONCENTRIC", "RCBW"),
         "flange" => ("FLANGE", "FLWN"),
         "blind" => ("FLANGE-BLIND", "FLBL"),
@@ -79,6 +80,7 @@ pub fn write(p: &Project, cat: &Catalogue, line: Option<u32>) -> Result<String, 
             }
             if !skey.is_empty() { s += &format!("    SKEY {skey}\n"); }
             if q.kind.starts_with("elbow") { s += &format!("    ANGLE {:.0}\n", if q.kind == "elbow90" { 90 } else { 45 }); }
+            if q.note.starts_with("FLAT") { s += &format!("    FLAT-DIRECTION {}\n", if q.note == "FLAT-TOP" { "UP" } else { "DOWN" }); }
             if q.rating > 0 { s += &format!("    ITEM-DESCRIPTION CLASS {} {}\n", q.rating, q.kind.to_uppercase()); }
         }
     }
@@ -268,7 +270,7 @@ pub mod import {
     use crate::parts::{add, dist, dot, mul, norm, sub, unit};
 
     #[derive(Default)]
-    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, co: Option<P3>, skey: String, desc: String, name: String }
+    struct Comp { kind: String, eps: Vec<(P3, f64)>, cp: Option<P3>, bp: Option<(P3, f64)>, co: Option<P3>, skey: String, desc: String, name: String, flat: String }
     #[derive(Default)]
     struct Group { name: String, spec: String, comps: Vec<Comp> }
 
@@ -316,6 +318,7 @@ pub mod import {
                 "SKEY" => comp.skey = rest.join(" ").to_uppercase(),
                 "CO-ORDS" => comp.co = pt(&rest).map(|p| p.0),
                 "NAME" => comp.name = rest.join(" "),
+                "FLAT-DIRECTION" => comp.flat = rest.join(" ").to_uppercase(),
                 "ITEM-DESCRIPTION" => comp.desc = rest.join(" ").to_uppercase(),
                 _ => {}
             }
@@ -408,7 +411,10 @@ pub mod import {
                     let Some((seg, at)) = place(centre, &l.pts) else { continue };
                     let u = unit(sub(l.pts[seg + 1], l.pts[seg]));
                     let mut it = Item { id: id(), kind, seg, at, dir: if u[2].abs() > 0.9 { [1.0, 0.0, 0.0] } else { [0.0, 0.0, 1.0] }, ..Default::default() };
-                    if kind == ItemKind::Reducer { it.nps2 = nps_of(b.1, inch).unwrap_or("").to_string(); }
+                    if kind == ItemKind::Reducer {
+                        it.nps2 = nps_of(b.1, inch).unwrap_or("").to_string();
+                        if c.kind == "REDUCER-ECCENTRIC" { it.flat = if c.flat.contains("DOWN") || c.flat.contains("BOT") { crate::model::Flat::Bottom } else { crate::model::Flat::Top }; }
+                    }
                     if kind == ItemKind::Tee {
                         if let Some((bp, bb)) = c.bp {
                             it.dir = unit(sub(bp, centre));

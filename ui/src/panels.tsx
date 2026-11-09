@@ -144,10 +144,11 @@ const ItemInsp = (p: { l: Line; id: number }) => {
   const it = () => p.l.items.find(i => i.id === p.id);
   return (
     <Show when={it()}>{x => <>
-      <p class="iwhat"><b>{ITEMS.find(k => k[0] === x().kind)?.[1]}</b> on <a href="#" onClick={e => { e.preventDefault(); setSel({ kind: "line", id: p.l.id }); }}>{p.l.number || "the line"}</a></p>
+      <p class="iwhat"><b>{x().kind === "reducer" && x().flat && x().flat !== "none" ? `Eccentric reducer, flat ${x().flat === "top" ? "on top" : "at the bottom"}` : ITEMS.find(k => k[0] === x().kind)?.[1]}</b> on <a href="#" onClick={e => { e.preventDefault(); setSel({ kind: "line", id: p.l.id }); }}>{p.l.number || "the line"}</a></p>
       <Row l="Tag"><input value={x().tag} placeholder="e.g. HV-101" onChange={e => act({ SetItem: { line: p.l.id, item: { ...x(), tag: e.currentTarget.value } } })} /></Row>
       <Row l="Distance from the start of its run" h="move"><NumIn q="len" v={x().at} set={v => act({ SetItem: { line: p.l.id, item: { ...x(), at: v } } })} /></Row>
-      <Show when={x().kind === "reducer"}><Row l="Size after it"><SizeSel v={x().nps2 || p.l.nps} set={s => act({ SetItem: { line: p.l.id, item: { ...x(), nps2: s } } })} /></Row></Show>
+      <Show when={x().kind === "reducer"}><Row l="Size after it"><SizeSel v={x().nps2 || p.l.nps} set={s => act({ SetItem: { line: p.l.id, item: { ...x(), nps2: s } } })} /></Row>
+        <Row l="Flat side" h="eccentric"><select class="flatside" onChange={e => act({ SetEccentric: { line: p.l.id, item: x().id, flat: e.currentTarget.value } })}><For each={[["none", "Concentric (no flat side)"], ["top", "Eccentric, flat on top"], ["bottom", "Eccentric, flat at the bottom"]]}>{([k, l]) => <option value={k} selected={(x().flat ?? "none") === k}>{l}</option>}</For></select></Row></Show>
       <Show when={x().kind === "tee"}>
         <Row l="Branch direction"><select onChange={e => act({ SetItem: { line: p.l.id, item: { ...x(), dir: JSON.parse(e.currentTarget.value) } } })}><For each={[["Up", [0, 0, 1]], ["Down", [0, 0, -1]], ["East", [1, 0, 0]], ["West", [-1, 0, 0]], ["North", [0, 1, 0]], ["South", [0, -1, 0]]] as [string, V3][]}>{([l, d]) => <option value={JSON.stringify(d)} selected={d.every((v, i) => Math.abs(v - x().dir[i]) < 1e-6)}>{l}</option>}</For></select></Row>
         <Show when={!project()?.lines.some(l => (l.from.kind === "branch" && l.from.item === x().id) || (l.to.kind === "branch" && l.to.item === x().id))}>

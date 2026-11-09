@@ -304,6 +304,24 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.keyboard.press("F5"); await settle(1200);
   check("after F5 the check badge reports the check", /clean|findings/.test(await p.textContent('.badge[data-badge="check"]')), await p.textContent(".status"));
 
+  // 7l. Eccentric reducers (0.2.4): flat on top, from the properties; concentric again.
+  await open("pumps");
+  st = await state();
+  const hdr = st.p.lines.find(l => l.number.includes("1005"));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(`.bbody tr.f:has-text(${JSON.stringify(hdr.number)})`); await settle(300);
+  await p.click('.tabs > button:has-text("Fittings")'); await p.click('.rb:has-text("Reducer")'); await settle(700);
+  await p.selectOption(".ipop select.flatside", "top"); await settle(700);
+  st = await state();
+  const er = st.p.lines.find(l => l.id === hdr.id).items.find(i => i.kind === "reducer");
+  check("a reducer's flat side can be set on top", er?.flat === "top", JSON.stringify(er));
+  check("the eccentric reducer routes cleanly", !st.issues.some(i => i.kind === "routing" || i.kind === "mismatch"), JSON.stringify(st.issues.map(i => i.text)));
+  check("the properties name it eccentric", (await p.textContent(".ipop .insp")).includes("flat on top"));
+  check("it goes to Datum Pipe as an eccentric reducer", (await ask("export_pcf", { line: hdr.id })).ok.includes("REDUCER-ECCENTRIC"));
+  if (shots) { await p.keyboard.press("Escape"); await settle(200); await shot("eccentric"); }
+  await p.keyboard.press("Control+z"); await settle(600);
+  check("undo makes it concentric again", (await state()).p.lines.find(l => l.id === hdr.id).items.find(i => i.kind === "reducer")?.flat === "none");
+
   // 7g. The valve list, butt welds in the take-off, design rules (0.1.10).
   await open("pumps");
   const nv = (await ask("lists")).ok.valves.length;

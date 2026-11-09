@@ -292,6 +292,11 @@ fn line(p: &Project, cat: &Catalogue, l: &Line, b: &mut Built) {
     }
     let lens: Vec<f64> = (0..n).map(|i| dist(pts[i], pts[i + 1])).collect();
     let dirs: Vec<P3> = (0..n).map(|i| unit(sub(pts[i + 1], pts[i]))).collect();
+    // Eccentric reducers: a short sloped run between two runs going the same way.
+    let ecc: Vec<Option<&Item>> = (0..n).map(|i| {
+        if i == 0 || i + 1 >= n || dot(dirs[i - 1], dirs[i + 1]) < 1.0 - 1e-6 || dot(dirs[i - 1], dirs[i]) < 0.9 || dot(dirs[i - 1], dirs[i]) > 1.0 - 1e-9 { return None; }
+        l.items.iter().find(|it| it.seg == i && it.kind == ItemKind::Reducer && it.flat != crate::model::Flat::None)
+    }).collect();
     // The route must leave each nozzle or tee square to it (it may not after the equipment moved).
     for (e, at, d) in [(&l.from, pts[0], dirs[0]), (&l.to, pts[n], mul(dirs[n - 1], -1.0))] {
         if let Some(port) = end_port(p, cat, e) {
@@ -342,6 +347,7 @@ fn line(p: &Project, cat: &Catalogue, l: &Line, b: &mut Built) {
     // Elbows.
     let mut elbows: Vec<Option<(f64, f64, &'static str)>> = vec![None; n + 1];
     for v in 1..n {
+        if ecc[v - 1].is_some() || ecc[v].is_some() { continue; }
         let (ui, uo) = (dirs[v - 1], dirs[v]);
         let th = dot(ui, uo).clamp(-1.0, 1.0).acos();
         let deg = th.to_degrees();
@@ -367,6 +373,25 @@ fn line(p: &Project, cat: &Catalogue, l: &Line, b: &mut Built) {
 
     // Each segment: end pieces, items, pipes between.
     for i in 0..n {
+        if let Some(it) = ecc[i] {
+            let (nin, nout) = item_nps[&it.id].clone();
+            let mut q = Part::new("reducer", l);
+            q.nps = larger(&nin, &nout);
+            q.nps2 = if q.nps == nin { nout.clone() } else { nin.clone() };
+            let u = dirs[i - 1];
+            let (a, e) = (pts[i], pts[i + 1]);
+            let h = dot(sub(e, a), u);
+            let flat = h * 0.2;
+            let (ra, rb) = (cat.od(&nin) / 2.0, cat.od(&nout) / 2.0);
+            q.shapes = vec![Shape::tube(a, add(a, mul(u, flat)), ra), Shape::Frustum { a: add(a, mul(u, flat)), b: sub(e, mul(u, flat)), r1: ra, r2: rb }, Shape::tube(sub(e, mul(u, flat)), e, rb)];
+            q.ports = vec![Port { p: a, d: mul(u, -1.0), nps: nin.clone(), rating: 0, end: "BW" }, Port { p: e, d: u, nps: nout.clone(), rating: 0, end: "BW" }];
+            q.length = h;
+            q.note = if it.flat == crate::model::Flat::Top { "FLAT-TOP".into() } else { "FLAT-BOTTOM".into() };
+            q.seg = i as i32;
+            q.item = it.id;
+            b.parts.push(q);
+            continue;
+        }
         let mut run = Run { l, a: pts[i], u: dirs[i], seg: i as i32, out: &mut b.parts };
         let mut cursor = 0.0;
         let nps_here = vert_nps[i].clone();

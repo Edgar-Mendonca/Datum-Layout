@@ -79,8 +79,9 @@
         "From the P&ID: read a plant package, place its equipment, route its lines with their components in order, and check the 3D model against it (0.2.1)",
         "Pipe supports (rest, guide, line stop, anchor) written for Datum Pipe's stress analysis (0.2.2)",
         "Drag equipment across the plot, nudge it with the arrow keys, a view cube and status badges (0.2.3)",
+        "Eccentric reducers, flat on top or at the bottom (0.2.4)",
         "A pipe class editor with its branch table (which tee or reinforcement for each header and branch size)",
-        "Eccentric reducers, crosses, sloped lines",
+        "Crosses and sloped lines",
         "Design rules for supports and access (with 0.3's steel)"
       ]
     },
