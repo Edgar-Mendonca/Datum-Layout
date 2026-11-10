@@ -75,7 +75,7 @@ pub fn run(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
 pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
     let conn = connections(b);
     let mut out = vec![];
-    let iss = |kind, text: String, at: P3, q: &Part| Issue { kind, text, at, line: q.line, item: q.item, equip: q.equip };
+    let iss = |kind, text: String, at: P3, q: &Part| Issue { kind, text, at, line: q.line, item: q.item, equip: q.equip, ..Default::default() };
     for (i, q) in b.parts.iter().enumerate() {
         for (j, pt) in q.ports.iter().enumerate() {
             match conn.get(&(i, j)) {
@@ -104,12 +104,12 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
         let Some(l) = p.line(q.line) else { continue };
         let Some(class) = cat.class(&l.class) else { continue };
         if !class.ratings.contains(&l.rating) && said.insert((l.id, 0, "rating".to_string())) {
-            out.push(Issue { kind: "class", text: format!("Line {}: class {} has no class {} flanges.", l.number, l.class, l.rating), at: l.pts[0], line: l.id, item: 0, equip: 0 });
+            out.push(Issue { kind: "class", text: format!("Line {}: class {} has no class {} flanges.", l.number, l.class, l.rating), at: l.pts[0], line: l.id, item: 0, equip: 0, ..Default::default() });
         }
         let allowed = match q.kind { "support" => true, "cross" => class.allows("tee", &q.nps), "weldolet" | "sockolet" => class.allows(q.kind, &q.nps) || class.allows("tee", &q.nps), k => class.allows(k, &q.nps) };
         if !allowed && said.insert((l.id, q.item, format!("{}{}", q.kind, q.nps))) {
             let pt = q.ports.first().map(|x| x.p).unwrap_or_default();
-            out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, kind_name(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0 });
+            out.push(Issue { kind: "class", text: format!("{}: a {}\" {} is not allowed by class {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, q.nps, kind_name(q.kind), l.class), at: pt, line: l.id, item: q.item, equip: 0, ..Default::default() });
         }
     }
     // The class's branch table: each branch made with the fitting the class gives for its sizes.
@@ -127,13 +127,13 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
                 let same = want == have || (want == "tee" && have == "reducing_tee") || (want == "reducing_tee" && have == "tee");
                 if !same && it.kind != ItemKind::Cross {
                     let words = |f: &str| match f { "reducing_tee" => "a reducing tee", "tee" => "a tee", "weldolet" => "a weldolet", "sockolet" => "a sockolet", x => x }.to_string();
-                    out.push(Issue { kind: "class", text: format!("{}: class {} makes a {}\" × {}\" branch with {}, not {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, l.class, run, br, words(want), words(have)), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: it.id, equip: 0 });
+                    out.push(Issue { kind: "class", text: format!("{}: class {} makes a {}\" × {}\" branch with {}, not {}.", if l.number.is_empty() { "Line without a number" } else { &l.number }, l.class, run, br, words(want), words(have)), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: it.id, equip: 0, ..Default::default() });
                 }
             }
         }
     }
     for l in p.lines.iter().filter(|l| l.number.trim().is_empty()) {
-        out.push(Issue { kind: "number", text: format!("A {}\" line has no line number.", l.nps), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 });
+        out.push(Issue { kind: "number", text: format!("A {}\" line has no line number.", l.nps), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0, ..Default::default() });
     }
     out.extend(line_list_issues(p));
     out.extend(design_rules(p, cat, b));
@@ -150,7 +150,7 @@ pub fn design_rules(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
     let name = |id: u32| p.line(id).map(|l| if l.number.is_empty() { "(no number)".to_string() } else { l.number.clone() }).unwrap_or_default();
     for q in &b.parts {
         let mid = if q.ports.len() >= 2 { crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5) } else { q.ports.first().map(|x| x.p).unwrap_or_default() };
-        let iss = |text: String| Issue { kind: "rule", text, at: mid, line: q.line, item: q.item, equip: 0 };
+        let iss = |text: String| Issue { kind: "rule", text, at: mid, line: q.line, item: q.item, equip: 0, ..Default::default() };
         match q.kind {
             "gate" | "globe" | "ball" | "butterfly" if q.item != 0 => {
                 let it = p.line(q.line).and_then(|l| l.items.iter().find(|i| i.id == q.item));
@@ -193,7 +193,7 @@ pub fn line_list_issues(p: &Project) -> Vec<Issue> {
     let centre = [(p.plot.e[0] + p.plot.e[1]) / 2.0, (p.plot.n[0] + p.plot.n[1]) / 2.0, p.plot.ground];
     for r in &p.line_list {
         let Some(l) = p.lines.iter().find(|l| l.number == r.number).or_else(|| p.lines.iter().find(|l| same_line(&l.number, &r.number))) else {
-            out.push(Issue { kind: "list", text: format!("Line {} is on the line list but not in the model yet.", r.number), at: centre, line: 0, item: 0, equip: 0 });
+            out.push(Issue { kind: "list", text: format!("Line {} is on the line list but not in the model yet.", r.number), at: centre, line: 0, item: 0, equip: 0, ..Default::default() });
             continue;
         };
         let mut d = vec![];
@@ -210,10 +210,10 @@ pub fn line_list_issues(p: &Project) -> Vec<Issue> {
             }
         }
         if (r.insulation - l.insulation).abs() > 0.0005 { d.push(format!("insulation {:.0} mm (the model has {:.0} mm)", r.insulation * 1000.0, l.insulation * 1000.0)); }
-        if !d.is_empty() { out.push(Issue { kind: "list", text: format!("Line {}: the line list says {}.", r.number, d.join(", ")), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 }); }
+        if !d.is_empty() { out.push(Issue { kind: "list", text: format!("Line {}: the line list says {}.", r.number, d.join(", ")), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0, ..Default::default() }); }
     }
     for l in p.lines.iter().filter(|l| !l.number.trim().is_empty() && !p.line_list.iter().any(|r| r.number == l.number || (same_line(&l.number, &r.number) && !p.lines.iter().any(|x| x.number == r.number)))) {
-        out.push(Issue { kind: "list", text: format!("Line {} is not on the line list.", l.number), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0 });
+        out.push(Issue { kind: "list", text: format!("Line {} is not on the line list.", l.number), at: l.pts.first().copied().unwrap_or_default(), line: l.id, item: 0, equip: 0, ..Default::default() });
     }
     out
 }
@@ -318,7 +318,7 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
         if boxes[i].0[2] < ground + c - 1e-9 && seen_ground.insert((q.line, q.item, q.seg)) {
             let mut pt = [(boxes[i].0[0] + boxes[i].1[0]) / 2.0, (boxes[i].0[1] + boxes[i].1[1]) / 2.0, ground];
             pt[2] = ground;
-            out.push(Issue { kind: "clash", text: format!("Pipe–ground: {} is {} from the ground (clearance {}).", label(p, q), if boxes[i].0[2] < ground { format!("{} below", mm(ground - boxes[i].0[2])) } else { mm(boxes[i].0[2] - ground) }, mm(c)), at: pt, line: q.line, item: q.item, equip: 0 });
+            out.push(Issue { kind: "clash", text: format!("Pipe–ground: {} is {} from the ground (clearance {}).", label(p, q), if boxes[i].0[2] < ground { format!("{} below", mm(ground - boxes[i].0[2])) } else { mm(boxes[i].0[2] - ground) }, mm(c)), at: pt, line: q.line, item: q.item, equip: 0, ..Default::default() });
         }
     }
     // Pairs whose boxes come within the clearance: sweep along east.
@@ -365,7 +365,7 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
         let mid = |k: usize| (bi.0[k].max(bj.0[k]) + bi.1[k].min(bj.1[k])) / 2.0;
         let pt = [mid(0), mid(1), mid(2)];
         let how = if d <= 1e-6 { "overlap".to_string() } else { format!("are {} apart", mm(d)) };
-        out.push(Issue { kind: "clash", text: format!("{kind}: {} and {} {how} (clearance {}).", label(p, qi), label(p, qj), mm(c)), at: pt, line: qi.line, item: qi.item, equip: qj.equip });
+        out.push(Issue { kind: "clash", text: format!("{kind}: {} and {} {how} (clearance {}).", label(p, qi), label(p, qj), mm(c)), at: pt, line: qi.line, item: qi.item, equip: qj.equip, line2: qj.line, item2: qj.item });
     }
     out
 }

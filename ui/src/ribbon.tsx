@@ -2,13 +2,12 @@
 // Check · Lists · View · Help, and the contextual Format tab for a selected line or equipment).
 // Copied from Datum Plan's ribbon by way of Datum Pipe.
 import { For, Show, JSX, createSignal, createMemo, onMount } from "solid-js";
-import { colourBy, setColourBy, ColourBy, section, hidden, isolated, picked, call, out, project, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, sel, opts, setOpts, selLine, selEquip, mode, elev, setElev, setBottom, checked, act } from "./store";
+import { colourBy, setColourBy, ColourBy, section, hidden, isolated, picked, call, out, project, tab, setTab, setBackstage, openMenu, openDialog, closeDialog, theme, setTheme, sel, opts, setOpts, selLine, selEquip, mode, setBottom, checked, act } from "./store";
 import { C, ALL_CMDS } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
 import { Help, helpCard, HELP } from "./help";
-import { invoke, Example, EQUIP, ITEMS, NPS, RATINGS, inch } from "./api";
-import { catalogue } from "./panels";
+import { invoke, Example, EQUIP, ITEMS, NPS, inch } from "./api";
 import { fmt, toU, fromU, unit } from "./units";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Layout";
@@ -95,12 +94,6 @@ export const exampleMenu = async (e: MouseEvent) => {
 };
 const sizeMenu = (e: MouseEvent) => openMenu(e, NPS.map(n => ({ label: inch(n), on: selLine()?.nps === n, run: () => C.resize(n) })));
 
-/** The working elevation for routing clicks. */
-export const ElevBox = () => (
-  <label class="elev" title="Clicks in the 3D view while routing land at this elevation (PgUp / PgDn change it by one grid step)">EL
-    <input type="number" step="0.1" value={+toU("coord", elev()).toFixed(3)} onChange={e => { const v = +e.currentTarget.value; if (Number.isFinite(v)) setElev(fromU("coord", v)); }} /><span class="unit">{unit("coord")}</span></label>
-);
-
 export const Ribbon = () => {
   const p = () => project();
   const n = (k: string) => (checked() ?? []).filter(i => i.kind === k).length;
@@ -123,13 +116,8 @@ export const Ribbon = () => {
         <G l="From the P&ID" h="package"><B big i="import" l="Plant Package" run={C.importPackage} title="Read a plant package from Datum Schema: equipment, nozzles, lines and their components" /><B big i="route" l="Route Listed Lines" run={C.routeListed} off={!p()?.line_list.length} title="Route the listed lines nozzle to nozzle, with their components in the P&ID's order" /></G>
       </Show>
       <Show when={tab() === "piping"}>
-        <G l="Route" h="route"><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Click a nozzle or a point, then the corners; end on a nozzle or double-click (R)" /><S><ElevBox /><B i="up" l="Up one grid step" run={() => C.elevation(p()?.plot.grid ?? 1)} /><B i="down" l="Down one grid step" run={() => C.elevation(-(p()?.plot.grid ?? 1))} /></S><S><B i="route" l="Route Again" run={C.reroute} off={!selLine()} title="Route the selected line square again between its ends (after equipment moved or turned)" /></S></G>
-        <G l="New Lines" h="spec"><S>
-          <label class="rsel">Size<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, nps: e.currentTarget.value } })}><For each={NPS}>{s => <option value={s} selected={p()?.settings.nps === s}>{inch(s)}</option>}</For></select></label>
-          <B i="library" l="Library" run={() => import("./library").then(k => k.library(`class:${p()?.settings.class ?? ""}`))} title="The pipe classes and parts tables" />
-          <label class="rsel">Class<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, class: e.currentTarget.value } })}><For each={catalogue()?.cat.classes ?? []}>{c => <option value={c.name} selected={p()?.settings.class === c.name}>{c.name}</option>}</For></select></label>
-          <label class="rsel">Rating<select onChange={e => p() && act({ SetSettings: { ...p()!.settings, rating: +e.currentTarget.value } })}><For each={RATINGS}>{r => <option value={r} selected={p()?.settings.rating === r}>Class {r}</option>}</For></select></label>
-        </S></G>
+        <G l="Route" h="route"><B big i="route" l="Route Line" on={mode() === "route"} run={C.route} title="Click a nozzle or a point, then the corners; end on a nozzle or double-click (R)" /><S><B i="up" l="Up one grid step" run={() => C.elevation(p()?.plot.grid ?? 1)} /><B i="down" l="Down one grid step" run={() => C.elevation(-(p()?.plot.grid ?? 1))} /></S><S><B i="route" l="Route Again" run={C.reroute} off={!selLine()} title="Route the selected line square again between its ends (after equipment moved or turned)" /></S></G>
+        <G l="Pipe Classes" h="spec"><B big i="library" l="Library" run={() => import("./library").then(k => k.library(`class:${p()?.settings.class ?? ""}`))} title="The pipe classes and parts tables; edit a class for this plant. The size, class and rating of new lines are on the bar under the ribbon." /></G>
         <G l="Corners" h="corners"><B big i="jog" l="Add Jog" run={() => C.jog()} off={sel()?.kind !== "run"} title="Step the selected run up (or sideways) with four elbows, to pass over or round something (J)" /><S><B i="straight" l="Remove Jog" run={C.removeJog} off={sel()?.kind !== "run"} title="Straighten the jog whose middle run is selected" /><div class="rnote">Select a line to drag its corners</div></S></G>
         <G l="Line Size" h="resize"><B big i="resize" l="Size" dd={sizeMenu} off={!selLine()} title="Change the selected line's size: every component re-sizes" /><S><B i="up" l="One size larger" run={() => C.step(true)} off={!selLine()} /><B i="down" l="One size smaller" run={() => C.step(false)} off={!selLine()} /></S></G>
         <G l="Elbows" h="elbows"><S><B i="elbow" l="Long radius" on={selLine()?.radius === "long"} run={() => C.radius("long")} off={!selLine()} /><B i="elbow" l="Short radius" on={selLine()?.radius === "short"} run={() => C.radius("short")} off={!selLine()} /></S></G>

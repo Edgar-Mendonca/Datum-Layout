@@ -97,6 +97,7 @@ const App = () => {
     else if (e.key === "PageDown") { e.preventDefault(); C.elevation(-grid); }
     else if (k === "r") C.route();
     else if (k === "m") C.measure();
+    else if (k === "n") C.nextClash();
     else if (k === "h") { if (e.shiftKey) C.showAll(); else C.hide(); }
     else if (k === "i") C.isolate();
     else if (k === "j") C.jog();

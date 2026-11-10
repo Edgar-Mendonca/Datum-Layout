@@ -77,7 +77,7 @@ export const [focus, setFocus] = createSignal<{ at: V3; r: number } | null>(null
 // ---------- what the view shows ----------
 /** Parts coloured by their kind, or each line's parts by its number, class, fluid or size. */
 export type ColourBy = "kind" | "line" | "class" | "fluid" | "size";
-export const [colourBy, setColourBy] = createSignal<ColourBy>("kind");
+export const [colourBy, setColourBy] = createSignal<ColourBy>("line");
 /** Equipment and line ids hidden; or, when isolated, the only ones shown. */
 export const [hidden, setHidden] = createSignal<number[]>([]);
 export const [isolated, setIsolated] = createSignal<number[] | null>(null);

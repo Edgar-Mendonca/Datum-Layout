@@ -1,6 +1,6 @@
 // Commands: what the ribbon, menus, keys and Tell Me run.
 import { SUPPORTS, SupportKind, SavedView, Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
-import { colourBy, setColourBy, ColourBy, isolated, hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
+import { checked, checkStale, colourBy, setColourBy, ColourBy, isolated, hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
 import * as D from "./dialogs";
 import { RouteFrom } from "./store";
 
@@ -38,6 +38,8 @@ const download = async (name: string, data: string, what: string) => {
 };
 const safe = (s: string) => (s || "plant").replace(/[\\/:*?"<>|]+/g, "-");
 
+/** The clash last shown (N steps on from it). */
+let clashAt = -1;
 export const C = {
   // ---------- file ----------
   save: async (asNew = false) => { const o = await call<Out | null>("save", { asNew }); if (o) { setOut(o); toast("Saved.", true); } },
@@ -262,8 +264,24 @@ export const C = {
     toast(r.length ? `${clashes} clash${clashes === 1 ? "" : "es"} and ${r.length - clashes} other finding${r.length - clashes === 1 ? "" : "s"}. Click one to show it.` : "No clashes and no errors.", !r.length);
   },
   goto: (i: Issue) => {
+    if (i.kind === "clash") {
+      // Both parts: the pair is picked (each line or equipment), the view frames them.
+      const ids = [i.line, i.line2 ?? 0, i.equip].filter(x => x > 0);
+      setSel(null); setPicked([...new Set(ids)]);
+      const k = (checked() ?? []).filter(x => x.kind === "clash").indexOf(i); if (k >= 0) clashAt = k;
+      setFocus({ at: i.at, r: 2.5 });
+      return;
+    }
     if (i.item) setSel({ kind: "item", id: i.item, line: i.line }); else if (i.line) setSel({ kind: "line", id: i.line }); else if (i.equip) setSel({ kind: "equip", id: i.equip });
     setFocus({ at: i.at, r: 1.5 });
+  },
+  /** The next clash of the last check (N), round again after the last. */
+  nextClash: () => {
+    const cl = checkStale() ? [] : (checked() ?? []).filter(x => x.kind === "clash");
+    if (!cl.length) return toast(checked() && !checkStale() ? "No clashes." : "Check first (F5): then N steps through the clashes.");
+    clashAt = (clashAt + 1) % cl.length;
+    C.goto(cl[clashAt]);
+    toast(`Clash ${clashAt + 1} of ${cl.length}: ${cl[clashAt].text}`, true);
   },
   exportPcf: async (line?: number) => {
     const p = project(); if (!p?.lines.length) return toast("The plant has no lines yet.");

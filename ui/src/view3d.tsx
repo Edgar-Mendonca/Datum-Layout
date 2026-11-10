@@ -9,7 +9,7 @@ import { Portal } from "solid-js/web";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line } from "./api";
-import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection, hintSlot } from "./store";
+import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection, hintSlot, checked, checkStale } from "./store";
 import { C, setFit, setStdView, setCamHook, finishRoute, branchSize } from "./cmds";
 import { fmt, toU, fromU, unit } from "./units";
 
@@ -98,9 +98,11 @@ export const View3D = () => {
     tag(`north`, [e[0] - sz * 1.4 + Math.sin(north * Math.PI / 180) * sz * 1.5, n[1] - sz + Math.cos(north * Math.PI / 180) * sz * 1.5, g], "N", "nlabel north");
     // Coordinates along the south and west edges, at a round step giving about ten labels.
     const nice = (span: number) => { const r = span / 10, m = Math.pow(10, Math.floor(Math.log10(r))); return [1, 2, 5, 10].map(k => k * m).find(k => k >= r) ?? r; };
-    const le = Math.max(maj, nice(e[1] - e[0])), ln = Math.max(maj, nice(n[1] - n[0]));
+    const span = (a: number[]) => a[1] - a[0];
+    const le = Math.max(maj, span(e) > 25 ? 10 : nice(span(e))), ln = Math.max(maj, span(n) > 25 ? 10 : nice(span(n)));
+    // E along the south edge; N along the west edge, but not at the south-west corner (E's first label is there) nor beside the north arrow.
     for (let x = Math.ceil(e[0] / le) * le; x <= e[1] + 1e-9; x += le) tag(`e${x}`, [x, n[0] - sz * 0.4, g], `E ${+x.toFixed(2)}`, "nlabel coord");
-    for (let y = Math.ceil(n[0] / ln) * ln; y <= n[1] + 1e-9; y += ln) tag(`n${y}`, [e[0] - sz * 0.5, y, g], `N ${+y.toFixed(2)}`, "nlabel coord");
+    for (let y = Math.ceil(n[0] / ln) * ln; y <= n[1] + 1e-9; y += ln) if (y - n[0] > ln * 0.5 && n[1] - y > sz * 2.2) tag(`n${y}`, [e[0] - sz * 0.5, y, g], `N ${+y.toFixed(2)}`, "nlabel coord");
     // Areas as boxes.
     for (const a of p.areas) {
       const box = new THREE.Box3(new THREE.Vector3(...a.min), new THREE.Vector3(...a.max));
@@ -188,13 +190,23 @@ export const View3D = () => {
     if (s.kind === "item") return q.line === s.line && q.item === s.id;
     return false;
   };
+  /** The clashes found by the last check, while it still stands. */
+  const clashes = () => checkStale() ? [] : (checked() ?? []).filter(i => i.kind === "clash");
+  /** Whether a part is one of a clash's two, at the clash (a line's pipe pieces: only the one there). */
+  const inClash = (i: { at: V3; line: number; item: number; equip: number; line2?: number; item2?: number }, q: PartRef) => {
+    const near = [0, 1, 2].every(k => i.at[k] >= q.lo[k] - 0.15 && i.at[k] <= q.hi[k] + 0.15);
+    if (!near) return false;
+    if (q.line) return (q.line === i.line && q.item === i.item) || (!!i.line2 && q.line === i.line2 && q.item === (i.item2 ?? 0));
+    return !!i.equip && q.equip === i.equip && q.kind === "equipment";
+  };
   const paintSelection = () => {
     if (!mesh || !colours || !base || !sceneData) return;
     colours.set(base);
     const idx = (mesh.geometry.index!.array) as Uint32Array;
     const bad = new Set((out()?.issues ?? []).filter(i => i.kind === "routing" && i.item).map(i => i.item));
+    const cl = clashes();
     for (const q of sceneData.parts) {
-      const on = selected(q), wrong = q.item && bad.has(q.item);
+      const on = selected(q), wrong = (q.item && bad.has(q.item)) || cl.some(i => inClash(i, q));
       if (!on && !wrong) continue;
       const c = on ? SELECTED : PROBLEM;
       for (let t = q.t0 * 3; t < q.t1 * 3; t++) { const v = idx[t]; colours[v * 3] = c.r; colours[v * 3 + 1] = c.g; colours[v * 3 + 2] = c.b; }
@@ -229,7 +241,8 @@ export const View3D = () => {
   };
 
   const buildLabels = () => {
-    liveTags = new Set([...liveTags].filter(k => !k.startsWith("eq") && !k.startsWith("ln")));
+    liveTags = new Set([...liveTags].filter(k => !k.startsWith("eq") && !k.startsWith("ln") && !k.startsWith("cl")));
+    clashes().forEach((i, k) => tag(`cl${k}`, i.at, String(k + 1), "nlabel clashl"));
     const p = project();
     if (p && opts().labels) {
       const vis = (id: number) => { const iso = isolated(); return iso ? iso.includes(id) : !hidden().includes(id); };
@@ -648,26 +661,29 @@ export const View3D = () => {
     const [q, at] = hit;
     if (q.line) {
       openMenu(e, [
-        { label: "Select the line", run: () => setSel({ kind: "line", id: q.line }) },
-        { label: "Select this run", run: () => setSel({ kind: "run", id: q.line, seg: q.seg }), off: q.kind !== "pipe" },
-        { label: "Add a jog here", off: q.kind !== "pipe", run: () => { const pts = out()?.paths.find(x => x[0] === q.line)?.[1]; const a = pts?.[q.seg]; setSel({ kind: "run", id: q.line, seg: q.seg }); C.jog(a ? Math.hypot(at[0] - a[0], at[1] - a[1], at[2] - a[2]) : undefined); } },
-        { label: "Take out this jog", off: q.kind !== "pipe", run: () => { setSel({ kind: "run", id: q.line, seg: q.seg }); C.removeJog(); } },
+        { label: "Select the line", icon: "pipe", run: () => setSel({ kind: "line", id: q.line }) },
+        { label: "Select this run", icon: "route", run: () => setSel({ kind: "run", id: q.line, seg: q.seg }), off: q.kind !== "pipe" },
+        { label: "Add a jog here", icon: "jog", keys: "J", off: q.kind !== "pipe", run: () => { const pts = out()?.paths.find(x => x[0] === q.line)?.[1]; const a = pts?.[q.seg]; setSel({ kind: "run", id: q.line, seg: q.seg }); C.jog(a ? Math.hypot(at[0] - a[0], at[1] - a[1], at[2] - a[2]) : undefined); } },
+        { label: "Take out this jog", icon: "straight", off: q.kind !== "pipe", run: () => { setSel({ kind: "run", id: q.line, seg: q.seg }); C.removeJog(); } },
         "-",
-        { label: "Add a component here", sub: ITEMS.map(([k, l]) => ({ label: l, run: () => C.drop(q.line, k, at) })) },
-        { label: "Export this line for Datum Pipe (.pcf)", run: () => C.exportPcf(q.line) },
+        { label: "Add a component here", icon: "valve", sub: ITEMS.map(([k, l]) => ({ label: l, run: () => C.drop(q.line, k, at) })) },
+        { label: "Export this line for Datum Pipe (.pcf)", icon: "export", run: () => C.exportPcf(q.line) },
         "-",
-        { label: "Delete", run: () => { setSel(q.item ? { kind: "item", id: q.item, line: q.line } : { kind: "line", id: q.line }); C.del(); } },
+        { label: "Delete", icon: "del", keys: "Del", run: () => { setSel(q.item ? { kind: "item", id: q.item, line: q.line } : { kind: "line", id: q.line }); C.del(); } },
       ]);
     } else {
       const pick = () => { setPicked([]); setSel({ kind: "equip", id: q.equip }); };
       openMenu(e, [
-        { label: "Select", run: pick },
-        { label: "Move to…", run: () => { pick(); C.moveTo(); } },
-        { label: "Turn 90°", run: () => { pick(); C.rotate(90); } },
-        { label: "Turn −90°", run: () => { pick(); C.rotate(-90); } },
-        { label: "Copy beside it", run: () => { pick(); C.copyGroup(); } },
+        { label: "Select", icon: "selectall", run: pick },
+        { label: "Move to…", icon: "measure", keys: "↑↓←→", run: () => { pick(); C.moveTo(); } },
+        { label: "Turn 90°", icon: "rotate", run: () => { pick(); C.rotate(90); } },
+        { label: "Turn −90°", icon: "rotate", run: () => { pick(); C.rotate(-90); } },
+        { label: "Copy beside it", icon: "copy", keys: "Ctrl+D", run: () => { pick(); C.copyGroup(); } },
         "-",
-        { label: "Delete", run: () => { pick(); C.del(); } },
+        { label: "Hide", icon: "hide", keys: "H", run: () => { pick(); C.hide(); } },
+        { label: "Show only this", icon: "isolate", keys: "I", run: () => { pick(); C.isolate(); } },
+        "-",
+        { label: "Delete", icon: "del", keys: "Del", run: () => { pick(); C.del(); } },
       ]);
     }
   };
@@ -764,6 +780,7 @@ export const View3D = () => {
   createEffect(on([hidden, isolated], () => applyShown(), { defer: true }));
   createEffect(on(section, applySection, { defer: true }));
   createEffect(on(() => opts().labels, () => { buildLabels(); draw(); }, { defer: true }));
+  createEffect(on(() => [checked(), checkStale()], () => { buildLabels(); paintSelection(); }, { defer: true }));
   createEffect(on(() => [sel()?.kind === "line" ? sel()!.id : 0, picked().length], () => { buildLabels(); draw(); }, { defer: true }));
   createEffect(on(mode, () => { buildPorts(); buildGizmo(); if (mode() !== "route") { setRubber([]); marker.visible = false; } host.style.cursor = mode() === "select" ? "" : "crosshair"; if (mode() !== "measure") setMeasure([]); }, { defer: true }));
   createEffect(on(measure, () => {

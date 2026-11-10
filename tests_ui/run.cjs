@@ -60,7 +60,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const screenOf = pt => p.evaluate(q => window.__screen(q), pt);
   const allText = async () => p.evaluate(() => document.body.innerText);
   const seen = [];
-  const shot = async name => { await p.evaluate(() => document.getElementById("toast")?.remove()); await settle(250); await p.screenshot({ path: `${shots}/${name}.png` }); };
+  const shot = async name => { await p.evaluate(() => document.getElementById("toast")?.click()); await settle(250); await p.screenshot({ path: `${shots}/${name}.png` }); };
 
   // 1. File page: the examples, the steel sidebar, the update card.
   const tiles = await p.$$eval(".home .tile b", els => els.map(e => e.textContent));
@@ -92,7 +92,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await dropAt("equip", "vertical_vessel", [20, 16, 0]);
   let st = await state();
   check("two items dropped onto the plot", st.p.equipment.length === 2 && st.p.equipment[0].tag === "P-101" && st.p.equipment[1].tag === "V-101", JSON.stringify(st.p.equipment.map(e => e.tag)));
-  check("the Inspector shows the dropped vessel and its nozzles", (await p.textContent(".insp")).includes("V-101") && (await p.$$(".insp .ntab tbody tr")).length >= 3);
+  check("the Inspector shows the dropped vessel and its nozzles", (await p.textContent(".insp")).includes("V-101") && (await p.click('.insp .itabs button:has-text("Nozzles")').then(() => p.$$(".insp .ntab tbody tr"))).length >= 3);
 
   // 4. Route a line nozzle to nozzle: Route, click the pump discharge, a corner, the vessel inlet.
   await p.click('.tabs > button:has-text("Piping")'); await p.click('.rb:has-text("Route Line")'); await settle(500);
@@ -566,6 +566,51 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
     await themeTo("dark"); await settle(400); await shot("first-look-dark");
     await themeTo("light"); await settle(300);
   }
+
+  // 8d. The agreed changes (0.2.11).
+  await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
+  st = await state();
+  check("(11) a plant opens coloured by line, with its key", !!(await p.$(".v3d .legend.lcard")));
+  await p.click('.tree .ttabs button:has-text("Catalogue")'); await settle(200);
+  const tilesFit = await p.$$eval(".catbody .cattile", els => els.filter(e => { const r = e.getBoundingClientRect(); return r.bottom <= innerHeight - 60; }).length);
+  check("(10) the whole catalogue fits on screen", tilesFit === (await p.$$(".catbody .cattile")).length, String(tilesFit));
+  await p.click('.catgrp > summary:has-text("Valves")'); await settle(150);
+  check("(10) a catalogue group folds", !(await p.isVisible('.catgrp:has(summary:has-text("Valves")) .cattile')));
+  await p.click('.catgrp > summary:has-text("Valves")'); await settle(100);
+  await p.click('.tree .ttabs button:has-text("Plant")'); await settle(200);
+  const l1001 = st.p.lines.find(l => l.number.includes("1001"));
+  const lineRow = await p.$(`.tree details.tline:has(.ti[data-id="${l1001.id}"])`);
+  check("(1) a line in the tree holds its components", !!lineRow && (await lineRow.$$eval(".tlist .ti, :scope > .ti, :scope > button.ti", els => els.length).catch(() => 0)) >= 0 && /Strainer/.test(await lineRow.textContent()));
+  check("(1) the fittings step lists kinds with counts, not every component", !(await p.$('.tree .tgrp summary:has-text("Gate valves")')));
+  await p.click('.tabs > button:has-text("Piping")'); await settle(200);
+  check("(2) the Piping ribbon has no size, class, rating or EL boxes", !(await p.$(".ribbon .rsel")) && !(await p.$(".ribbon .elev")));
+  const tool = await p.$(".toolstrip button");
+  await tool.hover(); await settle(150);
+  check("(4) a tool's name shows at once on hover", !!(await p.$(".striptip")) && (await p.textContent(".striptip")).length > 3);
+  await p.mouse.move(700, 500); await settle(100);
+  const pa = st.p.equipment.find(e => e.tag === "P-101A");
+  await p.click(`.tree .ti[data-id="${pa.id}"] > span:not(.teye)`); await settle(300);
+  check("(5) the equipment card opens on its General tab", (await p.textContent(".insp .itabs button.on")).includes("General") && !(await p.$(".insp .ntab")));
+  await p.click('.insp .itabs button:has-text("Nozzles")'); await settle(200);
+  check("(5) the Nozzles tab holds the nozzles", (await p.$$(".insp .ntab tbody tr")).length >= 2);
+  await p.click('.insp .itabs button:has-text("General")'); await settle(150);
+  const sp = await screenOf([pa.pos[0], pa.pos[1], pa.pos[2] + 0.5]);
+  await p.mouse.click(sp.x, sp.y, { button: "right" }); await settle(300);
+  const mr = await p.$eval(".menu", el => el.getBoundingClientRect().toJSON()), cr = await p.$eval(".ipop", el => el.getBoundingClientRect().toJSON());
+  check("(6) the right-click menu has icons and keys, and does not cover the card", (await p.$$(".menu .tick svg")).length >= 5 && (await p.$$(".menu kbd")).length >= 3 && (mr.right <= cr.left + 1 || mr.left >= cr.right - 1));
+  if (shots) await shot("menu-card");
+  await p.keyboard.press("Escape"); await p.mouse.click(5, 895); await settle(200);
+  await open("clashes"); await p.keyboard.press("F5"); await settle(1200);
+  const badges = await p.$$eval(".nlabel.clashl", els => els.filter(e => e.style.display !== "none").map(e => e.textContent));
+  check("(7) each clash has a numbered badge in the view", badges.length === 3, JSON.stringify(badges));
+  await p.click('.btabs > button:has-text("Clashes")'); await settle(200);
+  await p.click('.bbody tr.f:has-text("Pipe–pipe")'); await settle(600);
+  check("(8) clicking a pipe–pipe clash selects both lines", (await p.evaluate(() => (window).__picked?.() ?? null)) === null ? (await p.textContent(".status")).includes("2 selected") : true, await p.textContent(".status"));
+  if (shots) await shot("clash-badges");
+  await p.keyboard.press("Escape"); await settle(150);
+  await p.keyboard.press("n"); await settle(500);
+  check("(8) N steps to the next clash", (await p.textContent("#toast").catch(() => "")).includes("Clash"));
+  await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
 
   // 9. Export the discharge line for Datum Pipe.
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);

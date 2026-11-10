@@ -34,12 +34,9 @@ export const CataloguePanel = () => {
       <header>Catalogue <Help k="catalogue" /></header>
       <div class="catbody">
         <input class="catsearch" placeholder="Search the catalogue" value={q()} onInput={e => setQ(e.currentTarget.value)} />
-        <h4>Equipment</h4>
-        <div class="catgrid"><For each={EQUIP}>{([k, l, i]) => <Tile type="equip" kind={k} label={l} icon={i} hint={`${l}: drag onto the plot, or click and then click the plot`} run={() => C.place(k)} />}</For></div>
-        <h4>Valves</h4>
-        <div class="catgrid"><For each={ITEMS.slice(0, 6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe; it snaps, takes the line's size and class and splits the pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
-        <h4>Fittings</h4>
-        <div class="catgrid"><For each={ITEMS.slice(6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe`} run={() => C.dropOnSelected(k)} />}</For></div>
+        <details class="catgrp" open><summary>Equipment</summary><div class="catgrid"><For each={EQUIP}>{([k, l, i]) => <Tile type="equip" kind={k} label={l} icon={i} hint={`${l}: drag onto the plot, or click and then click the plot`} run={() => C.place(k)} />}</For></div></details>
+        <details class="catgrp" open><summary>Valves</summary><div class="catgrid"><For each={ITEMS.slice(0, 6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe; it snaps, takes the line's size and class and splits the pipe`} run={() => C.dropOnSelected(k)} />}</For></div></details>
+        <details class="catgrp" open><summary>Fittings</summary><div class="catgrid"><For each={ITEMS.slice(6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe`} run={() => C.dropOnSelected(k)} />}</For></div></details>
         <Show when={!q()}>
           <h4>Pipe classes <Help k="spec" /></h4>
           <For each={catalogue()?.cat.classes ?? []}>{c => <div class="catclass" role="button" title="Open in the Library" onClick={() => import("./library").then(k => k.library(`class:${c.name}`))}><b>{c.name}</b><span>{c.description}</span><small>{inch(c.sizes[0] ?? "")}–{inch(c.sizes[c.sizes.length - 1] ?? "")} · class {c.ratings.join(", ")}</small></div>}</For>
@@ -67,6 +64,9 @@ const V3In = (p: { v: V3; set: (v: V3) => void; q?: Q; labels?: [string, string,
 const SizeSel = (p: { v: string; set: (s: string) => void }) => <select onChange={e => p.set(e.currentTarget.value)}><For each={NPS}>{s => <option value={s} selected={s === p.v}>{inch(s)}</option>}</For></select>;
 const endText = (e: Line["from"]) => { const pr = project(); return e.kind === "nozzle" ? `${pr?.equipment.find(x => x.id === e.equip)?.tag} / ${e.nozzle}` : e.kind === "branch" ? `Branch of ${pr?.lines.find(l => l.id === e.line)?.number}` : e.term === "open" ? "Open end" : e.term === "cap" ? "Cap" : "Blind flange"; };
 
+/** The equipment card's tab (kept while moving between items). */
+const [eqTab, setEqTab] = createSignal<"general" | "nozzles" | "datasheet">("general");
+let lastEq = 0;
 const EquipInsp = (p: { e: Equipment }) => {
   const fields = () => catalogue()?.fields.find(f => f[0] === p.e.kind)?.[2] ?? [];
   const set = (e: Partial<Equipment>) => act({ SetEquipment: { ...p.e, ...e } });
@@ -74,7 +74,13 @@ const EquipInsp = (p: { e: Equipment }) => {
   const addN = () => { let k = p.e.nozzles.length + 1; while (p.e.nozzles.some(n => n.tag === `N${k}`)) k++; set({ nozzles: [...p.e.nozzles, { tag: `N${k}`, nps: "2", rating: 150, facing: "RF", pos: [0, 0, 1], dir: [1, 0, 0], proj: 0.2, service: "" }] }); };
   const dirs: [string, V3][] = [["East (+E)", [1, 0, 0]], ["West (−E)", [-1, 0, 0]], ["North (+N)", [0, 1, 0]], ["South (−N)", [0, -1, 0]], ["Up", [0, 0, 1]], ["Down", [0, 0, -1]]];
   const dirKey = (d: V3) => dirs.find(x => x[1].every((v, i) => Math.abs(v - d[i]) < 1e-6))?.[0] ?? "Other";
+  // A picked nozzle opens the Nozzles tab.
+  createEffect(on(() => sel()?.kind === "nozzle", n => { if (n) setEqTab("nozzles"); }));
+  // Another item opens on General.
+  createEffect(on(() => p.e.id, id => { if (id !== lastEq && sel()?.kind !== "nozzle") setEqTab("general"); lastEq = id; }));
   return (<>
+    <nav class="itabs" role="tablist"><For each={[["general", "General"], ["nozzles", `Nozzles · ${p.e.nozzles.length}`], ["datasheet", "Datasheet"]] as [typeof eqTab extends () => infer T ? T : never, string][]}>{([k, l]) => <button role="tab" classList={{ on: eqTab() === k }} onClick={() => setEqTab(k)}>{l}</button>}</For></nav>
+    <Show when={eqTab() === "general"}>
     <Row l="Tag"><input value={p.e.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
     <p class="muted iwhat">{EQUIP.find(x => x[0] === p.e.kind)?.[1]} · DEXPI class {({ vertical_vessel: "Vessel", horizontal_drum: "Vessel", tank: "Tank", column: "ProcessColumn", pump: "CentrifugalPump", exchanger: "TubularHeatExchanger" } as Record<EquipKind, string>)[p.e.kind]}</p>
     <h4>Position <Help k="move" /></h4>
@@ -82,6 +88,8 @@ const EquipInsp = (p: { e: Equipment }) => {
     <Row l="Rotation"><NumIn q="angle" v={p.e.rot} set={v => set({ rot: v })} /></Row>
     <h4>Sizes <Help k="equipment" /></h4>
     <For each={fields()}>{([k, l]) => <Row l={l}><NumIn q="coord" v={(p.e.dims as any)[k]} min={0.01} set={v => set({ dims: { ...p.e.dims, [k]: v } })} /></Row>}</For>
+    </Show>
+    <Show when={eqTab() === "nozzles"}>
     <h4>Nozzles <Help k="nozzles" /></h4>
     <table class="ntab"><thead><tr><th>Tag</th><th>Size</th><th>Class</th><th>Facing</th><th /></tr></thead><tbody>
       <For each={p.e.nozzles}>{(n, i) => <>
@@ -101,9 +109,12 @@ const EquipInsp = (p: { e: Equipment }) => {
       </>}</For>
     </tbody></table>
     <button class="btn sm" onClick={addN}>Add a nozzle</button>
+    </Show>
+    <Show when={eqTab() === "datasheet"}>
     <h4>Datasheet</h4>
     <For each={p.e.data}>{([k, v], i) => <div class="dsrow"><input value={k} onChange={e => set({ data: p.e.data.map((x, j) => j === i() ? [e.currentTarget.value, x[1]] : x) })} /><input value={v} onChange={e => set({ data: p.e.data.map((x, j) => j === i() ? [x[0], e.currentTarget.value] : x) })} /><button class="x" onClick={() => set({ data: p.e.data.filter((_, j) => j !== i()) })}>×</button></div>}</For>
     <button class="btn sm" onClick={() => set({ data: [...p.e.data, ["Value", ""]] })}>Add a datasheet line</button>
+    </Show>
   </>);
 };
 

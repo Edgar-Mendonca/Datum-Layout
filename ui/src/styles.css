@@ -1224,3 +1224,37 @@ tr.behind td { background: var(--err-bg); }
 /* The steps column fits beside the open bottom panel. */
 .flow button { padding: 6px 2px 5px; }
 .flow .fcap { margin-top: 2px; }
+
+/* ---------------------------------------------------------------- 0.2.11: the agreed changes */
+/* (1) Lines hold their components. */
+.tree .tsub.tline > summary { list-style: none; }
+/* (4) The tool strip's names, at once. */
+.toolstrip button.on { background: var(--sel); color: var(--blue); box-shadow: inset 2px 0 0 var(--blue); }
+.striptip { position: fixed; transform: translateY(-50%); z-index: 50; background: rgba(17, 27, 38, .94); color: #F1F5F8; font-size: 11.5px; padding: 4px 8px; border-radius: 3px; white-space: nowrap; pointer-events: none; box-shadow: 0 3px 10px rgba(0, 0, 0, .2); }
+/* (5) The card's tabs. */
+.insp .itabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: -2px -12px 8px; padding: 0 8px; position: sticky; top: 0; background: var(--panel); z-index: 2; }
+.insp .itabs button { padding: 6px 10px 5px; font-size: 12px; color: var(--text2); border-bottom: 2px solid transparent; }
+.insp .itabs button:hover { color: var(--blue); }
+.insp .itabs button.on { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+.insp .row > label, .insp .row > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* (6) Menu icons. */
+.menu .tick svg { width: 14px; height: 14px; color: var(--muted); }
+.menu button:hover .tick svg { color: var(--blue); }
+/* (7) Clash badges in the view. */
+.nlabel.clashl { background: #D92D20; color: #fff; border-radius: 50%; width: 20px; height: 20px; padding: 0; margin: -10px 0 0 -10px; display: grid; place-items: center; font: 600 11px var(--sans); box-shadow: 0 0 0 3px rgba(217, 45, 32, .28), 0 2px 6px rgba(0, 0, 0, .3); z-index: 3; }
+/* (9) No dark box on a clicked ribbon tab (the keyboard's focus ring stays). */
+.tabs > button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+/* (10) A compact catalogue: small tiles, three to a row, groups that fold. */
+.catgrid { grid-template-columns: 1fr 1fr 1fr; gap: 3px; }
+.cattile { padding: 5px 2px 4px; gap: 2px; font-size: 10.5px; min-height: 0; }
+.cattile .ic { width: 20px !important; height: 20px !important; }
+.cattile span { line-height: 1.1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.catbody h4 { margin: 8px 0 4px; }
+
+/* (10) Catalogue groups fold. */
+.catgrp { margin: 0 0 2px; }
+.catgrp > summary { font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 8px 0 4px; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; }
+.catgrp > summary::-webkit-details-marker { display: none; }
+.catgrp > summary::before { content: ""; border-top: 4px solid var(--muted); border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; }
+.catgrp:not([open]) > summary::before { transform: rotate(-90deg); }
+.catgrp > summary:hover { color: var(--blue); }

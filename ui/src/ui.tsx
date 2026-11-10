@@ -17,6 +17,10 @@ export const Menu = () => {
       const r = el.getBoundingClientRect();
       if (r.bottom > innerHeight - 4) el.style.top = `${Math.max(4, innerHeight - r.height - 4)}px`;
       if (r.right > innerWidth - 4) el.style.left = `${Math.max(4, depth ? px - r.width : innerWidth - r.width - 4)}px`;
+      // Never over the properties card: open to its left instead.
+      const card = depth ? null : document.querySelector(".ipop")?.getBoundingClientRect();
+      const now = el.getBoundingClientRect();
+      if (card && now.right > card.left && now.left < card.right && now.bottom > card.top && now.top < card.bottom) el.style.left = `${Math.max(4, card.left - now.width - 6)}px`;
     });
     return (
       <div class="menu" ref={el} style={{ left: `${x}px`, top: `${y}px` }} onMouseDown={e => e.stopPropagation()} onContextMenu={e => e.preventDefault()}>

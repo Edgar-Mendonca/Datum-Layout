@@ -1,5 +1,20 @@
 # What's new in Datum Layout
 
+## 0.2.11 — 2026-11-10
+The eleven changes agreed from the marked-up screenshots.
+
+- **Tree.** Each line holds its own valves and fittings: unfold a line to see them. The Valves and fittings step lists each kind once, with its count; a click shows that kind under its lines.
+- **Ribbon.** The Piping tab keeps only commands. The size, class, rating and elevation of new lines are set once, on the bar under the ribbon.
+- **Plot.** Coordinates every 10 m along the edges, none on top of each other at the corner, and the north arrow kept clear of them.
+- **Tool strip.** Each tool's name shows the moment you point at it, and the active tool stays lit.
+- **Properties card.** Equipment opens in three tabs (General · Nozzles · Datasheet), so each fits without scrolling. Picking a nozzle opens its tab; another item opens on General.
+- **Right-click menus.** Icons and shortcuts beside each item, including Hide (H) and Show only this (I). The menu opens beside the properties card, never over it.
+- **Clashes in 3D.** After a check, each clash has a red numbered badge in the view, and the parts at the clash are tinted red.
+- **Going to a clash.** A click on a clash selects both lines (or the line and the equipment) and frames the pair. N steps to the next clash.
+- **Ribbon tabs.** No dark box around a tab after a click.
+- **Catalogue.** Compact tiles, three to a row, in groups that fold: everything fits on one screen.
+- **Colours.** Plants open coloured by line, with the key in its dark card. Colour by part kind is one click away on the bar.
+
 ## 0.2.10 — 2026-11-10
 A cleaner workspace after Datum Mesh, and a pipe class editor.
 

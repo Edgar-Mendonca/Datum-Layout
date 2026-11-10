@@ -95,12 +95,12 @@ const Leaf = (p: { id: number; kind: "equip" | "line"; label: string; sub?: stri
   const on = () => picked().includes(p.id) || ((sel()?.kind === "equip" || sel()?.kind === "nozzle" || sel()?.kind === "line" || sel()?.kind === "run" || sel()?.kind === "corner") && (sel() as { id: number }).id === p.id);
   const pick = (e: MouseEvent) => { if (e.ctrlKey || e.metaKey || e.shiftKey) { C.pick(p.id); return; } setPicked([]); setSel(p.kind === "equip" ? { kind: "equip", id: p.id } : { kind: "line", id: p.id }); };
   const menu = (e: MouseEvent) => { if (!on()) pick(e); openMenu(e, [
-    { label: "Zoom to it", run: () => zoomTo(p.id) },
-    { label: shownId(p.id) ? "Hide" : "Show", run: () => shownId(p.id) ? setHidden([...hidden(), p.id]) : (setHidden(hidden().filter(i => i !== p.id)), isolated() && setIsolated([...isolated()!, p.id])) },
-    { label: "Show only this (isolate)", run: () => { setHidden([]); setIsolated([p.id]); } },
+    { label: "Zoom to it", icon: "fit", run: () => zoomTo(p.id) },
+    { label: shownId(p.id) ? "Hide" : "Show", icon: shownId(p.id) ? "hide" : "showall", keys: "H", run: () => shownId(p.id) ? setHidden([...hidden(), p.id]) : (setHidden(hidden().filter(i => i !== p.id)), isolated() && setIsolated([...isolated()!, p.id])) },
+    { label: "Show only this (isolate)", icon: "isolate", keys: "I", run: () => { setHidden([]); setIsolated([p.id]); } },
     "-",
-    ...(p.kind === "line" ? [{ label: "Export for Datum Pipe (.pcf)", run: () => C.exportPcf(p.id) }, "-" as const] : []),
-    { label: "Delete", run: () => C.del() },
+    ...(p.kind === "line" ? [{ label: "Export for Datum Pipe (.pcf)", icon: "export", run: () => C.exportPcf(p.id) }, "-" as const] : []),
+    { label: "Delete", icon: "del", keys: "Del", run: () => C.del() },
   ]); };
   return <button class="ti" classList={{ on: on(), dim: !shownId(p.id), bad: !!p.bad }} data-id={p.id} onClick={pick} onDblClick={() => zoomTo(p.id)} onContextMenu={menu} title={p.bad}>
     <Ic n={p.icon} /><span>{p.label}</span>{p.sub && <small>{p.sub}</small>}<Show when={p.bad}><i class="tmark need">!</i></Show><Eye ids={[p.id]} what={p.label} /></button>;
@@ -181,15 +181,18 @@ export const Tree = () => {
           </Step>
           <Step n={3} f={fs()[2]} count={pp().lines.length || undefined} eye={pp().lines.map(l => l.id)} add={() => C.route()}>
             <Show when={!pp().lines.length}><button class="ti ghost" onClick={() => C.route()}><Ic n="new" /><span>Route a line (R)</span></button></Show>
-            <For each={pp().lines}>{l => <Leaf id={l.id} kind="line" icon="pipe" label={l.number || "(no number)"} sub={`${inch(l.nps)} · ${l.class}`} bad={issuesOf(l.id).find(i => i.kind === "routing")?.text} />}</For>
+            <For each={pp().lines}>{l => { const its = () => items().filter(x => x.l.id === l.id); return <Show when={its().length} fallback={<Leaf id={l.id} kind="line" icon="pipe" label={l.number || "(no number)"} sub={`${inch(l.nps)} · ${l.class}`} bad={issuesOf(l.id).find(i => i.kind === "routing")?.text} />}>
+              <details class="tsub tline"><summary><Leaf id={l.id} kind="line" icon="pipe" label={l.number || "(no number)"} sub={`${inch(l.nps)} · ${l.class}`} bad={issuesOf(l.id).find(i => i.kind === "routing")?.text} /></summary>
+                <For each={its()}>{x => <Row2 icon={IT_ICON[x.it.kind]} label={x.it.tag || (x.it.kind === "support" ? (SUPPORTS.find(s => s[0] === x.it.support)?.[1] ?? "Support") : IT_NAME[x.it.kind])} sub={x.it.tag ? IT_NAME[x.it.kind] : undefined} on={sel()?.kind === "item" && (sel() as { id: number }).id === x.it.id} run={() => { setPicked([]); setSel({ kind: "item", id: x.it.id, line: x.l.id }); }} />}</For>
+              </details></Show>; }}</For>
             <Show when={pp().line_list.length}><Branch t="Line list" icon="list" n={pp().line_list.length} help="linelist" open={false} mark={{ ok: !listIssues().length, why: `${plural(listIssues().length, "difference")} with the model` }}>
               <Show when={pp().line_list.some(r => !pp().lines.some(l => l.number === r.number))}><button class="ti ghost" onClick={() => C.routeListed()}><Ic n="route" /><span>Route the listed lines</span></button></Show>
               <For each={pp().line_list}>{r => { const m = pp().lines.find(l => l.number === r.number); return <Row2 icon="list" label={r.number} sub={`${r.nps ? inch(r.nps) : "?"} · ${r.class || "—"}${m ? "" : " · not modelled"}`} dim={!m} title={r.components.length ? `${r.from} → ${r.to}: ${r.components.join(", ")}` : `${r.from} → ${r.to}`} run={() => m && (setPicked([]), setSel({ kind: "line", id: m.id }))} />; }}</For></Branch></Show>
           </Step>
           <Step n={4} f={fs()[3]}>
+            {/* 0.2.11: the components sit under their lines (step 3); here, one row per kind with its count. */}
             <For each={ITEMS.map(([k]) => k).filter(k => items().some(x => x.it.kind === k))}>{k => (
-              <Branch t={IT_GROUP[k] ?? IT_NAME[k]} icon={IT_ICON[k]} n={items().filter(x => x.it.kind === k).length} help="fittings">
-                <For each={items().filter(x => x.it.kind === k)}>{x => <Row2 icon={IT_ICON[k]} label={x.it.tag || (k === "support" ? (SUPPORTS.find(s => s[0] === x.it.support)?.[1] ?? "Support") : IT_NAME[k])} sub={`${x.l.number || "line"}`} on={sel()?.kind === "item" && (sel() as { id: number }).id === x.it.id} run={() => { setPicked([]); setSel({ kind: "item", id: x.it.id, line: x.l.id }); }} />}</For></Branch>)}</For>
+              <Row2 icon={IT_ICON[k]} label={IT_GROUP[k] ?? IT_NAME[k]} sub={String(items().filter(x => x.it.kind === k).length)} title={`Show the ${(IT_GROUP[k] ?? IT_NAME[k]).toLowerCase()} under their lines`} run={() => setTreeFilter(IT_NAME[k])} />)}</For>
             <Show when={!items().length}><button class="ti ghost" onClick={() => setTreeTab("catalogue")}><Ic n="valve" /><span>Drag valves and fittings onto a pipe</span></button></Show>
           </Step>
           <Step n={5} f={fs()[4]}>
@@ -258,11 +261,14 @@ const TOOLS: Record<string, () => Tl[]> = {
   lists: () => [["list", "Line list", () => setBottom("lines")], ["vvessel", "Equipment list", () => setBottom("equipment")], ["valve", "Valve list", () => setBottom("valves")], "-", ["import", "Import a line list", C.importLineList], ["pipe", "Import PCF lines", C.importPcf], "-", ["csv", "Export the line list", () => C.exportCsv("lines")]],
   view: () => [["fit", "Fit (F)", C.fit], ["cube", "Isometric", () => C.std("iso")], ["plan", "Plan", () => C.std("plan")], "-", ["hide", "Hide (H)", C.hide], ["isolate", "Isolate (I)", C.isolate], ["showall", "Show all", C.showAll], ["section", "Section box", C.sectionBox, () => !!section()], "-", ["camera", "Save this view", C.saveView]],
 };
+const [tip, setTip] = createSignal<{ text: string; x: number; y: number } | null>(null);
 /** Beside the tree: the open tab's most used tools, one click each. */
 export const ToolStrip = () => {
   const list = () => (TOOLS[tab()] ?? TOOLS.home)();
   return <div class="toolstrip" role="toolbar" aria-label="Tools of this tab">
-    <For each={list()}>{t => t === "-" ? <hr /> : <button classList={{ on: !!t[3]?.() }} title={t[1]} onClick={() => t[2]()}><Icon n={t[0]} /></button>}</For>
+    <For each={list()}>{t => t === "-" ? <hr /> : <button classList={{ on: !!t[3]?.() }} aria-label={t[1]} data-tip={t[1]} onClick={() => t[2]()}
+      onMouseEnter={e => { const r = e.currentTarget.getBoundingClientRect(); setTip({ text: t[1], x: r.right + 6, y: r.top + r.height / 2 }); }} onMouseLeave={() => setTip(null)}><Icon n={t[0]} /></button>}</For>
+    <Show when={tip()}>{x => <div class="striptip" style={{ left: `${x().x}px`, top: `${x().y}px` }}>{x().text}</div>}</Show>
   </div>;
 };
 

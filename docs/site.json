@@ -86,6 +86,7 @@
         "Weights for every pipe, fitting, flange and gate valve, in the take-off and the PCF for Datum Pipe (0.2.8)",
         "Butterfly valves, short pattern, class 150 to 600 (0.2.9)",
         "A cleaner workspace after Datum Mesh, and a pipe class editor: sizes, schedules, components and branch table, kept with the plant (0.2.10)",
+        "Clashes shown in 3D with N to step through them, line-by-line colours, a tree that holds each line's components, a tabbed properties card and a compact catalogue (0.2.11)",
         "Sloped lines",
         "Design rules for supports and access (with 0.3's steel)"
       ]

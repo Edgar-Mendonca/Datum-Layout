@@ -52,7 +52,7 @@ impl Part {
 }
 
 /// Something the checks or the routing found.
-#[derive(Clone, Debug, Serialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Default)]
 pub struct Issue {
     /// routing, clash, open, mismatch, class, number.
     pub kind: &'static str,
@@ -61,6 +61,9 @@ pub struct Issue {
     pub line: u32,
     pub item: u32,
     pub equip: u32,
+    /// A pipe–pipe clash: the other part's line and item (0 when there is none).
+    pub line2: u32,
+    pub item2: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Default)]
@@ -213,7 +216,7 @@ pub fn size_at(l: &Line, seg: usize, at: f64) -> String {
 }
 
 fn issue(kind: &'static str, text: String, at: P3, line: u32, item: u32) -> Issue {
-    Issue { kind, text, at, line, item, equip: 0 }
+    Issue { kind, text, at, line, item, equip: 0, ..Default::default() }
 }
 
 fn name(l: &Line) -> String {

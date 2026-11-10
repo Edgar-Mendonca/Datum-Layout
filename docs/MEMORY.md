@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.10 (2026-11-10) |
+| **Current version** | 0.2.11 (2026-11-10) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -133,6 +133,9 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.10 | Pipe classes a plant writes or edits live in `Project.classes` (saved in the `.dlayout`); `Catalogue::for_project` overlays them (same name: the plant's wins) and every shell call uses it; `validate_class` refuses a class the tables cannot make (no pipe in a schedule, unknown component or fitting) with the reason. Renaming moves the lines; a class in use cannot be removed unless the catalogue has one of that name | A class edit must never break routing silently, and a plant must carry its own specification |
 | 0.2.10 | The editor offers only schedules the pipe table has for the chosen size; a schedule that does not exist at a larger size in its range is caught by the engine (e.g. 40 from 20" reaches 22") | The check belongs in the engine |
 | 0.2.10 | Release number 0.2.10, not 0.3.0: 0.3 stays steel on the roadmap | Keep site.json's roadmap true |
+| 0.2.11 | UI changes are agreed first: a screenshot tour (`scratchpad/tools/tour.cjs`, same bridge as the UI test) marked up with numbered proposals (PIL), the user picks, then they are built and checked one test each (UI check 8d) | The user wants to see and agree before a change is made |
+| 0.2.11 | A clash `Issue` names its second part (`line2`, `item2`); the view tints only the parts whose box holds the clash point (a line's pipe pieces are item 0, so matching by line alone would tint the whole line) | Show where the clash is, not every pipe of the line |
+| 0.2.11 | Plants open coloured by line (the key in the dark card); part kind stays on the bar | Lines told apart at a glance |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -164,6 +167,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.8 | Weights: `weights.csv` (763 rows: fittings STD/XS, WN and blind flanges 150–2500, gate valves 150–600, every row checked against a second source or its own steel); pipe from π(D−t)tρ; `lists::part_kg`; line and take-off weights (CSV, print); PCF `WEIGHT` | ✅ |
 | 0.2.9 | Butterfly valves (`ItemKind::Butterfly`; triple offset, double flanged, short pattern, 150/300/600, 3–24"; 27 rows, long pattern checked equal to the gate table); PCF `VYFL` written and read; classes ≤ 600 allow them. Spectacle blinds deferred (only standard reproductions found) | ✅ |
 | 0.2.10 | Workspace after Datum Mesh (title bar, folding bottom strip with a Take-off tab, hints in the status bar, quiet view: line numbers on selection, dark folding key, zoom −/Fit/+, soft ground); pipe class editor (`Project.classes`, `Op::SetClass`/`DeleteClass`, `Catalogue::for_project`, `validate_class`; `ui/src/classedit.tsx`) | ✅ |
+| 0.2.11 | The eleven agreed UI changes: components under their lines; Piping ribbon without the bar's fields; plot labels every 10 m; tool-strip names at once; equipment card in tabs; menus with icons and keys beside the card; clash badges and tint; a clash selects both (`Issue.line2/item2`), N for the next; no tab focus box; compact folding catalogue; colour by line by default | ✅ |
 | 0.2 Pipe classes and fittings | Sloped lines (the class editor shipped in 0.2.10) | 🔜 |
 | 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
@@ -226,6 +230,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - Cloned Datum Mesh (read only), ran its UI test with SHOTS to get its screenshots, compared with ours: title bar, bottom console, hints, legend, view ground, card head, tree eyes, steps column.
 - 0.2.10: the workspace changes above and the pipe class editor; UI checks 7h2 (editor), 8a (quiet view), 8c (first look, light and dark screenshots).
 - Found while validating: no built-in class was invalid except that "bolts" was missing from the validator's list (fixed); test `every_builtin_class_is_valid`.
+- The user asked to see screenshots first: a tour of 14 screens, 11 proposals marked up; all agreed; 0.2.11 built them, each with a UI check (8d) and screenshots.
 - Disk filled once (target 25 GB): build with `CARGO_INCREMENTAL=0`; Mesh's target removed.
 
 ## 5. Known limits
