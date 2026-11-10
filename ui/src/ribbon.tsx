@@ -53,13 +53,15 @@ export const TitleBar = (p: { update: string | null }) => (
   <header class="top">
     <div class="bar">
       <div class="qat">
-        <img src="logo.svg" alt="" class="logo" />
+        <img src="logo.svg" alt="" class="logo" /><b class="appname">Datum Layout</b>
+        <button title="New plant (Ctrl+N)" onClick={() => setBackstage("new")}><Icon n="new" /></button>
+        <button title="Open (Ctrl+O)" onClick={() => C.open()}><Icon n="open" /></button>
         <button title="Save (Ctrl+S)" onClick={() => C.save()}><Icon n="save" /></button>
         <button title="Undo (Ctrl+Z)" disabled={!out()?.undo} onClick={C.undo}><Icon n="undo" /></button>
         <button title="Redo (Ctrl+Y)" disabled={!out()?.redo} onClick={C.redo}><Icon n="redo" /></button>
         <button title="Print (Ctrl+P)" onClick={C.print}><Icon n="print" /></button>
       </div>
-      <div class="title">{out() ? `${out()!.p.name}${out()!.dirty ? " •" : ""} — Datum Layout` : "Datum Layout"}</div>
+      <div class="title"><Show when={out()} fallback="Datum Layout">{o => <><b>{o().p.name}{o().dirty ? " •" : ""}</b><span class="tsub"> · {o().p.equipment.length} equipment · {o().p.lines.length} {o().p.lines.length === 1 ? "line" : "lines"} · {o().p.units === "US" ? "US" : "SI"}</span></>}</Show></div>
       <button class="search" onClick={palette} title="Tell me what you want to do (Ctrl+K)"><Icon n="search" /><span>Tell me what you want to do</span><kbd>Ctrl+K</kbd></button>
       <Show when={p.update}><button class="upd" onClick={() => setBackstage("about")}>Update {p.update} available</button></Show>
       <button class="theme" title="Theme: Auto follows Windows" onClick={() => setTheme(theme() === "auto" ? "light" : theme() === "light" ? "dark" : "auto")}>Theme · {theme()}</button>
@@ -145,7 +147,7 @@ export const Ribbon = () => {
         <G l="Against the P&ID" h="package"><B big i="compare" l="3D vs P&ID" off={!p()?.line_list.length} run={() => { setBottom("checks"); }} title="Lines missing or extra, sizes, classes and the components' order, against the plant package or line list" /></G>
       </Show>
       <Show when={tab() === "lists"}>
-        <G l="Lists" h="lists"><B big i="list" l="Line List" run={() => setBottom("lines")} /><B big i="vvessel" l="Equipment" run={() => setBottom("equipment")} /><B big i="valve" l="Valve List" run={() => setBottom("valves")} title="Every valve and strainer: tag, type, size, class, line, position and stem" /><B big i="mto" l="Take-off" run={() => setBottom("lines")} title="The material take-off is under the line list" /></G>
+        <G l="Lists" h="lists"><B big i="list" l="Line List" run={() => setBottom("lines")} /><B big i="vvessel" l="Equipment" run={() => setBottom("equipment")} /><B big i="valve" l="Valve List" run={() => setBottom("valves")} title="Every valve and strainer: tag, type, size, class, line, position and stem" /><B big i="mto" l="Take-off" run={() => setBottom("mto")} title="The material take-off: pipe, fittings, flanges, valves, gaskets, bolts and welds per line, with weights" /></G>
         <G l="Import" h="import"><B big i="import" l="Plant Package" run={C.importPackage} title="Read a plant package from Datum Schema" /><B big i="import" l="Line List" run={C.importLineList} title="Read a line list (CSV) to check the model against" /><B big i="pipe" l="PCF Lines" run={C.importPcf} title="Add lines from a piping component file (.pcf)" /></G>
         <G l="Export CSV" h="csv"><S><B i="csv" l="Line list" run={() => C.exportCsv("lines")} /><B i="csv" l="Equipment and nozzles" run={() => C.exportCsv("equipment")} /><B i="csv" l="Material take-off" run={() => C.exportCsv("mto")} /><B i="csv" l="Valve list" run={() => C.exportCsv("valves")} /></S></G>
         <G l="Exports" h="pcf"><B big i="pipe" l="PCF for Datum Pipe" run={() => C.exportPcf(selLine()?.id)} /><B big i="cube" l="glTF 3D Model" run={C.exportGltf} /><Planned big i="ifc" l="IFC" v="0.4" /></G>

@@ -76,8 +76,9 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the empty plot has a north arrow and coordinates", await p.$eval(".nlabels", el => el.innerText.includes("N") && /E \d/.test(el.innerText)));
   check("the empty state says what to do", (await p.textContent(".v3d .empty")).includes("Drag equipment"));
   check("the window has the eight ribbon tabs", JSON.stringify(await p.$$eval(".tabs > button:not(.file)", els => els.map(e => e.textContent))) === JSON.stringify(["Home", "Equipment", "Piping", "Fittings", "Check", "Lists", "View", "Help"]));
-  const bt = await p.$$eval(".btabs > button:not(.btn)", els => els.map(e => e.childNodes[0].textContent));
-  check("the bottom panel has Lines, Equipment, Valves, Clashes and Checks", bt.join() === "Lines,Equipment,Valves,Clashes,Checks", bt.join());
+  const bt = await p.$$eval(".btabs > button:not(.btn):not(.cchev)", els => els.map(e => e.childNodes[0].textContent));
+  check("the bottom panel has Lines, Take-off, Equipment, Valves, Clashes and Checks", bt.join() === "Lines,Take-off,Equipment,Valves,Clashes,Checks", bt.join());
+  check("the bottom panel starts folded, leaving the view the room (0.3.0)", !(await p.$(".console.open")) && !(await p.$(".bbody")));
   for (const t of ["Home", "Equipment", "Piping", "Fittings", "Check", "Lists", "View", "Help"]) { await p.click(`.tabs > button:has-text("${t}")`); await settle(80); seen.push(await allText()); }
 
   // 3. Place equipment from the catalogue by drag and drop onto the plot.
@@ -215,7 +216,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   // 7h. The Library (0.2.0): classes and parts tables with their sources.
   await open("pumps");
   await p.click('.flow button[data-tool="library"]'); await settle(600);
-  check("the Library lists every pipe class and the eight parts tables", (await p.$$('.libx .mlist > button')).length === 16, String((await p.$$('.libx .mlist > button')).length));
+  check("the Library lists every pipe class, a New class button and the eight parts tables", (await p.$$('.libx .mlist > button')).length === 17, String((await p.$$('.libx .mlist > button')).length));
   await p.click('.libx .mlist > button:has-text("CS300")'); await settle(300);
   const lt = await p.textContent(".libpage");
   check("a class page shows its wall by size and allowed components", lt.includes("Class 300") && /½"\s*80/.test(lt) && lt.includes("Gate valve"), lt.slice(0, 300));
@@ -223,6 +224,28 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.click('.libx .mlist > button:has-text("Use for new lines")').catch(() => {});
   await p.click('.libpage button:has-text("Use for new lines")'); await settle(500);
   check("Use for new lines sets the class", (await state()).p.settings.class === "CS300");
+  // 7h2. The class editor (0.3.0): CS300 edited for this plant, 6" and up in schedule 80.
+  await p.click('.libpage button:has-text("Edit…")'); await settle(300);
+  check("Edit opens the class editor", !!(await p.$(".cedit")) && (await p.textContent(".cedit h3")).includes("CS300"));
+  await p.click('.cedit button:has-text("Add a schedule")'); await settle(150);
+  const schRows = await p.$$(".cedit .cesched tbody tr");
+  const last = schRows[schRows.length - 1];
+  await (await last.$("td:nth-child(1) select")).selectOption("20"); await settle(100);
+  await (await last.$("td:nth-child(2) select")).selectOption("40");
+  await p.click('.cedit button:has-text("Save to this plant")'); await settle(400);
+  check("a class the pipe table cannot make is refused, with the reason", (await p.textContent(".ceerr").catch(() => "")).includes("22\" pipe in schedule"), await p.textContent(".cedit").then(x => x.slice(-300)));
+  await (await last.$("td:nth-child(1) select")).selectOption("6");
+  await (await last.$("td:nth-child(2) select")).selectOption("80");
+  if (shots) await shot("class-editor");
+  await p.click('.cedit button:has-text("Save to this plant")'); await settle(600);
+  st = await state();
+  const own = st.p.classes.find(c => c.name === "CS300");
+  check("saving keeps the edited class in the plant", !!own && own.schedules.some(([s, k]) => s === "6" && k === "80") && !(await p.$(".cedit")), JSON.stringify(st.p.classes));
+  check("the Library marks it as the plant's own", (await p.textContent('.libx .mlist > button:has-text("CS300")')).includes("this plant"));
+  check("its page shows the new wall", /6"\s*80/.test(await p.textContent(".libpage")));
+  await p.click('.libpage button:has-text("Edit…")'); await settle(300);
+  await p.click('.cedit button:has-text("Back to the catalogue")'); await settle(500);
+  check("Back to the catalogue's removes the plant's copy", !(await state()).p.classes.length);
   await p.click('.libx .mlist > button:has-text("Flanges")'); await settle(200);
   await p.fill(".libsearch", "2500"); await settle(300);
   const fr = await p.$$eval(".libtbl tbody tr", rs => rs.map(r => r.children[1]?.textContent));
@@ -274,7 +297,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const bodyPt = [pA.pos[0] + 0.55, pA.pos[1] + 0.12, pA.pos[2] + 0.5]; // the motor, clear of the arrows
   const s0 = await screenOf(bodyPt), sB = await screenOf([bodyPt[0] + 2, bodyPt[1], bodyPt[2]]);
   await p.mouse.move(s0.x, s0.y); await p.mouse.down(); await p.mouse.move((s0.x + sB.x) / 2, (s0.y + sB.y) / 2, { steps: 4 }); await p.mouse.move(sB.x, sB.y, { steps: 4 }); await settle(150);
-  check("dragging shows the move as it goes",(await p.textContent(".v3d")).includes("ΔE"));
+  check("dragging shows the move as it goes, in the status bar",(await p.textContent(".status")).includes("ΔE"));
   await p.mouse.up(); await settle(800);
   st = await state();
   const pA2 = st.p.equipment.find(e => e.tag === "P-101A");
@@ -514,15 +537,35 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   if (shots) { await p.click(".bbody tr.f >> nth=0"); await settle(400); await p.click(".tabs > button:has-text(\"Lists\")"); await shot("line-list"); }
   await p.click(".btabs > button:has-text(\"Equipment\")"); await settle(400);
   check("example 1: the equipment list shows every nozzle", (await p.textContent(".bbody")).includes("P-101A") && (await p.$$(".bbody tr.f")).length >= 7);
+  // 8a. A quiet view (0.3.0): line numbers show for the selected line only; hints sit in the status bar.
+  await p.keyboard.press("Escape"); await settle(200);
+  const lineLabels = () => p.$$eval(".nlabel.linel", els => els.filter(e => e.style.display !== "none").map(e => e.textContent));
+  check("no line numbers crowd the view when nothing is selected", (await lineLabels()).length === 0, JSON.stringify(await lineLabels()));
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
+  await p.click(".bbody tr.f >> nth=0"); await settle(400);
+  check("the selected line shows its number", (await lineLabels()).length === 1, JSON.stringify(await lineLabels()));
+  check("its hint is in the status bar, not over the model", (await p.textContent(".status")).includes("Click a straight run") && !(await p.$(".v3d .toolhint")));
+  await p.keyboard.press("Escape"); await settle(200);
+
   // 8b. Weights (0.2.8): the line list and the take-off show them; the PCF carries them to Datum Pipe.
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);
   check("the line list shows each line's empty weight", /Weight \(kg\)/.test(await p.textContent(".bbody thead")) && (await p.$$eval(".bbody tr.f", rs => rs.every(r => Number(r.lastElementChild.textContent.replace("+", "")) > 0))));
-  await p.click("label:has-text(\"Material take-off\") >> nth=0"); await settle(300);
+  await p.click(".btabs > button:has-text(\"Take-off\")"); await settle(300);
   const mtoText = await p.textContent(".bbody");
   check("the take-off weighs pipe, elbows, flanges and gate valves", (await p.$$eval(".bbody tbody tr", rs => rs.filter(r => /^(Pipe|Elbow|Flange, weld|Gate)/.test(r.children[2].textContent) && r.lastElementChild.textContent === "—").length)) === 0 && mtoText.includes("Gate valve"));
   if (shots) await shot("take-off-weights");
-  await p.click("label:has-text(\"Material take-off\") >> nth=0"); await settle(200);
+  await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
   check("valves and flanges go to Datum Pipe with their weight", /VALVE\n(?:    .*\n)*?    WEIGHT \d/.test((await ask("export_pcf", {})).ok));
+
+  // 8c. The first look (0.3.0): a plant just opened, the bottom panel folded, nothing selected.
+  if (await p.$(".console.open")) { await p.click(".console .cchev"); await settle(200); }
+  check("the chevron folds the bottom panel", !(await p.$(".console.open")));
+  if (shots) {
+    await open("pumps"); await p.keyboard.press("Escape"); await settle(300); await shot("first-look");
+    const themeTo = async want => { for (let i = 0; i < 3 && !(await p.textContent(".top .theme")).toLowerCase().includes(want); i++) { await p.click(".top .theme"); await settle(250); } };
+    await themeTo("dark"); await settle(400); await shot("first-look-dark");
+    await themeTo("light"); await settle(300);
+  }
 
   // 9. Export the discharge line for Datum Pipe.
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(300);

@@ -382,10 +382,13 @@ pub struct Project {
     pub next: u32,
     pub views: Vec<SavedView>,
     pub line_list: Vec<ListedLine>,
+    /// The plant's own pipe classes: new ones, or edited copies of the catalogue's (same name: the
+    /// plant's wins). They travel with the file.
+    pub classes: Vec<crate::catalogue::PipeClass>,
 }
 impl Default for Project {
     fn default() -> Self {
-        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![] }
+        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![] }
     }
 }
 

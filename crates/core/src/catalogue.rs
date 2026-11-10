@@ -329,6 +329,45 @@ impl Catalogue {
         self.packs.push(format!("{pack}{}", if self.warnings.len() > before { " (with warnings)" } else { "" }));
     }
 
+    /// The catalogue a plant sees: this one with the plant's own classes added (a plant's class
+    /// replaces the catalogue's of the same name).
+    pub fn for_project(&self, p: &crate::model::Project) -> std::borrow::Cow<'_, Catalogue> {
+        if p.classes.is_empty() { return std::borrow::Cow::Borrowed(self); }
+        let mut c = self.clone();
+        for k in &p.classes { c.classes.retain(|x| x.name != k.name); c.classes.push(k.clone()); }
+        std::borrow::Cow::Owned(c)
+    }
+    /// Whether a class can be used: every size has a pipe in its schedule, every component and
+    /// fitting is one Datum Layout makes. The reason when it cannot.
+    pub fn validate_class(&self, c: &PipeClass) -> Result<(), String> {
+        const KINDS: &[&str] = &["pipe", "elbow90", "elbow45", "tee", "reducer", "cap", "flange", "blind", "gasket", "bolts", "gate", "globe", "check", "ball", "butterfly", "strainer", "cross", "weldolet", "sockolet", "support"];
+        const FITTINGS: &[&str] = &["tee", "reducing_tee", "weldolet", "sockolet"];
+        let name = c.name.trim();
+        if name.is_empty() { return Err("The class needs a name.".into()); }
+        if name.len() > 40 || name.contains(['/', '\\', '"']) { return Err("The class name is too long or has a / \\ or \".".into()); }
+        if c.sizes.is_empty() { return Err(format!("Class {name}: choose the sizes it covers.")); }
+        if let Some(s) = c.sizes.iter().find(|s| !size_ok(s)) { return Err(format!("Class {name}: {s} is not a pipe size.")); }
+        if c.ratings.is_empty() { return Err(format!("Class {name}: choose at least one flange rating.")); }
+        if let Some(r) = c.ratings.iter().find(|r| ![150, 300, 400, 600, 900, 1500, 2500].contains(*r)) { return Err(format!("Class {name}: {r} is not a flange class (150 to 2500).")); }
+        if c.schedules.is_empty() { return Err(format!("Class {name}: give a schedule from its smallest size.")); }
+        for s in &c.sizes {
+            let sch = c.schedule(s);
+            if self.wall(s, &sch).is_none() { return Err(format!("Class {name}: the pipe table has no {s}\" pipe in schedule {sch}.")); }
+        }
+        for k in &c.components {
+            if !KINDS.contains(&k.kind.as_str()) { return Err(format!("Class {name}: \"{}\" is not a component Datum Layout makes.", k.kind)); }
+            for b in [&k.min, &k.max].into_iter().flatten() { if !size_ok(b) { return Err(format!("Class {name}: {b} is not a pipe size.")); } }
+            if let (Some(a), Some(b)) = (&k.min, &k.max) { if nps_index(a) > nps_index(b) { return Err(format!("Class {name}: the {} sizes run from {a}\" to {b}\", the wrong way round.", k.kind)); } }
+        }
+        for (i, r) in c.branches.iter().enumerate() {
+            if !FITTINGS.contains(&r.fitting.as_str()) { return Err(format!("Class {name}, branch rule {}: \"{}\" is not a branch fitting (tee, reducing tee, weldolet, sockolet).", i + 1, r.fitting)); }
+            for b in [&r.header_min, &r.header_max, &r.branch_min, &r.branch_max].into_iter().flatten() {
+                if !size_ok(b) && !["half", "one_smaller"].contains(&b.as_str()) { return Err(format!("Class {name}, branch rule {}: {b} is not a pipe size.", i + 1)); }
+            }
+            if let Some(b) = &r.branch { if b != "same" && !size_ok(b) { return Err(format!("Class {name}, branch rule {}: {b} is not a pipe size.", i + 1)); } }
+        }
+        Ok(())
+    }
     pub fn class(&self, name: &str) -> Option<&PipeClass> {
         self.classes.iter().find(|c| c.name == name)
     }
@@ -468,5 +507,14 @@ mod tests {
                 if name.ends_with("json") { c.add_class(name, t) } else { c.add_table(name, t) }
             }
         }
+    }
+}
+#[cfg(test)]
+mod class_checks {
+    #[test]
+    fn every_builtin_class_is_valid() {
+        let c = super::Catalogue::builtin();
+        let bad: Vec<String> = c.classes.iter().filter_map(|k| c.validate_class(k).err()).collect();
+        assert!(bad.is_empty(), "{bad:#?}");
     }
 }

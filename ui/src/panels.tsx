@@ -3,7 +3,7 @@
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
 import { SUPPORTS, SupportKind, CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
-import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, checked, checkStale, setFocus } from "./store";
+import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help } from "./help";
 import { Icon } from "./ui";
@@ -201,7 +201,7 @@ export const Inspector = () => {
   const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
   return (
     <aside class="insp">
-      <header>Properties <b>{title()}</b><Help k="inspector" /><button class="x" title="Close (Esc)" onClick={() => { setSel(null); setPicked([]); }}>×</button></header>
+      <header><b>{title()}</b><Help k="inspector" /><button class="x" title="Close (Esc)" onClick={() => { setSel(null); setPicked([]); }}>×</button></header>
       <div class="ibody">
         <Show when={project() && picked().length}>
           <p class="iwhat"><b>{picked().length} items selected</b></p>
@@ -230,29 +230,42 @@ const IssueRow = (p: { i: Issue }) => (
 );
 
 export const BottomPanel = () => {
-  const [mto, setMto] = createSignal(false);
-  createEffect(on(() => out(), () => { if (bottom() === "lines" || bottom() === "equipment") refreshLists(); }));
-  createEffect(on(bottom, () => refreshLists()));
+  createEffect(on(() => out(), () => { if (bottomOpen() && ["lines", "mto", "equipment", "valves"].includes(bottom())) refreshLists(); }));
+  createEffect(on([bottom, bottomOpen], () => { if (bottomOpen()) refreshLists(); }));
+  const mto = () => bottom() === "mto";
   const clashes = createMemo(() => (checked() ?? []).filter(i => i.kind === "clash"));
   const others = createMemo(() => checked() ? checked()!.filter(i => i.kind !== "clash") : (out()?.issues ?? []));
-  const tabs: [typeof bottom extends () => infer T ? T : never, string][] = [["lines", "Lines"], ["equipment", "Equipment"], ["valves", "Valves"], ["clashes", "Clashes"], ["checks", "Checks"]];
+  const tabs: [BottomTab, string][] = [["lines", "Lines"], ["mto", "Take-off"], ["equipment", "Equipment"], ["valves", "Valves"], ["clashes", "Clashes"], ["checks", "Checks"]];
+  const store = (k: string, v?: string) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { /* private window */ } return null; };
+  const [height, setHeight] = createSignal(Math.min(520, Math.max(110, +(store("dl.console.h") ?? 230) || 230)));
+  const grip = (e: PointerEvent) => {
+    const y0 = e.clientY, h0 = height(), el = e.currentTarget as HTMLElement; el.setPointerCapture(e.pointerId);
+    const mv = (m: PointerEvent) => setHeight(Math.min(window.innerHeight * 0.6, Math.max(90, h0 + y0 - m.clientY)));
+    const up = () => { el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); store("dl.console.h", String(Math.round(height()))); window.dispatchEvent(new Event("resize")); };
+    el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up);
+  };
   return (
-    <section class="bpanel">
+    <section class="console bpanel" classList={{ open: bottomOpen() }} style={bottomOpen() ? { height: `${height()}px` } : {}}>
+      <Show when={bottomOpen()}><div class="cgrip" onPointerDown={grip} title="Drag to make the panel taller or shorter" /></Show>
       <nav class="btabs">
-        <For each={tabs}>{([k, l]) => <button classList={{ on: bottom() === k }} onClick={() => setBottom(k)}>{l}{k === "clashes" && checked() ? <span class={`bcnt ${clashes().length ? "bad" : "ok"}`}>{clashes().length}</span> : k === "checks" ? <span class={`bcnt ${others().length ? "bad" : "ok"}`}>{others().length}</span> : null}</button>}</For>
+        <For each={tabs}>{([k, l]) => <button classList={{ on: bottomOpen() && bottom() === k }} onClick={() => setBottom(k)}>{l}{k === "clashes" && checked() ? <span class={`bcnt ${clashes().length ? "bad" : "ok"}`}>{clashes().length}</span> : k === "checks" ? <span class={`bcnt ${others().length ? "bad" : "ok"}`}>{others().length}</span> : null}</button>}</For>
         <span class="grow" />
-        <Show when={bottom() === "lines"}><label class="chk"><input type="checkbox" checked={mto()} onChange={e => setMto(e.currentTarget.checked)} />Material take-off</label><button class="btn sm" onClick={() => C.exportCsv(mto() ? "mto" : "lines")}>CSV</button></Show>
-        <Show when={bottom() === "equipment"}><button class="btn sm" onClick={() => C.exportCsv("equipment")}>CSV</button></Show>
-        <Show when={bottom() === "valves"}><button class="btn sm" onClick={() => C.exportCsv("valves")}>CSV</button></Show>
-        <Show when={bottom() === "clashes" || bottom() === "checks"}><Show when={checkStale()}><span class="muted">The plant changed since the check.</span></Show><button class="btn sm pri" onClick={C.check}>Check now</button></Show>
+        <Show when={bottomOpen()}>
+          <Show when={bottom() === "lines" || bottom() === "mto"}><button class="btn sm" onClick={() => C.exportCsv(mto() ? "mto" : "lines")}>CSV</button></Show>
+          <Show when={bottom() === "equipment"}><button class="btn sm" onClick={() => C.exportCsv("equipment")}>CSV</button></Show>
+          <Show when={bottom() === "valves"}><button class="btn sm" onClick={() => C.exportCsv("valves")}>CSV</button></Show>
+          <Show when={bottom() === "clashes" || bottom() === "checks"}><Show when={checkStale()}><span class="muted">The plant changed since the check.</span></Show><button class="btn sm pri" onClick={C.check}>Check now</button></Show>
+        </Show>
+        <button class="cchev" onClick={() => { setBottomOpen(!bottomOpen()); window.dispatchEvent(new Event("resize")); }} title={bottomOpen() ? "Hide the panel" : "Show the panel"} aria-label={bottomOpen() ? "Hide the panel" : "Show the panel"}>{bottomOpen() ? "▾" : "▴"}</button>
       </nav>
+      <Show when={bottomOpen()}>
       <div class="bbody">
-        <Show when={bottom() === "lines" && !mto()}>
+        <Show when={bottom() === "lines"}>
           <table class="tbl lst"><thead><tr><th>Line number</th><th>From</th><th>To</th><th>Size</th><th>Class</th><th>Fluid</th><th class="r">Length ({unit("len")})</th><th class="r">Components</th><th class="r" title="Empty (dry) weight of pipe, fittings, flanges and valves that have a weight in the catalogue">Weight ({unit("mass")})</th></tr></thead><tbody>
             <For each={lists()?.lines ?? []} fallback={<tr><td colSpan={9} class="muted">No lines yet: Piping › Route Line, then click a nozzle and the corners.</td></tr>}>{r => <tr class="f" classList={{ on: selLine()?.id === r.id }} onClick={() => setSel({ kind: "line", id: r.id })}><td>{r.number || <i class="muted">no number</i>}</td><td>{r.from}</td><td>{r.to}</td><td>{inch(r.nps)}</td><td>{r.class} / {r.rating}</td><td>{r.fluid}</td><td class="r mono">{toU("len", r.length).toFixed(2)}</td><td class="r mono">{r.components}</td><td class="r mono" title={r.unweighed ? `${r.unweighed} part${r.unweighed === 1 ? "" : "s"} (gaskets, bolts, caps or valves without a catalogue weight) not included` : "Every part included"}>{toU("mass", r.weight).toFixed(0)}{r.unweighed ? "+" : ""}</td></tr>}</For>
           </tbody></table>
         </Show>
-        <Show when={bottom() === "lines" && mto()}>
+        <Show when={bottom() === "mto"}>
           <table class="tbl lst"><thead><tr><th>Line</th><th>Group</th><th>Description</th><th>Size</th><th class="r">Quantity</th><th>Unit</th><th class="r">Weight ({unit("mass")})</th></tr></thead><tbody>
             <For each={lists()?.mto ?? []}>{r => <tr><td>{r.line}</td><td>{r.group}</td><td>{r.what}</td><td>{inch(r.nps)}</td><td class="r mono">{r.unit === "m" ? toU("len", r.qty).toFixed(2) : r.qty}</td><td>{r.unit === "m" ? unit("len") : r.unit}</td><td class="r mono" title={r.est ? "Estimated: scaled by the wall from the nearest listed wall" : r.kg == null ? "No catalogue weight" : ""}>{r.kg == null ? "—" : `${r.est ? "≈ " : ""}${toU("mass", r.kg).toFixed(1)}`}</td></tr>}</For>
           </tbody></table>
@@ -280,6 +293,7 @@ export const BottomPanel = () => {
           <table class="tbl lst"><tbody><For each={others()} fallback={<tr><td class="okline"><Icon n="ok" />No open ends, mismatches, class problems or lines without a number.</td></tr>}>{i => <IssueRow i={i} />}</For></tbody></table>
         </Show>
       </div>
+      </Show>
     </section>
   );
 };

@@ -85,9 +85,9 @@
         "Weldolets and sockolets, and a branch table in every pipe class (0.2.7)",
         "Weights for every pipe, fitting, flange and gate valve, in the take-off and the PCF for Datum Pipe (0.2.8)",
         "Butterfly valves, short pattern, class 150 to 600 (0.2.9)",
+        "A cleaner workspace after Datum Mesh, and a pipe class editor: sizes, schedules, components and branch table, kept with the plant (0.2.10)",
         "Sloped lines",
-        "Design rules for supports and access (with 0.3's steel)",
-        "A pipe class editor (sizes, schedules, components, branch table)"
+        "Design rules for supports and access (with 0.3's steel)"
       ]
     },
     {

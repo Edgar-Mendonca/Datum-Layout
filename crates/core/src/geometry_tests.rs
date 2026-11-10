@@ -766,3 +766,46 @@ fn butterfly_valves_are_short_and_go_to_datum_pipe() {
     let (lines, _) = crate::pcf::import::read(&pcf, &Project::new(), &cat, &mut || { n += 1; n }).unwrap();
     assert!(lines.iter().flat_map(|l| &l.items).any(|i| i.kind == ItemKind::Butterfly));
 }
+
+#[test]
+fn a_plant_keeps_its_own_pipe_classes() {
+    let base = Catalogue::builtin();
+    let mut d = Doc::new(crate::examples::get("pumps").unwrap());
+    let six = d.p.lines.iter().find(|l| l.nps == "6").unwrap().id;
+    let wall = |d: &Doc| base.for_project(&d.p).pipe("6", "CS1").unwrap().schedule.clone();
+    assert_eq!(wall(&d), "40");
+    // An edited copy of CS1: 6" in schedule 80. The plant's copy wins over the catalogue's.
+    let mut cs1 = base.class("CS1").unwrap().clone();
+    cs1.schedules.push(("6".into(), "80".into()));
+    cs1.schedules.push(("8".into(), "STD".into()));
+    d.apply(Op::SetClass { class: cs1.clone(), was: Some("CS1".into()) }, &base.for_project(&d.p)).unwrap();
+    assert_eq!(wall(&d), "80");
+    let lists = crate::lists::lists(&d.p, &base.for_project(&d.p));
+    assert!(lists.mto.iter().any(|r| r.what.contains("sch 80") && r.nps == "6"), "the take-off follows the plant's class");
+    // It travels with the file.
+    let back: Project = serde_json::from_str(&serde_json::to_string(&d.p).unwrap()).unwrap();
+    assert_eq!(back.classes.len(), 1);
+    // A class the engine cannot use is refused with the reason.
+    let mut bad = cs1.clone();
+    bad.name = "BAD".into();
+    bad.schedules = vec![("1/2".into(), "99".into())];
+    let e = d.apply(Op::SetClass { class: bad, was: None }, &base.for_project(&d.p)).unwrap_err();
+    assert!(e.contains("no 1/2\" pipe in schedule 99"), "{e}");
+    let mut bad2 = cs1.clone();
+    bad2.name = "BAD2".into();
+    bad2.branches[0].fitting = "elbow".into();
+    assert!(d.apply(Op::SetClass { class: bad2, was: None }, &base.for_project(&d.p)).unwrap_err().contains("not a branch fitting"));
+    // A new class, then renamed: its lines follow the new name.
+    let mut mine = cs1.clone();
+    mine.name = "CS-NEW".into();
+    d.apply(Op::SetClass { class: mine.clone(), was: None }, &base.for_project(&d.p)).unwrap();
+    d.apply(Op::SetLine(Line { class: "CS-NEW".into(), ..d.p.line(six).unwrap().clone() }), &base.for_project(&d.p)).unwrap();
+    let mut renamed = mine.clone();
+    renamed.name = "CS-6".into();
+    d.apply(Op::SetClass { class: renamed, was: Some("CS-NEW".into()) }, &base.for_project(&d.p)).unwrap();
+    assert_eq!(d.p.line(six).unwrap().class, "CS-6");
+    assert!(d.apply(Op::DeleteClass { name: "CS-6".into() }, &base.for_project(&d.p)).unwrap_err().contains("uses class CS-6"));
+    // Removing the plant's copy of CS1 brings the catalogue's back.
+    d.apply(Op::DeleteClass { name: "CS1".into() }, &base.for_project(&d.p)).unwrap();
+    assert!(d.p.classes.iter().all(|c| c.name != "CS1"));
+}

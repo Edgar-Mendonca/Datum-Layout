@@ -4,6 +4,7 @@
 import { For, Show, createSignal, createMemo, createResource, JSX } from "solid-js";
 import { CatalogueOut, PipeClass, inch, NPS, ITEMS } from "./api";
 import { call, openDialog, project, act } from "./store";
+import { ClassEditor } from "./classedit";
 import { Dialog } from "./ui";
 import { fmt } from "./units";
 
@@ -25,14 +26,20 @@ const Tbl = (p: { head: string[]; rows: (string | JSX.Element)[][]; right?: numb
 const WKIND: Record<string, string> = { elbow90_lr: "Elbow 90° long radius", elbow90_sr: "Elbow 90° short radius", elbow45_lr: "Elbow 45°", tee: "Tee, equal", reducing_tee: "Tee, reducing", reducer: "Reducer", flange_wn: "Flange, weld neck", flange_blind: "Flange, blind", gate: "Gate valve", globe: "Globe valve", check: "Check valve", ball: "Ball valve" };
 
 export const library = (start?: string) => openDialog(() => {
-  const [c] = createResource(() => call<CatalogueOut>("catalogue"));
+  const [c, { refetch }] = createResource(() => call<CatalogueOut>("catalogue"));
+  /** The class being edited (the editor shows in place of its page). */
+  const [editing, setEditing] = createSignal<{ start: PipeClass; was: string | null } | null>(null);
+  const own = (n: string) => !!c()?.own?.includes(n);
+  const builtin = (n: string) => !!c()?.base?.includes(n);
+  const blank = (): PipeClass => ({ name: "", description: "", material: "Carbon steel", ratings: [150], sizes: NPS.slice(0, 13), schedules: [["1/2", "80"], ["2", "40"]], elbow: "long", components: ["pipe", "elbow90", "elbow45", "tee", "reducer", "cap", "flange", "blind", "gasket", "gate", "check"].map(kind => ({ kind, min: null, max: null })), branches: [{ branch: "same", fitting: "tee" }, { fitting: "reducing_tee" }], source: "" });
+  const copyName = (n: string) => { let k = 1, s = `${n}-A`; while (c()?.cat.classes.some(x => x.name === s)) s = `${n}-${String.fromCharCode(65 + k++)}`; return s; };
   const [q, setQ] = createSignal("");
   const [cur, setCur] = createSignal(start ?? "");
   const cat = () => c()?.cat;
   const pages = createMemo((): Page[] => {
     const k = cat(); if (!k) return [];
     return [
-      ...k.classes.map(x => ({ k: `class:${x.name}`, label: x.name, group: "Pipe classes", sub: x.material })),
+      ...k.classes.map(x => ({ k: `class:${x.name}`, label: x.name, group: "Pipe classes", sub: own(x.name) ? (builtin(x.name) ? "edited · this plant" : "this plant") : x.material })),
       { k: "pipe", label: "Pipe", group: "Parts tables", sub: `${k.pipes.length} sizes` },
       { k: "fittings", label: "Butt-weld fittings", group: "Parts tables", sub: `${k.fittings.length} sizes` },
       { k: "flanges", label: "Flanges", group: "Parts tables", sub: `${k.flanges.length} rows` },
@@ -54,11 +61,13 @@ export const library = (start?: string) => openDialog(() => {
         <div class="mlist"><input class="libsearch" placeholder="Search: CS300, 6, gate, 2500…" value={q()} onInput={e => setQ(e.currentTarget.value)} />
           <Show when={cat()} fallback={<p class="muted">Loading…</p>}>
             <For each={[...new Set(shownPages().map(x => x.group))]}>{g => <><small class="fam">{g}</small>
-              <For each={shownPages().filter(x => x.group === g)}>{x => <button classList={{ on: x.k === page() }} onClick={() => setCur(x.k)}><span>{x.label}</span>{x.sub && <small>{x.sub}</small>}</button>}</For></>}</For>
+              <For each={shownPages().filter(x => x.group === g)}>{x => <button classList={{ on: x.k === page() && !editing() }} onClick={() => { setEditing(null); setCur(x.k); }}><span>{x.label}</span>{x.sub && <small>{x.sub}</small>}</button>}</For>
+              <Show when={g === "Pipe classes"}><button class="libnew" disabled={!project()} title={project() ? "Write a new pipe class for this plant" : "Open or start a plant first: a class is kept in the plant's file"} onClick={() => setEditing({ start: blank(), was: null })}>+ New pipe class</button></Show></>}</For>
             <Show when={cat()!.packs.length}><small class="fam">Plug-in packs</small><For each={cat()!.packs}>{p => <div class="libpack">{p}</div>}</For></Show>
           </Show></div>
         <div class="form libpage">
-          <Show when={cls()}>{x => <>
+          <Show when={editing()} keyed>{e => <ClassEditor start={e.start} was={e.was} cat={cat()!} own={!!e.was && own(e.was)} builtin={!!e.was && builtin(e.was)} done={async name => { setEditing(null); await refetch(); if (name) setCur(`class:${name}`); }} />}</Show>
+          <Show when={!editing() && cls()}>{x => <>
             <h3>{x().name} <small class="muted">{x().description}</small></h3>
             <p class="libmeta"><span><b>Material</b> {x().material}</span><span><b>Flange ratings</b> {x().ratings.map(r => `Class ${r}`).join(", ")}</span><span><b>Sizes</b> {inch(x().sizes[0] ?? "")} to {inch(x().sizes[x().sizes.length - 1] ?? "")}</span><span><b>Elbows</b> {x().elbow === "short" ? "short radius" : "long radius"}</span><span><b>Lines using it</b> {used(x().name)}</span></p>
             <div class="libcols">
@@ -73,30 +82,30 @@ export const library = (start?: string) => openDialog(() => {
                 </Show></section>
             </div>
             <p class="small libsrc"><b>Source:</b> {x().source}</p>
-            <p class="ibtns"><button class="btn pri" disabled={!project()} onClick={() => { const p = project(); if (p) act({ SetSettings: { ...p.settings, class: x().name, rating: x().ratings.includes(p.settings.rating) ? p.settings.rating : x().ratings[0] } }); }}>Use for new lines</button></p>
+            <p class="ibtns"><button class="btn" disabled={!project()} title="Change this class for this plant (the plant keeps its own copy)" onClick={() => setEditing({ start: x(), was: x().name })}>Edit…</button><button class="btn" disabled={!project()} title="A new class starting from this one" onClick={() => setEditing({ start: { ...x(), name: copyName(x().name), source: "" }, was: null })}>Copy as a new class…</button><span class="grow" /><button class="btn pri" disabled={!project()} onClick={() => { const p = project(); if (p) act({ SetSettings: { ...p.settings, class: x().name, rating: x().ratings.includes(p.settings.rating) ? p.settings.rating : x().ratings[0] } }); }}>Use for new lines</button></p>
           </>}</Show>
-          <Show when={page() === "pipe"}>
+          <Show when={!editing() && page() === "pipe"}>
             <h3>Pipe <small class="muted">outside diameter and wall by size and schedule</small></h3>
             <Tbl head={["Size", "DN", "Schedule", "OD", "Wall", "Source"]} right={[1, 3, 4]} rows={[...(cat()?.pipes ?? [])].sort(byNps).filter(r => has(r.nps, inch(r.nps), r.dn, r.schedule)).map(r => [inch(r.nps), String(r.dn), r.schedule, mm(r.od), mm(r.wall), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "fittings"}>
+          <Show when={!editing() && page() === "fittings"}>
             <h3>Butt-weld fittings <small class="muted">centre-to-end and end-to-end</small></h3>
             <Tbl head={["Size", "Elbow LR", "Elbow SR", "Tee", "Reducer", "Cap", "Source"]} right={[1, 2, 3, 4, 5]} rows={[...(cat()?.fittings ?? [])].sort(byNps).filter((r: any) => has(r.nps, inch(r.nps))).map((r: any) => [inch(r.nps), mm(r.elbow_lr), r.elbow_sr ? mm(r.elbow_sr) : "—", mm(r.tee_c), mm(r.reducer_h), mm(r.cap_e), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "flanges"}>
+          <Show when={!editing() && page() === "flanges"}>
             <h3>Flanges <small class="muted">weld-neck and blind, by size and class</small></h3>
             <Tbl head={["Size", "Class", "OD", "Thickness", "Blind", "Length", "Bolts", "Gasket", "Source"]} right={[2, 3, 4, 5, 7]} rows={[...(cat()?.flanges ?? [])].sort((a: any, b: any) => a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.nps, inch(r.nps), r.rating, `class ${r.rating}`)).map((r: any) => [inch(r.nps), String(r.rating), mm(r.od), mm(r.thick), r.blind_thick ? mm(r.blind_thick) : "—", mm(r.wn_length), `${r.bolts} × ${mm(r.bolt)}`, mm(r.gasket), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "tees"}>
+          <Show when={!editing() && page() === "tees"}>
             <h3>Reducing tees <small class="muted">run × branch: centre to end of the run (C) and of the branch (M)</small></h3>
             <Tbl head={["Run", "Branch", "C", "M", "Source"]} right={[2, 3]} rows={(cat()?.tees ?? []).filter(r => has(r.nps, inch(r.nps), r.nps_branch, inch(r.nps_branch))).map(r => [inch(r.nps), inch(r.nps_branch), mm(r.c), mm(r.m), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "reducers"}>
+          <Show when={!editing() && page() === "reducers"}>
             <h3>Reducers <small class="muted">large × small: end-to-end length, concentric and eccentric alike</small></h3>
             <Tbl head={["Large end", "Small end", "Length", "Source"]} right={[2]} rows={(cat()?.reducers ?? []).filter(r => has(r.nps, inch(r.nps), r.nps_small, inch(r.nps_small))).map(r => [inch(r.nps), inch(r.nps_small), mm(r.h), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "olets"}>
+          <Show when={!editing() && page() === "olets"}>
             <h3>Branch outlets <small class="muted">weldolets (standard weight) and sockolets (class 3000): height above the header (A), base and outlet diameters, weight</small></h3>
             <Tbl head={["Kind", "Fits", "Branch", "Height", "Base", "Outlet", "Weight", "Source"]} right={[3, 4, 5, 6]} rows={(cat()?.olets ?? []).filter(r => has(r.kind, r.nps_branch, inch(r.nps_branch))).map(r => [r.kind === "weldolet" ? "Weldolet" : "Sockolet", r.same ? "size on size" : "smaller than the header", inch(r.nps_branch), mm(r.height), mm(r.base_od), mm(r.top_od), r.weight_lb != null ? fmt("mass", r.weight_lb * 0.45359237) : "—", <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "valves"}>
+          <Show when={!editing() && page() === "valves"}>
             <h3>Valves and strainers <small class="muted">face to face, flanged, by size and class</small></h3>
             <Tbl head={["Type", "Size", "Class", "Face to face", "Source"]} right={[3]} rows={[...(cat()?.valves ?? [])].sort((a: any, b: any) => a.kind.localeCompare(b.kind) || a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.kind, VALVE[r.kind] ?? "", r.nps, inch(r.nps), r.rating)).map((r: any) => [VALVE[r.kind] ?? r.kind, inch(r.nps), String(r.rating), mm(r.f2f), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
-          <Show when={page() === "weights"}>
+          <Show when={!editing() && page() === "weights"}>
             <h3>Weights <small class="muted">fittings by wall (STD, XS), flanges and valves by class; pipe is weighed from its diameter and wall</small></h3>
             <p class="small muted">A schedule whose wall is neither STD nor XS is scaled by its wall from the nearer of the two (marked ≈ in the take-off). Weights are the makers' approximate figures: check them with your supplier.</p>
             <Tbl head={["Part", "Size", "Wall or class", "Weight", "Source"]} right={[3]} rows={(cat()?.weights ?? []).filter(r => has(WKIND[r.kind] ?? r.kind, r.nps, inch(r.nps), r.nps_small, r.wall, r.rating || "")).map(r => [WKIND[r.kind] ?? r.kind, r.nps_small ? `${inch(r.nps)} × ${inch(r.nps_small)}` : inch(r.nps), r.wall || `class ${r.rating}`, fmt("mass", r.kg), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>

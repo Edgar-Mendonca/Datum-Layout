@@ -19,7 +19,7 @@ fn out(d: &Doc, cat: &Catalogue, created: Vec<u32>) -> Value {
 }
 
 fn main() {
-    let cat = Catalogue::builtin();
+    let base = Catalogue::builtin();
     let mut d = Doc::new(Project::new());
     let mut opts = json!({ "autosave": 0, "beta": false, "theme": "light", "openLast": false, "units": "SI", "lod": 1, "clearance": 0.025, "labels": true, "paper": "A4", "landscape": true, "company": "", "packs": [] });
     let stdin = std::io::stdin();
@@ -29,9 +29,11 @@ fn main() {
         let v: Value = serde_json::from_str(&line).unwrap_or(json!({}));
         let cmd = v["cmd"].as_str().unwrap_or("");
         let a = &v["args"];
+        // The catalogue as the plant sees it: with the plant's own classes.
+        let cat = base.for_project(&d.p).into_owned();
         let r: Result<Value, String> = match cmd {
             "state" => Ok(out(&d, &cat, vec![])),
-            "apply" => serde_json::from_value::<Op>(a["op"].clone()).map_err(|e| e.to_string()).and_then(|op| d.apply(op, &cat)).map(|c| out(&d, &cat, c)),
+            "apply" => serde_json::from_value::<Op>(a["op"].clone()).map_err(|e| e.to_string()).and_then(|op| d.apply(op, &cat)).map(|c| out(&d, &base.for_project(&d.p), c)),
             "history" => { if a["redo"].as_bool() == Some(true) { d.redo() } else { d.undo() }; Ok(out(&d, &cat, vec![])) }
             "scene" => Ok(json!(scene::scene(&d.p, &cat, &route::build(&d.p, &cat), opts["lod"].as_u64().unwrap_or(1) as u32))),
             "snap" => (|| -> Result<Value, String> {
@@ -48,7 +50,7 @@ fn main() {
                 Some(id) => examples::get(id).ok_or("no such example".into()).map(|p| { d = Doc::new(p); out(&d, &cat, vec![]) }),
                 None => { d = Doc::new(Project::new()); Ok(out(&d, &cat, vec![])) }
             },
-            "catalogue" => Ok(json!({ "cat": cat, "fields": EquipKind::ALL.iter().map(|k| (k, k.name(), equipment::fields(*k))).collect::<Vec<_>>() })),
+            "catalogue" => Ok(json!({ "base": base.classes.iter().map(|c| c.name.clone()).collect::<Vec<_>>(), "own": d.p.classes.iter().map(|c| c.name.clone()).collect::<Vec<_>>(), "cat": cat, "fields": EquipKind::ALL.iter().map(|k| (k, k.name(), equipment::fields(*k))).collect::<Vec<_>>() })),
             "unit_table" => Ok(json!((units::shown(false), units::shown(true), units::typed()))),
             "export_pcf" => pcf::write(&d.p, &cat, a["line"].as_u64().map(|x| x as u32)).map(Value::from),
             "export_gltf" => Ok(json!(format!("data:model/gltf-binary;base64,{}", scene::b64(&gltf::glb(&d.p, &route::build(&d.p, &cat), 1))))),

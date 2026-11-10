@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.9 (2026-11-09) |
+| **Current version** | 0.2.10 (2026-11-10) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -48,6 +48,7 @@ Coordinates: metres, X east, Y north, Z up, in the engine, the file and PCF; the
 | `src-tauri/src/update.rs` | Plan's updater (`REPO` = Datum-Layout; requires SHA256SUMS.txt) |
 | `ui/src/view3d.tsx` | The 3D view: plot (ground, grid, coordinates, plant north), areas, parts from one buffer with colours per part, picking, selection colours, labels, ports and the route preview, snap marker while dragging, axis arrows (gizmo), standard views and fit, the orbit speed check |
 | `catalogue/tees_reducing.csv`, `reducers.csv`, `olets.csv`, `weights.csv` | Researched tables (Texas Flange, Bonney Forge, Wermac) with sources on every row |
+| `ui/src/classedit.tsx` | The pipe class editor inside the Library (draft in a Solid store; saved with `Op::SetClass`) |
 | `crates/core/src/package.rs`, `docs/formats/` | The plant package (P&ID → layout): read, import (place/update equipment, list lines), route listed lines; the format document and a worked example |
 | `ui/src/library.tsx` | The Library: pipe classes and parts tables with sources |
 | `ui/src/shell.tsx` | The workspace after Datum Mesh: steps bar (`Flow`), plant tree (`Tree`: steps, branches, counts, marks, eyes, filter, menus), context bar (`CtxBar`), tool strip (`ToolStrip`), pane grips and the properties card |
@@ -128,6 +129,10 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.8 | Weights: pipe computed (π (D − t) t ρ, 7850 kg/m³, 8000 for stainless), everything else from `weights.csv` in kg; a fitting in a schedule whose wall is neither STD nor XS is the nearer row scaled by the wall, flagged `est` (≈ in the window). Parts with no source (globe/check/ball valves, gaskets, bolts, caps, crosses) have no weight rather than a guess; the line list counts them (`unweighed`). Weights are empty: no contents or insulation (geometry, not process) | A missing weight is honest; an invented one is not. Datum Pipe reads `WEIGHT` for valves and flanges (`import.rs`), so those matter most |
 | 0.2.8 | Weight checks are in the build script (scratchpad), recorded per row in `source`: reducers vs a second maker; elbows, tees, blinds vs their own steel from the dimension tables | One published source per kind exists on the allowed sites; geometry is the independent check |
 | 0.2.9 | Butterfly valves are short pattern (double flanged); the long-pattern length is kept in each row's source. Spectacle blinds, spades and spacers deferred: the only tables on the allowed sites reproduce ASME B16.48, which the catalogue must not copy; a manufacturer's table (or the user's own) is needed. A pack can add them once the part exists | Rule: never copy a standard's tables |
+| 0.2.10 | The workspace follows Datum Mesh by side-by-side screenshots (Mesh's own UI test run with SHOTS): bottom panel = Mesh's console (folded strip of tabs, opens on demand, full width under the work area); hints in the status bar through a Portal into `hintSlot` (the `.toolhint` classes kept for the tests); line numbers only for the selected/picked lines; the colour key as Mesh's dark results card; a gradient ground from `--vtop`/`--vbot`; −/Fit/+ at the bottom right; the card's head is the object's name | The user: the window felt cluttered and unlike Mesh. Lists open when asked for; the model gets the room |
+| 0.2.10 | Pipe classes a plant writes or edits live in `Project.classes` (saved in the `.dlayout`); `Catalogue::for_project` overlays them (same name: the plant's wins) and every shell call uses it; `validate_class` refuses a class the tables cannot make (no pipe in a schedule, unknown component or fitting) with the reason. Renaming moves the lines; a class in use cannot be removed unless the catalogue has one of that name | A class edit must never break routing silently, and a plant must carry its own specification |
+| 0.2.10 | The editor offers only schedules the pipe table has for the chosen size; a schedule that does not exist at a larger size in its range is caught by the engine (e.g. 40 from 20" reaches 22") | The check belongs in the engine |
+| 0.2.10 | Release number 0.2.10, not 0.3.0: 0.3 stays steel on the roadmap | Keep site.json's roadmap true |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -158,7 +163,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.7 | Weldolets and sockolets (`olets.csv` from Bonney Forge, checked with Wermac; `ItemKind::Weldolet`, `Sockolet`; zero length on the header, PCF OLET written and read); class branch tables (`PipeClass::branches`, `branch_fitting`; routing a branch applies it; Check reports others) | ✅ |
 | 0.2.8 | Weights: `weights.csv` (763 rows: fittings STD/XS, WN and blind flanges 150–2500, gate valves 150–600, every row checked against a second source or its own steel); pipe from π(D−t)tρ; `lists::part_kg`; line and take-off weights (CSV, print); PCF `WEIGHT` | ✅ |
 | 0.2.9 | Butterfly valves (`ItemKind::Butterfly`; triple offset, double flanged, short pattern, 150/300/600, 3–24"; 27 rows, long pattern checked equal to the gate table); PCF `VYFL` written and read; classes ≤ 600 allow them. Spectacle blinds deferred (only standard reproductions found) | ✅ |
-| 0.2 Pipe classes and fittings | Class editor with branch table; sloped lines | 🔜 |
+| 0.2.10 | Workspace after Datum Mesh (title bar, folding bottom strip with a Take-off tab, hints in the status bar, quiet view: line numbers on selection, dark folding key, zoom −/Fit/+, soft ground); pipe class editor (`Project.classes`, `Op::SetClass`/`DeleteClass`, `Catalogue::for_project`, `validate_class`; `ui/src/classedit.tsx`) | ✅ |
+| 0.2 Pipe classes and fittings | Sloped lines (the class editor shipped in 0.2.10) | 🔜 |
 | 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
 | 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
 | 0.5 From Schema | Schema's own export of the package (brief written); round trip with Schema's examples | ⬜ |
@@ -214,6 +220,13 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - 0.2.3 (2026-11-09, the user: moving equipment felt weird; more from Datum Mesh): drag on the plot, nudge, Move to…, view cube, status badges; three window bugs found by the new checks.
 - 0.2.2: pipe supports; `scripts/verify.sh` with Datum Pipe eca6ebb: every example solved, the rack's lines read with their supports and no warnings.
 - 0.2.1: From the P&ID: plant package format, import, Route Listed Lines, component-order check; brief for Schema.
+
+### 2026-11-10: Session 5 (0.2.10, the workspace)
+- The user: the UI still did not look like Datum Mesh's and felt cluttered; make it look professional first, with the class editor, so they can evaluate the app.
+- Cloned Datum Mesh (read only), ran its UI test with SHOTS to get its screenshots, compared with ours: title bar, bottom console, hints, legend, view ground, card head, tree eyes, steps column.
+- 0.2.10: the workspace changes above and the pipe class editor; UI checks 7h2 (editor), 8a (quiet view), 8c (first look, light and dark screenshots).
+- Found while validating: no built-in class was invalid except that "bolts" was missing from the validator's list (fixed); test `every_builtin_class_is_valid`.
+- Disk filled once (target 25 GB): build with `CARGO_INCREMENTAL=0`; Mesh's target removed.
 
 ## 5. Known limits
 

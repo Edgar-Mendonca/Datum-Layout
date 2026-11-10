@@ -5,10 +5,11 @@
 // end on); components dropped from the catalogue with a snap marker; arrows to move equipment
 // and runs along an axis. The engine owns all geometry: this file only draws what it sends.
 import { onMount, onCleanup, createEffect, on, Show, For, createSignal } from "solid-js";
+import { Portal } from "solid-js/web";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line } from "./api";
-import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection } from "./store";
+import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection, hintSlot } from "./store";
 import { C, setFit, setStdView, setCamHook, finishRoute, branchSize } from "./cmds";
 import { fmt, toU, fromU, unit } from "./units";
 
@@ -51,6 +52,7 @@ export const View3D = () => {
   const sun2 = new THREE.DirectionalLight(0xffffff, 0.5); sun2.position.set(-30, 20, -40); sc.add(sun2);
   let mesh: THREE.Mesh | null = null, insMesh: THREE.Mesh | null = null, colours: Float32Array | null = null, sceneData: Scene | null = null, idx0: Uint32Array | null = null;
   const [legend, setLegend] = createSignal<[string, string][]>([]);
+  const [legendFolded, setLegendFolded] = createSignal(false);
   /** Whether a part is drawn (hidden and isolated items are not). */
   const shown = (q: PartRef) => { const id = q.line || q.equip, iso = isolated(); return iso ? iso.includes(id) : !hidden().includes(id); };
   // The section box: six clipping planes (three.js axes: plant east = x, north = −z, up = y).
@@ -69,10 +71,17 @@ export const View3D = () => {
   const buildPlot = () => {
     plotG.clear();
     renderer.setClearColor(new THREE.Color(css("--bg2")));
+    {
+      const cv = document.createElement("canvas"); cv.width = 2; cv.height = 256;
+      const g2 = cv.getContext("2d")!, gr = g2.createLinearGradient(0, 0, 0, 256);
+      gr.addColorStop(0, css("--vtop") || "#F2F5F7"); gr.addColorStop(1, css("--vbot") || "#D3DCE3"); g2.fillStyle = gr; g2.fillRect(0, 0, 2, 256);
+      const old = sc.background as THREE.Texture | null; if (old && (old as THREE.Texture).isTexture) old.dispose();
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; sc.background = tex;
+    }
     const p = project(); if (!p) return;
     const { e, n, grid, ground, north } = p.plot;
     const g = ground;
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(e[1] - e[0], n[1] - n[0]), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--panel2")), transparent: true, opacity: 0.55, depthWrite: false }));
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(e[1] - e[0], n[1] - n[0]), new THREE.MeshBasicMaterial({ color: new THREE.Color(css("--plot")), transparent: true, opacity: 0.7, depthWrite: false }));
     plane.position.set((e[0] + e[1]) / 2, (n[0] + n[1]) / 2, g - 0.002); plotG.add(plane);
     const minor: number[] = [], major: number[] = [];
     const step = Math.max(grid, (e[1] - e[0]) / 400);
@@ -231,6 +240,7 @@ export const View3D = () => {
       }
       for (const [id, pts] of (out()?.paths ?? []).length <= 40 ? out()?.paths ?? [] : []) {
         const l = p.lines.find(x => x.id === id); if (!l || pts.length < 2 || !vis(id)) continue;
+        if (!(sel()?.kind === "line" && sel()!.id === id) && !picked().includes(id)) continue;
         // On the longest run, in its middle.
         let k = 0, best = -1; for (let i = 0; i + 1 < pts.length; i++) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1], pts[i + 1][2] - pts[i][2]); if (d > best) { best = d; k = i; } }
         tag(`ln${id}`, [(pts[k][0] + pts[k + 1][0]) / 2, (pts[k][1] + pts[k + 1][1]) / 2, (pts[k][2] + pts[k + 1][2]) / 2 + 0.3], l.number || "(no number)", "nlabel linel");
@@ -395,6 +405,8 @@ export const View3D = () => {
     controls.target.copy(c); controls.update(); draw();
   };
   const fit = () => frame(bounds());
+  /** Zooms towards (f < 1) or away from (f > 1) the point the view turns about. */
+  const zoom = (f: number) => { if (!controls) return; const t = controls.target; camera.position.sub(t).multiplyScalar(f).add(t); controls.update(); draw(); };
   // ------------------------------------------------------------ the view cube (after Datum Mesh's)
   // Drawn in SVG from the camera each frame and hit-tested by our own code: a face looks straight
   // at it, an edge from between its two faces, a corner from the three (an isometric view).
@@ -752,6 +764,7 @@ export const View3D = () => {
   createEffect(on([hidden, isolated], () => applyShown(), { defer: true }));
   createEffect(on(section, applySection, { defer: true }));
   createEffect(on(() => opts().labels, () => { buildLabels(); draw(); }, { defer: true }));
+  createEffect(on(() => [sel()?.kind === "line" ? sel()!.id : 0, picked().length], () => { buildLabels(); draw(); }, { defer: true }));
   createEffect(on(mode, () => { buildPorts(); buildGizmo(); if (mode() !== "route") { setRubber([]); marker.visible = false; } host.style.cursor = mode() === "select" ? "" : "crosshair"; if (mode() !== "measure") setMeasure([]); }, { defer: true }));
   createEffect(on(measure, () => {
     const m = measure();
@@ -778,22 +791,25 @@ export const View3D = () => {
           <Show when={cubeZone()}>{z => <polygon class="zone" points={z().pts}><title>{z().name}</title></polygon>}</Show>
         </svg>
       </div>
-      <Show when={dragInfo2()}><div class="toolhint">{dragInfo2()}<span class="muted"> · Shift: finer · Esc puts it back</span></div></Show>
       <Show when={p() && !p()!.equipment.length && !p()!.lines.length && mode() === "select"}>
         <div class="empty"><b>An empty plot</b><span>Drag equipment from the catalogue on the left onto the plot, or choose it on the Equipment tab. Then route lines between nozzles with Piping › Route Line.</span>
           <span class="ibtns"><button class="btn" onClick={() => C.place("vertical_vessel")}>Place a vessel</button><button class="btn" onClick={() => C.newProject("pumps")}>Open an example</button></span></div>
       </Show>
+      <Show when={hintSlot()}>{slot => <Portal mount={slot()}>
+      <Show when={dragInfo2()}><div class="toolhint">{dragInfo2()}<span class="muted"> · Shift: finer · Esc puts it back</span></div></Show>
       <Show when={mode() === "route"}><div class="toolhint">{route()?.start ? "Click to add a corner (orthogonal to the last point) · click a nozzle to end there · double-click or right-click to end at a free point · Esc to cancel" : "Click a nozzle, a tee's branch end or a point on the plot to start the line"}<span class="muted"> · Elevation {fmt("coord", elev())} · Shift: use the working elevation</span></div></Show>
       <Show when={mode() === "measure"}><div class="toolhint">{measure().length === 2 ? (() => { const [a, b] = measure(); const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; return <span><b>{fmt("len", Math.hypot(d[0], d[1], d[2]))}</b> · ΔE {fmt("len", d[0])} · ΔN {fmt("len", d[1])} · ΔEL {fmt("len", d[2])} · horizontal {fmt("len", Math.hypot(d[0], d[1]))}</span>; })() : measure().length === 1 ? "Click the second point" : "Measure: click a point on a part or on the plot"}<span class="muted"> · Esc to finish</span></div></Show>
       <Show when={mode() === "place"}><div class="toolhint">Click on the plot to place the {placing()?.replace("_", " ")} · Esc to cancel</div></Show>
       <Show when={!dragInfo2() && (sel()?.kind === "equip" || picked().length > 0) && mode() === "select"}><div class="toolhint sub">Drag it across the plot (or its arrows) · arrow keys nudge it a grid step · right-click to turn or type a position</div></Show>
       <Show when={selLine() && sel()?.kind === "line"}><div class="toolhint sub">Click a straight run to move it · click an amber corner dot to move the corner · Piping › Add Jog steps a run over an obstacle · drag components from the catalogue onto the pipe</div></Show>
       <Show when={sel()?.kind === "corner"}><div class="toolhint sub">Corner {(sel() as { v: number }).v + 1}: drag its arrows to move it; the runs on both sides stay square · Esc or click elsewhere to finish</div></Show>
-      <Show when={legend().length}><div class="legend"><b>{({ line: "Line", class: "Pipe class", fluid: "Fluid", size: "Size" } as Record<string, string>)[colourBy()]}</b><For each={legend().slice(0, 16)}>{([k, c]) => <span><i style={{ background: c }} />{k}</span>}</For>{legend().length > 16 && <span class="muted">+{legend().length - 16} more</span>}</div></Show>
+      <Show when={hidden().length || isolated()}><div class="hidnote">{isolated() ? `Showing ${isolated()!.length} item${isolated()!.length === 1 ? "" : "s"} only` : `${hidden().length} hidden`} · <a onClick={() => C.showAll()}>Show all</a></div></Show>
+      </Portal>}</Show>
+      <div class="zoomctl"><button title="Zoom out" aria-label="Zoom out" onClick={() => zoom(1.25)}>−</button><button title="Fit the whole plant in view (F)" onClick={() => C.fit()}>Fit</button><button title="Zoom in" aria-label="Zoom in" onClick={() => zoom(0.8)}>+</button></div>
+      <Show when={legend().length}><div class="legend lcard" classList={{ folded: legendFolded() }}><button class="lfold" title={legendFolded() ? "Show the key" : "Fold the key away"} onClick={() => setLegendFolded(!legendFolded())}>{legendFolded() ? "▸ Key" : "▾"}</button><b>{({ line: "Line", class: "Pipe class", fluid: "Fluid", size: "Size" } as Record<string, string>)[colourBy()]}</b><For each={legend().slice(0, 16)}>{([k, c]) => <span><i style={{ background: c }} />{k}</span>}</For>{legend().length > 16 && <span class="muted">+{legend().length - 16} more</span>}</div></Show>
       <Show when={section()}><div class="secbox"><b>Section box</b>
         <For each={[["E", 0], ["N", 1], ["EL", 2]] as [string, number][]}>{([n, k]) => <label>{n}<input type="number" step="0.5" value={+toU("coord", section()!.lo[k]).toFixed(2)} onChange={e => { const v = fromU("coord", +e.currentTarget.value), s = section()!; if (Number.isFinite(v) && v < s.hi[k]) { const lo = [...s.lo] as V3; lo[k] = v; setSection({ lo, hi: s.hi }); } }} />to<input type="number" step="0.5" value={+toU("coord", section()!.hi[k]).toFixed(2)} onChange={e => { const v = fromU("coord", +e.currentTarget.value), s = section()!; if (Number.isFinite(v) && v > s.lo[k]) { const hi = [...s.hi] as V3; hi[k] = v; setSection({ lo: s.lo, hi }); } }} /><span class="unit">{unit("coord")}</span></label>}</For>
         <button class="btn" onClick={() => setSection(null)}>Turn off</button></div></Show>
-      <Show when={hidden().length || isolated()}><div class="hidnote">{isolated() ? `Showing ${isolated()!.length} item${isolated()!.length === 1 ? "" : "s"} only` : `${hidden().length} hidden`} · <a onClick={() => C.showAll()}>Show all</a></div></Show>
     </div>
   );
 };

@@ -1139,3 +1139,88 @@ tr.behind td { background: var(--err-bg); }
 .dlg .xyz { display: flex; gap: 10px; }
 .dlg .xyz .fld { display: flex; align-items: center; gap: 4px; }
 .dlg .xyz input { width: 90px; }
+
+/* ---------------------------------------------------------------- 0.3.0: the workspace after Datum Mesh */
+:root { --vtop: #F4F6F8; --vbot: #CDD6DE; --plot: #FFFFFF; }
+:root[data-theme="dark"] { --vtop: #223041; --vbot: #0E151E; --plot: #1A2533; }
+.top .qat .appname { font-size: 13px; font-weight: 600; margin: 0 10px 0 2px; white-space: nowrap; color: var(--text); }
+.top .title b { font-weight: 600; color: var(--text); }
+.top .title .tsub { color: var(--muted); }
+/* The bottom panel: a strip of tabs under the work area; it opens on demand (Mesh's console). */
+.console { flex: none; display: flex; flex-direction: column; border-top: 1px solid var(--line); background: var(--panel); position: relative; min-height: 0; }
+.console > .btabs { height: 28px; border-bottom: 0; padding: 0 6px; gap: 2px; }
+.console.open > .btabs { border-bottom: 1px solid var(--line); }
+.console > .btabs > button:not(.btn) { padding: 0 10px; height: 100%; color: var(--text2); border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; font: 400 12px var(--sans); letter-spacing: 0; text-transform: none; }
+.console > .btabs > button:not(.btn):hover { color: var(--blue); }
+.console > .btabs > button.on { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+.console > .btabs .cchev { font-size: 13px; padding: 0 8px; }
+.console > .btabs .btn { margin-left: 6px; }
+.console .bbody { flex: 1; min-height: 0; overflow: auto; }
+.console .cgrip { position: absolute; left: 0; right: 0; top: -3px; height: 6px; cursor: ns-resize; z-index: 3; }
+.console .cgrip:hover { background: var(--blue); opacity: .5; }
+/* Hints in the status bar, not over the model. */
+.status .hintslot { min-width: 0; flex: 0 1 auto; overflow: hidden; display: flex; }
+.status .hintslot > div { display: flex; gap: 14px; min-width: 0; }
+.status .toolhint, .status .toolhint.sub { position: static; transform: none; background: none; border: 0; padding: 0; max-width: none; color: var(--text2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status .toolhint.sub { color: var(--muted); }
+.status .hidnote { position: static; background: none; border: 0; padding: 0; white-space: nowrap; color: var(--blue); }
+.status .hidnote a { cursor: pointer; text-decoration: underline; }
+.status .smode { font-weight: 500; }
+/* The view: a soft ground, zoom at the bottom right, the key as a dark card. */
+.v3d { background: linear-gradient(var(--vtop), var(--vbot)); }
+.v3d .zoomctl { position: absolute; right: 10px; bottom: 10px; display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); font: 11px var(--mono); z-index: 3; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.v3d .zoomctl button { padding: 3px 9px; color: var(--text2); }
+.v3d .zoomctl button:hover { background: var(--pale); color: var(--blue); }
+.v3d .legend.lcard { left: 12px; right: auto; top: 112px; width: 200px; padding: 9px 11px 10px; border: 0; border-radius: 3px; background: rgba(17, 27, 38, .9); color: #E8EEF3; box-shadow: 0 4px 16px rgba(0, 0, 0, .25); font-size: 11.5px; gap: 3px; z-index: 4; }
+.v3d .legend.lcard b { font: 500 10px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #9FB0BF; margin-bottom: 3px; }
+.v3d .legend.lcard span { color: #E8EEF3; font-family: var(--mono); font-size: 11px; }
+.v3d .legend.lcard .muted { color: #A9B8C5; }
+.v3d .legend.lcard .lfold { position: absolute; top: 5px; right: 7px; color: #A9B8C5; font-size: 11px; padding: 0 2px; }
+.v3d .legend.lcard .lfold:hover { color: #fff; }
+.v3d .legend.lcard.folded { width: auto; padding: 4px 10px; }
+.v3d .legend.lcard.folded > :not(.lfold) { display: none; }
+.v3d .legend.lcard.folded .lfold { position: static; }
+.v3d .secbox { top: 10px; left: 112px; box-shadow: 0 4px 16px rgba(0, 0, 0, .12); }
+.nlabel { background: color-mix(in srgb, var(--plot) 82%, transparent); }
+.nlabel.coord { color: var(--muted); opacity: .8; }
+/* The tree: eyes only where they help (on hover, or when something is hidden). */
+.tree .teye:not(.off) { visibility: hidden; }
+.tree .ti:hover .teye, .tree summary:hover .teye, .tree .sthead:hover .teye, .tree .ti.on .teye { visibility: visible; }
+/* The properties card: the object's name at its head, as Mesh's. */
+.ipop .insp header b { font: 600 13px var(--sans); color: var(--text); letter-spacing: 0; text-transform: none; }
+
+/* The pipe class editor (0.3.0). */
+.libx .mlist > button.libnew { color: var(--blue); font-weight: 500; margin-top: 4px; }
+.libx .mlist > button.libnew:disabled { color: var(--muted); }
+.cedit h3 { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; margin: 0 0 10px; font-weight: 500; }
+.cedit h3 b { font-weight: 600; }
+.cedit h4 { margin: 14px 0 6px; font: 500 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+.cedit h4 small { text-transform: none; letter-spacing: 0; font-family: var(--sans); font-size: 11px; }
+.cegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+.cefield { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 2px 8px; font-size: 12px; color: var(--text2); }
+.cefield small { grid-column: 2; font-size: 10.5px; }
+.cefield input, .cefield select { width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips button { padding: 3px 9px; border: 1px solid var(--line); background: var(--panel); font-size: 11.5px; color: var(--text2); border-radius: 2px; }
+.chips button:hover { border-color: var(--blue); color: var(--blue); }
+.chips button.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.chips.sizes button { min-width: 44px; font-family: var(--mono); font-size: 11px; }
+.cetbl { margin-bottom: 6px; }
+.cetbl td { padding: 2px 4px; }
+.cetbl select { font-size: 11.5px; padding: 1px 3px; max-width: 150px; }
+.cetbl tr.bad td { color: var(--err-fg, #B42318); }
+.cetbl .nowrap { white-space: nowrap; }
+.ceb { padding: 0 5px; color: var(--muted); font-size: 12px; }
+.ceb:hover:not(:disabled) { color: var(--blue); }
+.ceb:disabled { opacity: .3; }
+.ceerr { background: color-mix(in srgb, #D92D20 10%, var(--panel)); border-left: 3px solid #D92D20; padding: 6px 10px; margin: 10px 0 0; font-size: 12px; }
+.cefoot { display: flex; gap: 8px; align-items: center; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); position: sticky; bottom: 0; background: var(--bg2); }
+.libpage .ibtns { display: flex; gap: 8px; align-items: center; }
+
+/* 0.3.0: the status bar stays one line; the hint gives way first. */
+.status > * { white-space: nowrap; flex: none; }
+.status .hintslot { flex: 0 1 auto; min-width: 0; }
+.status .grow { flex: 1 1 0; }
+/* The steps column fits beside the open bottom panel. */
+.flow button { padding: 6px 2px 5px; }
+.flow .fcap { margin-top: 2px; }

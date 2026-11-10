@@ -50,7 +50,15 @@ export const [opts, setOpts] = createSignal<Options>({ autosave: 5, beta: false,
 export const [backstage, setBackstage] = createSignal<string | null>("home");
 export const [tab, setTab] = createSignal("home");
 /** The bottom panel's tab and whether it is open. */
-export const [bottom, setBottom] = createSignal<"lines" | "equipment" | "valves" | "clashes" | "checks">("lines");
+export type BottomTab = "lines" | "mto" | "equipment" | "valves" | "clashes" | "checks";
+const [bottom, setBottomRaw] = createSignal<BottomTab>("lines");
+export { bottom };
+/** Whether the bottom panel is open (closed, only its tabs show: the view gets the room). */
+export const [bottomOpen, setBottomOpen] = createSignal(false);
+/** Shows a tab of the bottom panel, opening it. */
+export const setBottom = (k: BottomTab) => { setBottomRaw(k); setBottomOpen(true); window.dispatchEvent(new Event("resize")); };
+/** The status bar's slot for the view's hints (after Datum Mesh: hints in the status bar, not over the model). */
+export const [hintSlot, setHintSlot] = createSignal<HTMLElement>();
 
 // ---------- selection ----------
 /** What is selected: equipment, one of its nozzles, a line, one straight run of it, a component on it, an area, or the plot. */

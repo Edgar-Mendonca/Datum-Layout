@@ -76,6 +76,10 @@ pub enum Op {
     SetEccentric { line: u32, item: u32, flat: Flat },
     /// The plant's saved views (replaces the list).
     SetViews(Vec<SavedView>),
+    /// Adds or replaces one of the plant's own pipe classes (by name; `was` renames one).
+    SetClass { class: crate::catalogue::PipeClass, #[serde(default)] was: Option<String> },
+    /// Removes one of the plant's own classes (a catalogue class of that name then applies again).
+    DeleteClass { name: String },
     /// Reads a line list (CSV text with a header row) and keeps it with the plant, replacing any
     /// earlier list; the checks compare the model's lines with it.
     ImportLineList { csv: String },
@@ -749,6 +753,24 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             }
         }
         Op::SetViews(v) => { p.views = v; }
+        Op::SetClass { mut class, was } => {
+            class.name = class.name.trim().to_string();
+            if class.source.trim().is_empty() { class.source = "Written for this plant".into(); }
+            cat.validate_class(&class)?;
+            let old = was.unwrap_or_else(|| class.name.clone());
+            if old != class.name && (p.classes.iter().any(|c| c.name == class.name) || cat.class(&class.name).is_some()) {
+                return Err(format!("There is already a class called {}.", class.name));
+            }
+            p.classes.retain(|c| c.name != old);
+            if old != class.name { for l in p.lines.iter_mut().filter(|l| l.class == old) { l.class = class.name.clone(); } }
+            p.classes.push(class);
+        }
+        Op::DeleteClass { name } => {
+            if !p.classes.iter().any(|c| c.name == name) { return Err(format!("{name} is not one of this plant's own classes.")); }
+            let builtin = Catalogue::builtin_cached().class(&name).is_some();
+            if !builtin { if let Some(l) = p.lines.iter().find(|l| l.class == name) { return Err(format!("Line {} uses class {name}: give it another class first.", l.number)); } }
+            p.classes.retain(|c| c.name != name);
+        }
         Op::SetEccentric { line, item, flat } => {
             let pts = route::path(p, cat, p.line(line).ok_or("That line no longer exists.")?);
             let l = line_mut(p, line)?;

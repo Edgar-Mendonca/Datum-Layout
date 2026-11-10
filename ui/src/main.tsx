@@ -2,7 +2,7 @@
 // Equipment, Clashes and Checks tabs below it, the Inspector on the right; title bar, ribbon,
 // status bar, keyboard shortcuts, start-up and recovery.
 import { render } from "solid-js/web";
-import { For, Show, onMount, createSignal } from "solid-js";
+import { For, Show, onMount } from "solid-js";
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";
 import "@fontsource/ibm-plex-sans/latin-600.css";
@@ -12,7 +12,7 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "./styles.css";
 import { invoke, listen, Out, Options, Shown, Typed } from "./api";
-import { checkStale, setBottom, setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, elev, scene, checked } from "./store";
+import { setHintSlot, checkStale, setBottom, setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, scene, checked } from "./store";
 import { C } from "./cmds";
 import { TitleBar, Ribbon, palette } from "./ribbon";
 import { Backstage, update, checkUpdate } from "./backstage";
@@ -20,7 +20,7 @@ import { View3D } from "./view3d";
 import { Inspector, BottomPanel } from "./panels";
 import { Flow, Tree, CtxBar, ToolStrip, grip, treeW, inspW, popShown } from "./shell";
 import { Menu, Toast } from "./ui";
-import { setUnitTable, fmt } from "./units";
+import { setUnitTable } from "./units";
 import * as D from "./dialogs";
 
 /** Status badges (after Datum Mesh's): the check, routing and the line list, each in words and
@@ -44,18 +44,16 @@ const Badges = () => {
 
 const Status = () => (
   <footer class="status">
-    <span>{mode() === "route" ? "Routing" : mode() === "place" ? "Placing" : mode() === "measure" ? "Measuring" : "Ready"}</span>
+    <span class="smode">{mode() === "route" ? "Routing" : mode() === "place" ? "Placing" : mode() === "measure" ? "Measuring" : "Ready"}</span>
+    <span class="hintslot" ref={setHintSlot} />
     <span class="muted">{project() ? `${project()!.equipment.length} equipment · ${project()!.lines.length} lines · ${scene()?.parts.filter(p => p.line).length ?? 0} piping parts` : ""}</span>
-    <Show when={project()}><Badges /></Show>
     <span class="grow" />
-    <span class="muted">Working elevation {fmt("coord", elev())}</span>
-    <span class="muted">{project()?.units === "US" ? "US units" : "SI units"}</span>
-    <span class="muted">{picked().length ? `${picked().length} selected` : sel() ? sel()!.kind : ""}</span>
+    <Show when={project()}><Badges /></Show>
+    <Show when={picked().length}><span class="muted">{picked().length} selected</span></Show>
   </footer>
 );
 
 const App = () => {
-  const [bh, setBh] = createSignal(210);
   onMount(async () => {
     // For the UI tests: open an example by id (the speed check opens a large plant this way).
     (window as any).__open = (id: string) => C.newProject(id);
@@ -105,12 +103,6 @@ const App = () => {
     else if (k === "f") C.fit();
     else if ("1234".includes(k) && k.length === 1) C.std(["iso", "plan", "front", "side"][+k - 1]);
   };
-  const drag = (e: PointerEvent) => {
-    const y0 = e.clientY, h0 = bh();
-    const move = (m: PointerEvent) => setBh(Math.max(90, Math.min(window.innerHeight * 0.6, h0 - (m.clientY - y0))));
-    const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); };
-    addEventListener("pointermove", move); addEventListener("pointerup", up);
-  };
   return (
     <div class="app" ref={() => document.addEventListener("keydown", keys)}>
       <TitleBar update={update()?.available ? update()!.latest : null} />
@@ -128,12 +120,11 @@ const App = () => {
                 <View3D />
                 <Show when={popShown()}><div class="ipop"><div class="vgrip" onPointerDown={e => grip(e, "insp")} title="Drag to widen or narrow this panel" /><Inspector /></div></Show>
               </div>
-              <div class="bhandle" onPointerDown={drag} />
-              <div style={{ height: `${bh()}px`, flex: "none", display: "flex" }}><BottomPanel /></div>
             </div>
           </div>
         </Show>
       </main>
+      <Show when={out()}><BottomPanel /></Show>
       <Status />
       <Show when={backstage()}><Backstage /></Show>
       <For each={dialogs()}>{d => d()}</For>

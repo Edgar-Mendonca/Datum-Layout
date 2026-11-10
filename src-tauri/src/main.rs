@@ -111,10 +111,10 @@ struct Out {
 }
 
 fn out(a: &App) -> Out {
-    let b = route::build(&a.doc.p, &a.cat);
+    let b = route::build(&a.doc.p, &a.cat.for_project(&a.doc.p));
     let mut issues = b.issues.clone();
-    issues.extend(checks::connection_issues(&a.doc.p, &a.cat, &b));
-    let paths = a.doc.p.lines.iter().map(|l| (l.id, route::path(&a.doc.p, &a.cat, l))).collect();
+    issues.extend(checks::connection_issues(&a.doc.p, &a.cat.for_project(&a.doc.p), &b));
+    let paths = a.doc.p.lines.iter().map(|l| (l.id, route::path(&a.doc.p, &a.cat.for_project(&a.doc.p), l))).collect();
     Out { p: a.doc.p.clone(), path: a.doc.path.clone(), dirty: a.doc.dirty, undo: a.doc.can_undo(), redo: a.doc.can_redo(), created: vec![], warnings: vec![], issues, paths }
 }
 
@@ -170,7 +170,7 @@ fn state(st: State<St>) -> Out {
 fn apply(st: State<St>, op: Op) -> R<Out> {
     guard(|| {
         let mut a = st.lock();
-        let cat = a.cat.clone();
+        let cat = a.cat.for_project(&a.doc.p).into_owned();
         let created = a.doc.apply(op, &cat)?;
         let mut o = out(&a);
         o.created = created;
@@ -190,15 +190,15 @@ fn history(st: State<St>, redo: bool) -> Out {
 fn scene(st: State<St>) -> R<scene::Scene> {
     guard(|| {
         let a = st.lock();
-        let b = route::build(&a.doc.p, &a.cat);
-        Ok(scene::scene(&a.doc.p, &a.cat, &b, a.opts.lod))
+        let b = route::build(&a.doc.p, &a.cat.for_project(&a.doc.p));
+        Ok(scene::scene(&a.doc.p, &a.cat.for_project(&a.doc.p), &b, a.opts.lod))
     })
 }
 
 /// Every check, clashes included (runs off the window's thread).
 #[tauri::command]
 async fn check(st: State<'_, St>) -> R<Vec<Issue>> {
-    let (p, cat) = { let a = st.lock(); (a.doc.p.clone(), a.cat.clone()) };
+    let (p, cat) = { let a = st.lock(); (a.doc.p.clone(), a.cat.for_project(&a.doc.p).into_owned()) };
     tauri::async_runtime::spawn_blocking(move || guard(|| { let b = route::build(&p, &cat); Ok(checks::run(&p, &cat, &b)) })).await.map_err(|e| e.to_string())?
 }
 
@@ -208,13 +208,13 @@ fn snap(st: State<St>, line: u32, kind: datum_core::model::ItemKind, at: model::
     guard(|| {
         let a = st.lock();
         let l = a.doc.p.line(line).ok_or("That line no longer exists.")?;
-        datum_core::doc::snap(&a.doc.p, &a.cat, l, kind, at, "").map(|x| x.2)
+        datum_core::doc::snap(&a.doc.p, &a.cat.for_project(&a.doc.p), l, kind, at, "").map(|x| x.2)
     })
 }
 
 #[tauri::command]
 fn lists(st: State<St>) -> R<lists::Lists> {
-    guard(|| { let a = st.lock(); Ok(lists::lists(&a.doc.p, &a.cat)) })
+    guard(|| { let a = st.lock(); Ok(lists::lists(&a.doc.p, &a.cat.for_project(&a.doc.p))) })
 }
 
 #[tauri::command]
@@ -241,6 +241,10 @@ type Kind = (model::EquipKind, &'static str, Vec<(&'static str, &'static str)>);
 #[derive(Serialize)]
 struct CatalogueOut {
     cat: Catalogue,
+    /// The plant's own classes (edited or new), by name.
+    own: Vec<String>,
+    /// The catalogue's own classes (built in or from packs), by name.
+    base: Vec<String>,
     fields: Vec<Kind>,
 }
 
@@ -248,7 +252,7 @@ struct CatalogueOut {
 #[tauri::command]
 fn catalogue(st: State<St>) -> CatalogueOut {
     let a = st.lock();
-    CatalogueOut { cat: a.cat.clone(), fields: model::EquipKind::ALL.iter().map(|k| (*k, k.name(), equipment::fields(*k))).collect() }
+    CatalogueOut { base: a.cat.classes.iter().map(|c| c.name.clone()).collect(), own: a.doc.p.classes.iter().map(|c| c.name.clone()).collect(), cat: a.cat.for_project(&a.doc.p).into_owned(), fields: model::EquipKind::ALL.iter().map(|k| (*k, k.name(), equipment::fields(*k))).collect() }
 }
 
 /// Adds a plug-in pack folder (picked by the user) and reloads the catalogue.
@@ -283,19 +287,19 @@ fn unit_table() -> (Vec<units::Shown>, Vec<units::Shown>, Vec<units::Typed>) {
 /// A line (or every line, `line` = None) as a piping component file, for Datum Pipe.
 #[tauri::command]
 fn export_pcf(st: State<St>, line: Option<u32>) -> R<String> {
-    guard(|| { let a = st.lock(); pcf::write(&a.doc.p, &a.cat, line) })
+    guard(|| { let a = st.lock(); pcf::write(&a.doc.p, &a.cat.for_project(&a.doc.p), line) })
 }
 
 /// The model as glTF 2.0 binary (a data URL for `save_file`).
 #[tauri::command]
 fn export_gltf(st: State<St>) -> R<String> {
-    guard(|| { let a = st.lock(); let b = route::build(&a.doc.p, &a.cat); Ok(format!("data:model/gltf-binary;base64,{}", scene::b64(&gltf::glb(&a.doc.p, &b, a.opts.lod)))) })
+    guard(|| { let a = st.lock(); let b = route::build(&a.doc.p, &a.cat.for_project(&a.doc.p)); Ok(format!("data:model/gltf-binary;base64,{}", scene::b64(&gltf::glb(&a.doc.p, &b, a.opts.lod)))) })
 }
 
 /// A list as CSV: lines, equipment (with nozzles) or the material take-off.
 #[tauri::command]
 fn export_csv(st: State<St>, kind: String) -> R<String> {
-    guard(|| { let a = st.lock(); lists::csv(&lists::lists(&a.doc.p, &a.cat), &kind) })
+    guard(|| { let a = st.lock(); lists::csv(&lists::lists(&a.doc.p, &a.cat.for_project(&a.doc.p)), &kind) })
 }
 
 // ---------------------------------------------------------------- files

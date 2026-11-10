@@ -1,5 +1,26 @@
 # What's new in Datum Layout
 
+## 0.2.10 — 2026-11-10
+A cleaner workspace after Datum Mesh, and a pipe class editor.
+
+**The workspace.** The window now follows Datum Mesh's layout, compared screenshot by screenshot:
+- The title bar names the app, then the plant in bold with its equipment, lines and units. New and Open sit beside Save.
+- The lists live in a strip of tabs along the bottom (Lines, Take-off, Equipment, Valves, Clashes, Checks), folded until you open one, so the 3D view gets the room. Drag its edge to size it; the chevron folds it again.
+- Hints move from over the model into the status bar, which keeps to one line: what is happening, the hint, the counts, then the badges.
+- The 3D view has a soft ground, light or dark with the theme. Line numbers show only for the selected line; equipment tags stay. The colour key is a dark card you can fold away. Zoom out, Fit and zoom in sit at the bottom right.
+- The properties card opens with the object's name. The tree's eyes show on hover, or when something is hidden. The steps column is tighter.
+
+**The pipe class editor.** In the Library, Edit… changes a class for this plant, and Copy as a new class… or + New pipe class starts one. You can set:
+- name, material and description
+- flange ratings and sizes
+- schedules by size, with each size's wall shown as you choose
+- the components allowed and their sizes
+- the branch table, rows in order
+
+The engine checks the class before it is saved (every size needs a pipe in its schedule; every component and fitting must be one it makes) and says what is wrong. The class is kept in the plant's file: the plant's copy is used in place of the catalogue's, and the Library marks it. Renaming a class moves its lines with it, and Back to the catalogue's removes the copy.
+
+**Fixed.** The bolt sets every example class lists are now recognised by the class check.
+
 ## 0.2.9 — 2026-11-09
 Butterfly valves.
 
