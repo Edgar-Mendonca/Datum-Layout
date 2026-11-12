@@ -216,7 +216,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const nEq = (await state()).p.equipment.length;
   await p.dblclick('.partsp .cattile[data-kind="pump"]'); await settle(600);
   check("double-clicking equipment places it at once, and the Parts panel stays open", (await state()).p.equipment.length === nEq + 1 && await p.isVisible(".partsp"));
-  check("what was used shows under Recent", (await p.textContent(".partsp .recentgrp").catch(() => "")).includes("pump"));
+  check("what was used shows under Recent", (await p.$$eval(".partsp .recentgrp .cattile", els => els.map(e => e.dataset.kind))).includes("pump"));
   await p.keyboard.press("Control+z"); await settle(400);
   await p.selectOption("select.ctxunits", "US"); await settle(500);
   check("the context bar switches units", (await state()).p.units === "US");
@@ -576,6 +576,19 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
     await themeTo("dark"); await settle(400); await shot("first-look-dark");
     await themeTo("light"); await settle(300);
   }
+
+  // 8e. Seventeen equipment types (0.2.13): each placed by a double-click, drawn, and checked clean.
+  await open(null); await settle(300);
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  const eqKinds = await p.$$eval('.partsp details.catgrp:first-of-type .cattile', els => els.map(e => e.dataset.kind));
+  for (const k of eqKinds) { await p.dblclick(`.partsp details.catgrp .cattile[data-kind="${k}"]`); await settle(250); }
+  check("a click on a part never moves the list (Recent keeps its height)", await p.$eval(".partsp details.catgrp", el => el.open));
+  st = await state();
+  check("all seventeen equipment types place from the Parts panel", eqKinds.length === 17 && st.p.equipment.length === 17, `${eqKinds.length} ${st.p.equipment.length}`);
+  check("every type is drawn with its nozzles", (await ask("scene")).ok.parts.filter(q => q.kind === "nozzle").length >= 17 * 2);
+  const ck = (await ask("check")).ok;
+  check("placed apart, they do not clash", !ck.some(i => i.kind === "clash"), JSON.stringify(ck.map(i => i.text).slice(0, 3)));
+  if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("all-equipment"); }
 
   // 8d. The agreed changes (0.2.11).
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);

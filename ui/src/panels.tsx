@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { SUPPORTS, SupportKind, CatalogueOut, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help, helpCard } from "./help";
@@ -21,11 +21,17 @@ const dragStart = (type: "item" | "equip", kind: string) => (e: DragEvent) => {
 /** Where a component's dimensions are in the Library (equipment: its help). */
 const LIB_PAGE: Record<string, string> = { gate: "valves", globe: "valves", check: "valves", ball: "valves", butterfly: "valves", strainer: "valves", flange_pair: "flanges", reducer: "reducers", tee: "tees", cross: "tees", weldolet: "olets", sockolet: "olets" };
 /** A free spot for equipment placed by a double-click: the plot's middle, stepped east past what is there. */
-const freeSpot = (): V3 => {
+const freeSpot = (kind: string): V3 => {
   const p = project()!; const { e, n, ground } = p.plot;
-  let x = (e[0] + e[1]) / 2; const y = (n[0] + n[1]) / 2;
-  for (let k = 0; k < 40 && p.equipment.some(q => Math.hypot(q.pos[0] - x, q.pos[1] - y) < 4); k++) x += 4;
-  return [Math.min(x, e[1] - 2), y, ground];
+  const big = (k: string) => ["sphere", "heater", "air_cooler", "tank"].includes(k) ? 7 : ["compressor", "kettle", "horizontal_drum", "exchanger", "package", "column"].includes(k) ? 4.5 : 3;
+  const free = (x: number, y: number) => p.equipment.every(q => Math.hypot(q.pos[0] - x, q.pos[1] - y) >= big(q.kind) + big(kind));
+  const cx = (e[0] + e[1]) / 2, cy = (n[0] + n[1]) / 2;
+  // Rings outward from the plot's middle, on the grid of 2 m.
+  for (let r = 0; r <= Math.max(e[1] - e[0], n[1] - n[0]); r += 2) for (let a = 0; a < 16; a++) {
+    const x = Math.round((cx + r * Math.cos(a * Math.PI / 8)) / 2) * 2, y = Math.round((cy + r * Math.sin(a * Math.PI / 8)) / 2) * 2;
+    if (x >= e[0] + 2 && x <= e[1] - 2 && y >= n[0] + 2 && y <= n[1] - 2 && free(x, y)) return [x, y, ground];
+  }
+  return [cx, cy, ground];
 };
 /** The Parts panel (0.2.12, after Datum Mesh's parts panel): what can be placed, docked beside the
  *  tree and open while you work. Drag a part in, click it (equipment: then click the plot; a
@@ -45,7 +51,7 @@ export const PartsPanel = () => {
     const lib = () => LIB_PAGE[t.k];
     return <Show when={part(t.k)}>
       <button class="cattile" data-kind={t.k} draggable="true" onDragStart={e => { useRecent(t.k); dragStart(x()[3], t.k)(e); }} onDragEnd={() => { (window as any).__drag = undefined; }}
-        onClick={() => use(t.k)} onDblClick={() => { if (x()[3] === "equip" && project()) { C.cancelTool(); act({ AddEquipment: { kind: t.k, pos: freeSpot() } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[0] })); } }}
+        onClick={() => use(t.k)} onDblClick={() => { if (x()[3] === "equip" && project()) { C.cancelTool(); act({ AddEquipment: { kind: t.k, pos: freeSpot(t.k) } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[0] })); } }}
         title={x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
         <Icon n={x()[2]} size={22} /><span>{x()[1].replace(/ \(.*\)$/, "")}</span>
         <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
@@ -57,8 +63,9 @@ export const PartsPanel = () => {
       <header>Parts <Help k="catalogue" /><span class="grow" /><button class="x" title="Close the Parts panel (Tools › Parts opens it again)" onClick={() => setPartsOpen(false)}>×</button></header>
       <div class="catbody">
         <input class="catsearch" type="search" placeholder="Search: pump, isolation, olet…" value={q()} onInput={e => setQ(e.currentTarget.value)} />
-        <Show when={!q() && recent().filter(k => part(k)).length}>
-          <div class="catgrp recentgrp"><div class="csub">Recent</div><div class="catgrid"><For each={recent().filter(k => part(k))}>{k => <Tile k={k} />}</For></div></div>
+        {/* A fixed height (one row), so a click that updates it never moves the parts under the pointer. */}
+        <Show when={!q()}>
+          <div class="catgrp recentgrp"><div class="csub">Recent</div><div class="catgrid"><For each={recent().filter(k => part(k)).slice(0, 3)} fallback={<p class="muted small rempty">The parts you use appear here.</p>}>{k => <Tile k={k} />}</For></div></div>
         </Show>
         <For each={PART_GROUPS}>{g => <Show when={g.subs.some(([sub, ks]) => ks.some(k => has(k, g.g, sub)))}>
           <details class="catgrp" open><summary>{g.g}</summary>
@@ -114,7 +121,7 @@ const EquipInsp = (p: { e: Equipment }) => {
     <nav class="itabs" role="tablist"><For each={[["general", "General"], ["nozzles", `Nozzles · ${p.e.nozzles.length}`], ["datasheet", "Datasheet"]] as [typeof eqTab extends () => infer T ? T : never, string][]}>{([k, l]) => <button role="tab" classList={{ on: eqTab() === k }} onClick={() => setEqTab(k)}>{l}</button>}</For></nav>
     <Show when={eqTab() === "general"}>
     <Row l="Tag"><input value={p.e.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
-    <p class="muted iwhat">{EQUIP.find(x => x[0] === p.e.kind)?.[1]} · DEXPI class {({ vertical_vessel: "Vessel", horizontal_drum: "Vessel", tank: "Tank", column: "ProcessColumn", pump: "CentrifugalPump", exchanger: "TubularHeatExchanger" } as Record<EquipKind, string>)[p.e.kind]}</p>
+    <p class="muted iwhat">{EQUIP.find(x => x[0] === p.e.kind)?.[1]} · DEXPI class {DEXPI[p.e.kind]}</p>
     <h4>Position <Help k="move" /></h4>
     <V3In v={p.e.pos} set={v => set({ pos: v })} />
     <Row l="Rotation"><NumIn q="angle" v={p.e.rot} set={v => set({ rot: v })} /></Row>

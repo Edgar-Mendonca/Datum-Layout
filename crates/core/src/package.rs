@@ -41,7 +41,18 @@ pub struct PComp { pub uid: String, pub kind: String, pub tag: String }
 /// The equipment kind for a DEXPI class (and the usual other names).
 pub fn kind_of(class: &str) -> Option<EquipKind> {
     let c = class.to_lowercase();
-    Some(if c.contains("pump") { EquipKind::Pump }
+    Some(if c.contains("inline") && c.contains("pump") { EquipKind::InlinePump }
+    else if c.contains("pump") { EquipKind::Pump }
+    else if c.contains("reciprocating") && c.contains("compressor") { EquipKind::RecipCompressor }
+    else if c.contains("compressor") || c.contains("blower") { EquipKind::Compressor }
+    else if c.contains("aircooled") || c.contains("air_cooled") || c.contains("air cooled") || c.contains("air cooler") || c.contains("fin fan") { EquipKind::AirCooler }
+    else if c.contains("plate") && c.contains("exchanger") { EquipKind::PlateHx }
+    else if c.contains("kettle") || c.contains("reboiler") { EquipKind::Kettle }
+    else if c.contains("furnace") || c.contains("fired heater") || c.contains("firedheater") { EquipKind::Heater }
+    else if c.contains("sphere") || c.contains("spherical") { EquipKind::Sphere }
+    else if c.contains("filter") { EquipKind::Filter }
+    else if c.contains("agitat") || c.contains("reactor") || c.contains("mixer") { EquipKind::Agitated }
+    else if c.contains("package") || c.contains("skid") || c.contains("customequipment") { EquipKind::Package }
     else if c.contains("column") || c.contains("tower") { EquipKind::Column }
     else if c.contains("tank") { EquipKind::Tank }
     else if c.contains("exchanger") || c.contains("cooler") || c.contains("heater") || c.contains("condenser") { EquipKind::Exchanger }
@@ -105,7 +116,7 @@ pub fn import(p: &mut Project, pk: &Package, created: &mut Vec<u32>) -> Result<R
             None => {
                 let Some(kind) = kind_of(&pe.class) else { r.warnings.push(format!("{} ({}): no 3D shape for this class yet; place it by hand.", pe.tag, pe.class)); continue };
                 let mut e = crate::equipment::new(kind, &pe.tag);
-                let half = match kind { EquipKind::HorizontalDrum | EquipKind::Exchanger => e.dims.l / 2.0 + 1.0, EquipKind::Pump => e.dims.l / 2.0, _ => e.dims.d / 2.0 };
+                let half = match kind { EquipKind::HorizontalDrum | EquipKind::Exchanger | EquipKind::Kettle | EquipKind::AirCooler | EquipKind::Heater | EquipKind::Package | EquipKind::PlateHx => e.dims.l / 2.0 + 1.0, EquipKind::Pump | EquipKind::Compressor | EquipKind::RecipCompressor => e.dims.l / 2.0 + 0.5, _ => e.dims.d / 2.0 };
                 x += half;
                 e.id = p.id();
                 e.pos = [x, y, p.plot.ground];

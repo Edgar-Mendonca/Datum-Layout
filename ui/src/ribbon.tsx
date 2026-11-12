@@ -7,7 +7,7 @@ import { C, ALL_CMDS } from "./cmds";
 import * as D from "./dialogs";
 import { Icon } from "./ui";
 import { Help, helpCard, HELP } from "./help";
-import { invoke, Example, EQUIP, ITEMS, NPS, inch } from "./api";
+import { invoke, Example, EQUIP, ITEMS, NPS, PART_GROUPS, inch } from "./api";
 import { fmt, toU, fromU, unit } from "./units";
 
 const GH = "https://github.com/Edgar-Mendonca/Datum-Layout";
@@ -109,8 +109,9 @@ export const Ribbon = () => {
         <G l="Hand Over" h="pcf"><B big i="pipe" l="To Datum Pipe" run={() => { const l = selLine(); C.exportPcf(l?.id); }} title="Export the selected line (or every line) as a piping component file for Datum Pipe" /></G>
       </Show>
       <Show when={tab() === "equipment"}>
-        <G l="Vessels" h="equipment"><B big i="vvessel" l="Vertical Vessel" run={() => C.place("vertical_vessel")} /><B big i="drum" l="Horizontal Drum" run={() => C.place("horizontal_drum")} /><B big i="column" l="Column" run={() => C.place("column")} /><B big i="tank" l="Storage Tank" run={() => C.place("tank")} /></G>
-        <G l="Machines" h="equipment"><B big i="pump" l="Pump" run={() => C.place("pump")} /><B big i="exchanger" l="Exchanger" run={() => C.place("exchanger")} /></G>
+        <For each={PART_GROUPS[0].subs}>{([sub, ks]) => { const eq = (k: string) => EQUIP.find(x => x[0] === k)!; return <G l={sub.replace(" and ", " & ")} h="equipment">
+          <B big i={eq(ks[0])[2]} l={eq(ks[0])[1].replace(/ \(.*\)$/, "")} run={() => C.place(ks[0] as any)} />
+          <Show when={ks.length > 1}><S><For each={ks.slice(1)}>{k => <B i={eq(k)[2]} l={eq(k)[1].replace(/ \(.*\)$/, "")} run={() => C.place(k as any)} />}</For></S></Show></G>; }}</For>
         <G l="Arrange" h="move"><S><B i="rotate" l="Rotate 90°" run={() => C.rotate(90)} off={!selEquip()} /><B i="rotate" l="Rotate −90°" run={() => C.rotate(-90)} off={!selEquip()} /><B i="del" l="Delete" run={C.del} off={!sel()} /></S></G>
         <G l="Nozzles" h="nozzles"><S><div class="rnote">Select an item: its nozzles are listed in the Inspector, where you can add, move or remove them.</div></S></G>
         <G l="From the P&ID" h="package"><B big i="import" l="Plant Package" run={C.importPackage} title="Read a plant package from Datum Schema: equipment, nozzles, lines and their components" /><B big i="route" l="Route Listed Lines" run={C.routeListed} off={!p()?.line_list.length} title="Route the listed lines nozzle to nozzle, with their components in the P&ID's order" /></G>

@@ -63,7 +63,7 @@ export const [partsOpen, setPartsOpenRaw] = createSignal(keepB("dl.parts", true)
 export const setPartsOpen = (v: boolean) => { setPartsOpenRaw(v); try { localStorage.setItem("dl.parts", v ? "1" : "0"); } catch { /* private window */ } window.dispatchEvent(new Event("resize")); };
 /** The parts used last (newest first), shown at the top of the Parts panel. */
 export const [recent, setRecentRaw] = createSignal<string[]>((() => { try { return JSON.parse(localStorage.getItem("dl.recent") ?? "[]"); } catch { return []; } })());
-export const useRecent = (k: string) => { const v = [k, ...recent().filter(x => x !== k)].slice(0, 6); setRecentRaw(v); try { localStorage.setItem("dl.recent", JSON.stringify(v)); } catch { /* private window */ } };
+export const useRecent = (k: string) => { const v = [k, ...recent().filter(x => x !== k)].slice(0, 3); setRecentRaw(v); try { localStorage.setItem("dl.recent", JSON.stringify(v)); } catch { /* private window */ } };
 /** The status bar's slot for the view's hints (after Datum Mesh: hints in the status bar, not over the model). */
 export const [hintSlot, setHintSlot] = createSignal<HTMLElement>();
 

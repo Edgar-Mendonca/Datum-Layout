@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.2.13 — 2026-11-12
+Eleven more kinds of equipment: seventeen in all.
+
+- **Vessels and tanks:** spherical tank (on legs), filter vessel, agitated vessel (with its drive), beside the vertical vessel, horizontal drum and storage tank.
+- **Columns and heaters:** fired heater (radiant box, convection section and stack).
+- **Pumps and compressors:** inline pump, centrifugal compressor (with its driver on a baseplate), reciprocating compressor (opposed cylinders).
+- **Heat exchangers:** kettle reboiler, plate exchanger, air cooler (bay on legs, with headers and fans).
+- **Packages:** a skid, for vendor packages.
+
+Each is drawn from its sizes like the first six: change a diameter or a length on the properties card and it follows. Each comes with typical nozzles you can add to, move or remove, a short datasheet, its DEXPI class, and a tag prefix (K for compressors, H for heaters, PK for packages…). Every one is in the Parts panel, on the Equipment tab and in Ctrl+K. A plant package from Datum Schema places them by their class.
+
+**Fixed:** the first click of a double-click in the Parts panel could add a row to Recent and push the list down, so the second click folded a group. Recent now keeps one row of the last three parts used, so nothing moves under the pointer.
+
 ## 0.2.12 — 2026-11-12
 The Parts panel: what you place, always to hand.
 

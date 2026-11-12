@@ -1278,3 +1278,5 @@ tr.behind td { background: var(--err-bg); }
 .catp.partsp .csub { margin: 4px 0 2px 1px; font-size: 10.5px; color: var(--muted); }
 .catp.partsp .catgrp > summary { margin: 8px 0 1px; }
 .catp.partsp .catbody { flex: 1; min-height: 0; }
+.recentgrp .catgrid { min-height: 48px; }
+.recentgrp .rempty { grid-column: 1 / -1; margin: 0; align-self: center; font-size: 11px; }

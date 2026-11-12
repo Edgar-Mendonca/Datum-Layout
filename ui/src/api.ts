@@ -11,7 +11,7 @@ export const listen = (e: string, f: (p: any) => void) => window.__TAURI__?.even
 export type V3 = [number, number, number];
 export interface Plot { grid: number; e: [number, number]; n: [number, number]; north: number; ground: number }
 export interface Area { id: number; uid: string; name: string; unit: string; min: V3; max: V3 }
-export type EquipKind = "vertical_vessel" | "horizontal_drum" | "tank" | "column" | "pump" | "exchanger";
+export type EquipKind = "vertical_vessel" | "horizontal_drum" | "tank" | "column" | "pump" | "exchanger" | "sphere" | "filter" | "agitated" | "heater" | "inline_pump" | "compressor" | "recip_compressor" | "kettle" | "plate_hx" | "air_cooler" | "package";
 export interface Nozzle { tag: string; nps: string; rating: number; facing: string; pos: V3; dir: V3; proj: number; service: string }
 export interface Dims { d: number; l: number; h: number; elev: number; d2: number; l2: number; w: number }
 export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number }
@@ -71,7 +71,7 @@ export const ITEMS: [ItemKind, string, string][] = [
 ];
 /** The Parts panel's groups (0.2.12): group, then sub-groups of part kinds (equipment and components). */
 export const PART_GROUPS: { g: string; subs: [string, string[]][] }[] = [
-  { g: "Equipment", subs: [["Vessels and tanks", ["vertical_vessel", "horizontal_drum", "tank"]], ["Columns", ["column"]], ["Pumps", ["pump"]], ["Heat exchangers", ["exchanger"]]] },
+  { g: "Equipment", subs: [["Vessels and tanks", ["vertical_vessel", "horizontal_drum", "tank", "sphere", "filter", "agitated"]], ["Columns and heaters", ["column", "heater"]], ["Pumps and compressors", ["pump", "inline_pump", "compressor", "recip_compressor"]], ["Heat exchangers", ["exchanger", "kettle", "plate_hx", "air_cooler"]], ["Packages", ["package"]]] },
   { g: "Valves", subs: [["Isolation", ["gate", "ball", "butterfly"]], ["Regulating", ["globe"]], ["Non-return", ["check"]], ["Strainers", ["strainer"]]] },
   { g: "Fittings", subs: [["In-line", ["flange_pair", "reducer"]], ["Branches", ["tee", "cross", "weldolet", "sockolet"]], ["Supports", ["support"]]] },
 ];
@@ -79,13 +79,19 @@ export const PART_GROUPS: { g: string; subs: [string, string[]][] }[] = [
 export const PART_WORDS: Record<string, string> = {
   vertical_vessel: "drum separator knock-out receiver accumulator vessel", horizontal_drum: "vessel separator receiver accumulator", tank: "storage atmospheric api tank",
   column: "tower distillation absorber stripper", pump: "centrifugal rotating machine", exchanger: "heat exchanger cooler heater condenser shell tube",
+  sphere: "lpg storage pressure tank ball", filter: "strainer cartridge basket separator", agitated: "reactor mixer agitator stirred tank", heater: "furnace fired heater stack burner",
+  inline_pump: "vertical centrifugal rotating machine", compressor: "centrifugal gas rotating machine blower", recip_compressor: "piston gas rotating machine",
+  kettle: "reboiler heat exchanger", plate_hx: "gasketed heat exchanger", air_cooler: "fin fan heat exchanger cooler condenser", package: "skid vendor unit dosing injection",
   gate: "isolation block on off valve", ball: "isolation quarter turn valve", butterfly: "isolation quarter turn valve", globe: "regulating throttling control valve", check: "non-return nrv swing valve", strainer: "filter y-strainer",
   flange_pair: "flange joint spool break", reducer: "concentric eccentric size change", tee: "branch equal reducing", cross: "branch four-way", weldolet: "branch olet outlet", sockolet: "branch olet outlet small bore", support: "rest guide anchor line stop shoe",
 };
 export const EQUIP: [EquipKind, string, string][] = [
   ["vertical_vessel", "Vertical vessel", "vvessel"], ["horizontal_drum", "Horizontal drum", "drum"], ["tank", "Storage tank", "tank"],
   ["column", "Column", "column"], ["pump", "Centrifugal pump", "pump"], ["exchanger", "Shell-and-tube exchanger", "exchanger"],
+  ["sphere", "Spherical tank", "sphere"], ["filter", "Filter vessel", "filterv"], ["agitated", "Agitated vessel", "agitated"], ["heater", "Fired heater", "heater"], ["inline_pump", "Inline pump", "ipump"], ["compressor", "Centrifugal compressor", "compressor"], ["recip_compressor", "Reciprocating compressor", "recip"], ["kettle", "Kettle reboiler", "kettle"], ["plate_hx", "Plate exchanger", "platehx"], ["air_cooler", "Air cooler", "aircooler"], ["package", "Package (skid)", "package"],
 ];
+/** Each equipment type's DEXPI class (as the engine's `EquipKind::class`). */
+export const DEXPI: Record<string, string> = { vertical_vessel: "Vessel", horizontal_drum: "Vessel", tank: "Tank", column: "ProcessColumn", pump: "CentrifugalPump", exchanger: "TubularHeatExchanger", sphere: "Vessel", filter: "Filter", agitated: "Vessel", heater: "Furnace", inline_pump: "CentrifugalPump", compressor: "CentrifugalCompressor", recip_compressor: "ReciprocatingCompressor", kettle: "TubularHeatExchanger", plate_hx: "PlateHeatExchanger", air_cooler: "AirCooledHeatExchanger", package: "CustomEquipment" };
 
 /** A number typed by a person: "−" and "," are understood; empty or not a number gives null. */
 export const parseNum = (s: string): number | null => {

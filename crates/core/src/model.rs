@@ -46,10 +46,21 @@ pub enum EquipKind {
     Column,
     Pump,
     Exchanger,
+    Sphere,
+    Filter,
+    Agitated,
+    Heater,
+    InlinePump,
+    Compressor,
+    RecipCompressor,
+    Kettle,
+    PlateHx,
+    AirCooler,
+    Package,
 }
 
 impl EquipKind {
-    pub const ALL: [EquipKind; 6] = [EquipKind::VerticalVessel, EquipKind::HorizontalDrum, EquipKind::Tank, EquipKind::Column, EquipKind::Pump, EquipKind::Exchanger];
+    pub const ALL: [EquipKind; 17] = [EquipKind::VerticalVessel, EquipKind::HorizontalDrum, EquipKind::Tank, EquipKind::Column, EquipKind::Pump, EquipKind::Exchanger, EquipKind::Sphere, EquipKind::Filter, EquipKind::Agitated, EquipKind::Heater, EquipKind::InlinePump, EquipKind::Compressor, EquipKind::RecipCompressor, EquipKind::Kettle, EquipKind::PlateHx, EquipKind::AirCooler, EquipKind::Package];
     pub fn name(self) -> &'static str {
         match self {
             EquipKind::VerticalVessel => "Vertical vessel",
@@ -58,6 +69,17 @@ impl EquipKind {
             EquipKind::Column => "Column",
             EquipKind::Pump => "Centrifugal pump",
             EquipKind::Exchanger => "Shell-and-tube exchanger",
+            EquipKind::Sphere => "Spherical tank",
+            EquipKind::Filter => "Filter vessel",
+            EquipKind::Agitated => "Agitated vessel",
+            EquipKind::Heater => "Fired heater",
+            EquipKind::InlinePump => "Inline pump",
+            EquipKind::Compressor => "Centrifugal compressor",
+            EquipKind::RecipCompressor => "Reciprocating compressor",
+            EquipKind::Kettle => "Kettle reboiler",
+            EquipKind::PlateHx => "Plate exchanger",
+            EquipKind::AirCooler => "Air cooler",
+            EquipKind::Package => "Package (skid)",
         }
     }
     /// The DEXPI class name.
@@ -69,6 +91,17 @@ impl EquipKind {
             EquipKind::Column => "ProcessColumn",
             EquipKind::Pump => "CentrifugalPump",
             EquipKind::Exchanger => "TubularHeatExchanger",
+            EquipKind::Sphere => "Vessel",
+            EquipKind::Filter => "Filter",
+            EquipKind::Agitated => "Vessel",
+            EquipKind::Heater => "Furnace",
+            EquipKind::InlinePump => "CentrifugalPump",
+            EquipKind::Compressor => "CentrifugalCompressor",
+            EquipKind::RecipCompressor => "ReciprocatingCompressor",
+            EquipKind::Kettle => "TubularHeatExchanger",
+            EquipKind::PlateHx => "PlateHeatExchanger",
+            EquipKind::AirCooler => "AirCooledHeatExchanger",
+            EquipKind::Package => "CustomEquipment",
         }
     }
     pub fn prefix(self) -> &'static str {
@@ -78,6 +111,17 @@ impl EquipKind {
             EquipKind::Column => "C",
             EquipKind::Pump => "P",
             EquipKind::Exchanger => "E",
+            EquipKind::Sphere => "T",
+            EquipKind::Filter => "F",
+            EquipKind::Agitated => "R",
+            EquipKind::Heater => "H",
+            EquipKind::InlinePump => "P",
+            EquipKind::Compressor => "K",
+            EquipKind::RecipCompressor => "K",
+            EquipKind::Kettle => "E",
+            EquipKind::PlateHx => "E",
+            EquipKind::AirCooler => "E",
+            EquipKind::Package => "PK",
         }
     }
 }
