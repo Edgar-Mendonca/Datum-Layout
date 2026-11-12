@@ -76,6 +76,9 @@ pub enum Op {
     SetEccentric { line: u32, item: u32, flat: Flat },
     /// The plant's saved views (replaces the list).
     SetViews(Vec<SavedView>),
+    /// A new equipment item made from a template (its type, sizes, nozzles and datasheet), with
+    /// the next free tag, its base at `pos`.
+    AddFromTemplate { equip: Equipment, pos: P3 },
     /// Adds or replaces one of the plant's own pipe classes (by name; `was` renames one).
     SetClass { class: crate::catalogue::PipeClass, #[serde(default)] was: Option<String> },
     /// Removes one of the plant's own classes (a catalogue class of that name then applies again).
@@ -448,6 +451,16 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             e.pos = pos;
             created.push(e.id);
             p.equipment.push(e);
+        }
+        Op::AddFromTemplate { equip, pos } => {
+            let mut e = equip;
+            e.id = p.id();
+            e.tag = next_tag(p, e.kind);
+            e.pos = pos;
+            p.equipment.push(Equipment { nozzles: vec![], ..e.clone() });
+            // The nozzles are checked as any edit is (sizes, unique tags).
+            apply_op(p, Op::SetEquipment(e.clone()), cat, created)?;
+            created.push(e.id);
         }
         Op::SetEquipment(e) => {
             if e.tag.trim().is_empty() { return Err("Equipment needs a tag (for example P-101A).".into()); }

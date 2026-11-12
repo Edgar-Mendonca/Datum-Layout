@@ -119,6 +119,12 @@ impl PipeClass {
     }
 }
 
+/// An equipment template (0.2.14): an item as the user set it up (type, sizes, nozzles, datasheet),
+/// kept by name to place again in any plant. From the user's own list or a pack's `templates/`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(default)]
+pub struct Template { pub name: String, pub equip: crate::model::Equipment, pub origin: String }
+
 /// The whole catalogue: every table and class, and what could not be read.
 #[derive(Clone, Debug, Serialize, Default)]
 pub struct Catalogue {
@@ -131,6 +137,7 @@ pub struct Catalogue {
     pub reducers: Vec<ReducerRow>,
     pub weights: Vec<WeightRow>,
     pub classes: Vec<PipeClass>,
+    pub templates: Vec<Template>,
     pub packs: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -317,12 +324,27 @@ impl Catalogue {
         }
     }
 
+    /// Adds equipment templates (one, or a list) from JSON; `origin` says whose they are. A template
+    /// of the same name is replaced; ones that cannot be used are listed as warnings.
+    pub fn add_templates(&mut self, origin: &str, text: &str) {
+        let list: Vec<Template> = match serde_json::from_str::<Vec<Template>>(text) { Ok(v) => v, Err(_) => match serde_json::from_str::<Template>(text) { Ok(t) => vec![t], Err(e) => { self.warnings.push(format!("{origin}: not equipment templates Datum Layout can read ({e}).")); return; } } };
+        for mut t in list.into_iter().take(500) {
+            t.name = t.name.trim().chars().take(60).collect();
+            if t.name.is_empty() { self.warnings.push(format!("{origin}: a template has no name, so it was not used.")); continue; }
+            if let Some(n) = t.equip.nozzles.iter().find(|n| !size_ok(&n.nps)) { self.warnings.push(format!("{origin}, template {}: nozzle {} has no pipe size ({}), so the template was not used.", t.name, n.tag, n.nps)); continue; }
+            t.equip.id = 0; t.equip.pos = [0.0; 3]; t.equip.tag.clear();
+            t.origin = origin.to_string();
+            self.templates.retain(|x| x.name != t.name);
+            self.templates.push(t);
+        }
+    }
     /// Adds a plug-in pack: (relative file name, text) pairs from its folder.
     pub fn add_pack(&mut self, pack: &str, files: &[(String, String)]) {
         let before = self.warnings.len();
         for (name, text) in files {
             let lower = name.to_lowercase();
-            if lower.ends_with(".json") { self.add_class(&format!("{pack}/{name}"), text); }
+            if lower.ends_with(".json") && lower.starts_with("templates/") { self.add_templates(pack, text); }
+            else if lower.ends_with(".json") { self.add_class(&format!("{pack}/{name}"), text); }
             else if lower.ends_with(".csv") { self.add_table(&format!("{pack}/{name}"), text); }
         }
         if files.is_empty() { self.warnings.push(format!("{pack}: the pack has no .csv or .json files.")); }

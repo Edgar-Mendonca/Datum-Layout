@@ -19,7 +19,7 @@ fn out(d: &Doc, cat: &Catalogue, created: Vec<u32>) -> Value {
 }
 
 fn main() {
-    let base = Catalogue::builtin();
+    let mut base = Catalogue::builtin();
     let mut d = Doc::new(Project::new());
     let mut opts = json!({ "autosave": 0, "beta": false, "theme": "light", "openLast": false, "units": "SI", "lod": 1, "clearance": 0.025, "labels": true, "paper": "A4", "landscape": true, "company": "", "packs": [] });
     let stdin = std::io::stdin();
@@ -50,6 +50,14 @@ fn main() {
                 Some(id) => examples::get(id).ok_or("no such example".into()).map(|p| { d = Doc::new(p); out(&d, &cat, vec![]) }),
                 None => { d = Doc::new(Project::new()); Ok(out(&d, &cat, vec![])) }
             },
+            // The user's templates, kept in memory as the app keeps them in templates.json.
+            "save_template" => {
+                let t = json!([{ "name": a["name"], "equip": a["equip"] }]).to_string();
+                let before = base.warnings.len();
+                base.add_templates("My templates", &t);
+                Ok(json!(base.warnings[before..].to_vec()))
+            }
+            "delete_template" => { let n = a["name"].as_str().unwrap_or(""); base.templates.retain(|t| t.name != n); Ok(Value::Null) }
             "catalogue" => Ok(json!({ "base": base.classes.iter().map(|c| c.name.clone()).collect::<Vec<_>>(), "own": d.p.classes.iter().map(|c| c.name.clone()).collect::<Vec<_>>(), "cat": cat, "fields": EquipKind::ALL.iter().map(|k| (k, k.name(), equipment::fields(*k))).collect::<Vec<_>>() })),
             "unit_table" => Ok(json!((units::shown(false), units::shown(true), units::typed()))),
             "export_pcf" => pcf::write(&d.p, &cat, a["line"].as_u64().map(|x| x as u32)).map(Value::from),

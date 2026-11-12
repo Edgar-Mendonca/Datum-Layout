@@ -3,10 +3,10 @@
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
 import { SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
-import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
+import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, openDialog, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help, helpCard } from "./help";
-import { Icon } from "./ui";
+import { Icon, Dialog } from "./ui";
 import { fmt, toU, fromU, unit, parseQ, Q } from "./units";
 
 // ------------------------------------------------------------ the catalogue
@@ -38,6 +38,7 @@ const freeSpot = (kind: string): V3 => {
  *  component: onto the selected line), or double-click equipment to place it at once. */
 export const PartsPanel = () => {
   const [q, setQ] = createSignal("");
+  const templates = () => (catalogue()?.cat.templates ?? []).filter(t => { const w = q().trim().toLowerCase(); return !w || `${t.name} ${t.equip.kind.replace("_", " ")} template`.toLowerCase().includes(w); });
   const all = (): [string, string, string, "equip" | "item"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"])];
   const part = (k: string) => all().find(x => x[0] === k);
   const words = (k: string, g = "", sub = "") => `${part(k)?.[1] ?? k} ${PART_WORDS[k] ?? ""} ${g} ${sub}`.toLowerCase();
@@ -66,6 +67,18 @@ export const PartsPanel = () => {
         {/* A fixed height (one row), so a click that updates it never moves the parts under the pointer. */}
         <Show when={!q()}>
           <div class="catgrp recentgrp"><div class="csub">Recent</div><div class="catgrid"><For each={recent().filter(k => part(k)).slice(0, 3)} fallback={<p class="muted small rempty">The parts you use appear here.</p>}>{k => <Tile k={k} />}</For></div></div>
+        </Show>
+        <Show when={templates().length}>
+          <details class="catgrp tmplgrp" open><summary>My templates</summary>
+            <div class="catgrid"><For each={templates()}>{t => {
+              const icon = () => EQUIP.find(x => x[0] === t.equip.kind)?.[2] ?? "vvessel";
+              const put = (pos?: V3) => { if (!project()) return; C.cancelTool(); act({ AddFromTemplate: { equip: t.equip, pos: pos ?? freeSpot(t.equip.kind) } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[o.created.length - 1] })); };
+              return <button class="cattile tmpl" data-template={t.name} draggable="true" onDragStart={e => { (window as any).__drag = { type: "template", kind: t.equip.kind, template: t.equip }; e.dataTransfer?.setData("text/plain", `template:${t.name}`); }} onDragEnd={() => { (window as any).__drag = undefined; }}
+                onClick={() => put()} title={`${t.name}: ${EQUIP.find(x => x[0] === t.equip.kind)?.[1] ?? ""}, ${t.equip.nozzles.length} nozzles${t.origin && t.origin !== "My templates" ? ` · from the pack ${t.origin}` : ""}. Click to place it in a free spot, or drag it onto the plot.`}>
+                <Icon n={icon()} size={22} /><span>{t.name}</span>
+                <Show when={t.origin === "My templates"}><i class="cinfo tdel" role="button" title="Delete this template" onClick={async e => { e.stopPropagation(); await call("delete_template", { name: t.name }); refetchCatalogue(); toast(`Template ${t.name} deleted.`, true); }}>×</i></Show>
+              </button>; }}</For></div>
+          </details>
         </Show>
         <For each={PART_GROUPS}>{g => <Show when={g.subs.some(([sub, ks]) => ks.some(k => has(k, g.g, sub)))}>
           <details class="catgrp" open><summary>{g.g}</summary>
@@ -103,6 +116,19 @@ const V3In = (p: { v: V3; set: (v: V3) => void; q?: Q; labels?: [string, string,
 const SizeSel = (p: { v: string; set: (s: string) => void }) => <select onChange={e => p.set(e.currentTarget.value)}><For each={NPS}>{s => <option value={s} selected={s === p.v}>{inch(s)}</option>}</For></select>;
 const endText = (e: Line["from"]) => { const pr = project(); return e.kind === "nozzle" ? `${pr?.equipment.find(x => x.id === e.equip)?.tag} / ${e.nozzle}` : e.kind === "branch" ? `Branch of ${pr?.lines.find(l => l.id === e.line)?.number}` : e.term === "open" ? "Open end" : e.term === "cap" ? "Cap" : "Blind flange"; };
 
+/** Keeps an item as one of the user's templates (asks its name). */
+const saveTemplate = (e: Equipment) => {
+  let name = `${EQUIP.find(x => x[0] === e.kind)?.[1] ?? "Item"} ${e.tag}`;
+  openDialog(() => (
+    <Dialog title="Save as a template" okText="Save" cancel="Cancel" help="templates" ok={async () => {
+      const w = await call<string[]>("save_template", { name, equip: e });
+      if (w) { refetchCatalogue(); setPartsOpen(true); toast(w.length ? w[0] : `Saved: ${name.trim()} is in Parts › My templates, for every plant.`, !w.length); }
+    }}>
+      <p class="muted small">Its type, sizes, nozzles and datasheet are kept. Place it again from Parts › My templates in any plant; its tag is given there.</p>
+      <label class="fld">Name<input value={name} maxLength={60} onInput={x => { name = x.currentTarget.value; }} /></label>
+    </Dialog>
+  ));
+};
 /** The equipment card's tab (kept while moving between items). */
 const [eqTab, setEqTab] = createSignal<"general" | "nozzles" | "datasheet">("general");
 let lastEq = 0;
@@ -127,6 +153,7 @@ const EquipInsp = (p: { e: Equipment }) => {
     <Row l="Rotation"><NumIn q="angle" v={p.e.rot} set={v => set({ rot: v })} /></Row>
     <h4>Sizes <Help k="equipment" /></h4>
     <For each={fields()}>{([k, l]) => <Row l={l}><NumIn q="coord" v={(p.e.dims as any)[k]} min={0.01} set={v => set({ dims: { ...p.e.dims, [k]: v } })} /></Row>}</For>
+    <p class="ibtns"><button class="btn sm" title="Keep this item (type, sizes, nozzles, datasheet) as a template to place again in any plant, from Parts › My templates" onClick={() => saveTemplate(p.e)}>Save as a template…</button></p>
     </Show>
     <Show when={eqTab() === "nozzles"}>
     <h4>Nozzles <Help k="nozzles" /></h4>

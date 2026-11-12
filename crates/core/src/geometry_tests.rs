@@ -809,3 +809,33 @@ fn a_plant_keeps_its_own_pipe_classes() {
     d.apply(Op::DeleteClass { name: "CS1".into() }, &base.for_project(&d.p)).unwrap();
     assert!(d.p.classes.iter().all(|c| c.name != "CS1"));
 }
+
+#[test]
+fn templates_place_an_item_as_it_was_set_up() {
+    let mut cat = Catalogue::builtin();
+    let mut d = Doc::new(crate::examples::get("pumps").unwrap());
+    let mut pump = d.p.equipment.iter().find(|e| e.tag == "P-101A").unwrap().clone();
+    pump.dims.l = 2.4;
+    pump.data.push(("Seal".into(), "Double".into()));
+    // Saved by the shell as JSON; read back as a template (position, id and tag dropped).
+    let json = serde_json::to_string(&serde_json::json!([{ "name": "Pump 50 m3/h", "equip": pump }])).unwrap();
+    cat.add_templates("My templates", &json);
+    assert!(cat.warnings.is_empty(), "{:?}", cat.warnings);
+    let t = cat.templates.iter().find(|t| t.name == "Pump 50 m3/h").unwrap().clone();
+    assert!(t.equip.tag.is_empty() && t.equip.id == 0 && t.equip.pos == [0.0; 3]);
+    // Placed: a new tag, the sizes, nozzles and datasheet as saved.
+    let n = d.p.equipment.len();
+    let made = d.apply(Op::AddFromTemplate { equip: t.equip.clone(), pos: [30.0, 4.0, 0.0] }, &cat).unwrap();
+    assert_eq!(d.p.equipment.len(), n + 1);
+    let e = d.p.equip(*made.last().unwrap()).unwrap();
+    assert!(e.tag.starts_with('P') && e.tag != "P-101A", "{}", e.tag);
+    assert_eq!((e.dims.l, e.nozzles.len(), e.pos), (2.4, pump.nozzles.len(), [30.0, 4.0, 0.0]));
+    assert!(e.data.iter().any(|(k, v)| k == "Seal" && v == "Double"));
+    // From a pack's templates folder; a broken one is reported, not used.
+    cat.add_pack("Site pack", &[("templates/site.json".into(), serde_json::to_string(&serde_json::json!({ "name": "Site drum", "equip": crate::equipment::new(EquipKind::HorizontalDrum, "") })).unwrap())]);
+    assert!(cat.templates.iter().any(|t| t.name == "Site drum" && t.origin == "Site pack"));
+    let mut bad = pump.clone();
+    bad.nozzles[0].nps = "7".into();
+    cat.add_templates("My templates", &serde_json::to_string(&serde_json::json!([{ "name": "Bad", "equip": bad }])).unwrap());
+    assert!(cat.templates.iter().all(|t| t.name != "Bad") && cat.warnings.iter().any(|w| w.contains("Bad")));
+}

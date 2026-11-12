@@ -89,6 +89,7 @@
         "Clashes shown in 3D with N to step through them, line-by-line colours, a tree that holds each line's components, a tabbed properties card and a compact catalogue (0.2.11)",
         "A Parts panel beside the tree: sub-groups, search by use, recent parts, double-click to place (0.2.12)",
         "Seventeen equipment types: spheres, filters, agitated vessels, fired heaters, inline pumps, compressors, kettle reboilers, plate exchangers, air coolers and packages added (0.2.13)",
+        "Your own equipment templates: save an item as set up, place it again in any plant, share them in a pack (0.2.14)",
         "Sloped lines",
         "Design rules for supports and access (with 0.3's steel)"
       ]

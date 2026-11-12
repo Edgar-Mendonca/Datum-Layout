@@ -1280,3 +1280,6 @@ tr.behind td { background: var(--err-bg); }
 .catp.partsp .catbody { flex: 1; min-height: 0; }
 .recentgrp .catgrid { min-height: 48px; }
 .recentgrp .rempty { grid-column: 1 / -1; margin: 0; align-self: center; font-size: 11px; }
+.cattile.tmpl .tdel { font-style: normal; font-size: 11px; }
+.cattile.tmpl .tdel:hover { background: #D92D20; }
+.tmplgrp .cattile { border-color: color-mix(in srgb, var(--blue) 35%, var(--line)); }

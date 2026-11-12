@@ -1,5 +1,13 @@
 # What's new in Datum Layout
 
+## 0.2.14 — 2026-11-12
+Your own equipment templates.
+
+- **Save as a template.** Set an item up the way you use it (its sizes, nozzles and datasheet), then use Save as a template… on its card. Name it, for example "Pump 50 m³/h".
+- **Place it again in any plant.** It appears under Parts › My templates. Click it to put it in a free spot, or drag it onto the plot. It gets the next free tag, with everything else as you saved it.
+- **Kept for every plant** with Datum Layout's settings on this computer. Hover a template and × deletes it.
+- **For a team:** templates in a pack's `templates` folder (one template, or a list, as JSON) appear for everyone who adds the pack, marked with the pack's name. A template that cannot be used (for example a nozzle with no real pipe size) is listed as a warning, not loaded.
+
 ## 0.2.13 — 2026-11-12
 Eleven more kinds of equipment: seventeen in all.
 

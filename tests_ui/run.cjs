@@ -590,6 +590,23 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("placed apart, they do not clash", !ck.some(i => i.kind === "clash"), JSON.stringify(ck.map(i => i.text).slice(0, 3)));
   if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("all-equipment"); }
 
+  // 8f. Templates (0.2.14): an item saved as set up, placed again, deleted.
+  await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  st = await state();
+  const pT = st.p.equipment.find(e => e.tag === "P-101A");
+  await p.click(`.tree .ti[data-id="${pT.id}"] > span:not(.teye)`); await settle(300);
+  await p.click('.insp button:has-text("Save as a template")'); await settle(300);
+  await p.fill('.dlg input', "Pump 50 m3/h"); await p.click('.dlg button:has-text("Save")'); await settle(600);
+  check("Save as a template puts it in Parts › My templates", (await p.textContent(".partsp .tmplgrp").catch(() => "")).includes("Pump 50 m3/h"));
+  const nT = (await state()).p.equipment.length;
+  await p.click('.partsp .cattile.tmpl[data-template="Pump 50 m3/h"]'); await settle(600);
+  st = await state();
+  const made = st.p.equipment[st.p.equipment.length - 1];
+  check("placing the template makes a new item with the same sizes, nozzles and datasheet", st.p.equipment.length === nT + 1 && made.tag !== "P-101A" && made.nozzles.length === pT.nozzles.length && made.dims.l === pT.dims.l && made.data.length === pT.data.length, `${made.tag} ${made.nozzles.length}`);
+  await p.hover('.partsp .cattile.tmpl[data-template="Pump 50 m3/h"]'); await p.click('.partsp .cattile.tmpl[data-template="Pump 50 m3/h"] .tdel'); await settle(500);
+  check("a template can be deleted", !(await p.$(".partsp .tmplgrp")));
+
   // 8d. The agreed changes (0.2.11).
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
   st = await state();

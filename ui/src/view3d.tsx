@@ -726,7 +726,9 @@ export const View3D = () => {
     } else {
       const p = onPlane(e, project()?.plot.ground ?? 0); if (!p) return;
       const s = project()?.plot.grid ?? 1;
-      act({ AddEquipment: { kind: d.kind, pos: [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0] } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[0] }); });
+      const pos: V3 = [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0];
+      const tm = (d as { template?: object }).template;
+      act(tm ? { AddFromTemplate: { equip: tm, pos } } : { AddEquipment: { kind: d.kind, pos } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[o.created.length - 1] }); });
     }
   };
   const onDragLeave = () => { snapSeq++; marker.visible = false; host.title = ""; draw(); };

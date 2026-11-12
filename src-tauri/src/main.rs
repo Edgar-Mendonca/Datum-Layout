@@ -136,18 +136,20 @@ fn fresh(o: &Options, mut p: Project) -> Project {
 /// a `classes` folder inside it).
 fn load_catalogue(packs: &[String]) -> Catalogue {
     let mut c = Catalogue::builtin();
+    if let Some(t) = TEMPLATES.lock().ok().and_then(|f| f.clone()).and_then(|f| read_limited(&f, 8 << 20).ok()) { c.add_templates("My templates", &t); }
     for dir in packs {
         let d = Path::new(dir);
         let name = d.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_else(|| dir.clone());
         let mut files = vec![];
-        for sub in [d.to_path_buf(), d.join("classes")] {
+        for sub in [d.to_path_buf(), d.join("classes"), d.join("templates")] {
             let Ok(rd) = std::fs::read_dir(&sub) else { continue };
             for e in rd.flatten().take(500) {
                 let path = e.path();
                 let ext = path.extension().map(|x| x.to_string_lossy().to_lowercase()).unwrap_or_default();
                 if ext == "csv" || ext == "json" {
                     if let Ok(t) = read_limited(&path, 20 * 1024 * 1024) {
-                        let rel = if sub == d { path.file_name().unwrap_or_default().to_string_lossy().to_string() } else { format!("classes/{}", path.file_name().unwrap_or_default().to_string_lossy()) };
+                        let leaf = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                        let rel = if sub == d { leaf } else if sub.ends_with("templates") { format!("templates/{leaf}") } else { format!("classes/{leaf}") };
                         files.push((rel, t));
                     }
                 }
@@ -253,6 +255,40 @@ struct CatalogueOut {
 fn catalogue(st: State<St>) -> CatalogueOut {
     let a = st.lock();
     CatalogueOut { base: a.cat.classes.iter().map(|c| c.name.clone()).collect(), own: a.doc.p.classes.iter().map(|c| c.name.clone()).collect(), cat: a.cat.for_project(&a.doc.p).into_owned(), fields: model::EquipKind::ALL.iter().map(|k| (*k, k.name(), equipment::fields(*k))).collect() }
+}
+
+/// Where the user's own equipment templates are kept (set at start-up).
+static TEMPLATES: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+
+/// Saves an item as one of the user's templates (same name: replaced) and reloads the catalogue.
+#[tauri::command]
+fn save_template(st: State<St>, name: String, equip: datum_core::model::Equipment) -> R<Vec<String>> {
+    guard(|| {
+        let f = TEMPLATES.lock().ok().and_then(|f| f.clone()).ok_or("There is no folder for templates.")?;
+        let mut list: Vec<datum_core::catalogue::Template> = read_limited(&f, 8 << 20).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        let name = name.trim().to_string();
+        if name.is_empty() { return Err("Give the template a name.".into()); }
+        list.retain(|t| t.name != name);
+        list.push(datum_core::catalogue::Template { name, equip, origin: String::new() });
+        std::fs::write(&f, serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?).map_err(|e| format!("The templates could not be saved: {e}"))?;
+        let mut a = st.lock();
+        a.cat = load_catalogue(&a.opts.packs);
+        Ok(a.cat.warnings.clone())
+    })
+}
+
+/// Removes one of the user's templates.
+#[tauri::command]
+fn delete_template(st: State<St>, name: String) -> R<()> {
+    guard(|| {
+        let f = TEMPLATES.lock().ok().and_then(|f| f.clone()).ok_or("There is no folder for templates.")?;
+        let mut list: Vec<datum_core::catalogue::Template> = read_limited(&f, 8 << 20).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        list.retain(|t| t.name != name);
+        std::fs::write(&f, serde_json::to_string_pretty(&list).map_err(|e| e.to_string())?).map_err(|e| format!("The templates could not be saved: {e}"))?;
+        let mut a = st.lock();
+        a.cat = load_catalogue(&a.opts.packs);
+        Ok(())
+    })
 }
 
 /// Adds a plug-in pack folder (picked by the user) and reloads the catalogue.
@@ -555,6 +591,7 @@ fn main() {
                 }));
             }
             let opts: Options = options_file(app.handle()).and_then(|f| read_limited(&f, 1 << 20).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+            if let Ok(mut t) = TEMPLATES.lock() { *t = options_file(app.handle()).map(|f| f.with_file_name("templates.json")); }
             let cat = load_catalogue(&opts.packs);
             let p = fresh(&opts, Project::new());
             app.manage(St(Mutex::new(App { doc: Doc::new(p), opts, cat })));
@@ -571,7 +608,7 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
-            state, apply, history, scene, snap, check, lists, examples_list, new_project, catalogue, add_pack, remove_pack, unit_table, export_pcf, export_gltf, export_csv,
+            state, apply, history, scene, snap, check, lists, examples_list, new_project, catalogue, add_pack, remove_pack, save_template, delete_template, unit_table, export_pcf, export_gltf, export_csv,
             open, save, save_file, options, set_options, autosave, recovery, recover, recent, startup_file, open_url, version, quit, check_update, install_update
         ])
         .run(tauri::generate_context!())
