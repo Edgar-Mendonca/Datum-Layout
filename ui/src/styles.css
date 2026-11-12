@@ -1258,3 +1258,23 @@ tr.behind td { background: var(--err-bg); }
 .catgrp > summary::before { content: ""; border-top: 4px solid var(--muted); border-left: 3.5px solid transparent; border-right: 3.5px solid transparent; }
 .catgrp:not([open]) > summary::before { transform: rotate(-90deg); }
 .catgrp > summary:hover { color: var(--blue); }
+
+/* ---------------------------------------------------------------- 0.2.12: the Parts panel, docked */
+.catp.partsp { width: 236px; border-right: 1px solid var(--line); background: var(--bg2); }
+.catp.partsp > header { display: flex; }
+.catp.partsp > header .x { font-size: 15px; color: var(--muted); padding: 0 2px; }
+.catp.partsp > header .x:hover { color: var(--blue); }
+.catbody { overflow-y: auto; }
+.csub { font-size: 11px; color: var(--text2); margin: 6px 0 3px 1px; font-weight: 500; }
+.recentgrp { padding-bottom: 6px; border-bottom: 1px solid var(--line2); margin-bottom: 4px; }
+.cattile { position: relative; }
+.cattile .cinfo { position: absolute; top: 1px; right: 2px; width: 13px; height: 13px; border-radius: 50%; font: italic 600 9px/13px var(--sans); color: var(--muted); text-align: center; opacity: 0; }
+.cattile:hover .cinfo { opacity: 1; }
+.cattile .cinfo:hover { background: var(--blue); color: #fff; }
+.catp.partsp .catgrp > summary { margin: 10px 0 2px; }
+/* 0.2.12: tighter tiles and headings in the Parts panel. */
+.catp.partsp .cattile { padding: 4px 2px 3px; }
+.catp.partsp .cattile svg { width: 20px; height: 20px; }
+.catp.partsp .csub { margin: 4px 0 2px 1px; font-size: 10.5px; color: var(--muted); }
+.catp.partsp .catgrp > summary { margin: 8px 0 1px; }
+.catp.partsp .catbody { flex: 1; min-height: 0; }

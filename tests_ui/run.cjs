@@ -205,9 +205,19 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const vis = await p.$$eval(".tree .ti[data-id]", els => els.filter(e => e.offsetParent !== null).map(e => e.textContent));
   check("the filter keeps only matching rows", vis.length === 1 && vis[0].includes("P-101B"), JSON.stringify(vis));
   await p.fill(".tfilter input", ""); await settle(200);
-  await p.click('.ttabs button:has-text("Catalogue")'); await settle(200);
-  check("the Catalogue tab holds the parts to drag", (await p.$$(".tree .cattile")).length >= 10 && await p.isVisible(".tree .cattile"));
-  await p.click('.ttabs button:has-text("Plant")'); await settle(200);
+  // 0.2.12: the Parts panel, docked beside the tree and open while you work.
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  check("the Parts panel sits beside the tree with the parts to drag", (await p.$$(".partsp .cattile")).length >= 18 && await p.isVisible(".tree .tbody"));
+  { const pt = await p.textContent(".partsp"); check("parts are in sub-groups (vessels, pumps, exchangers, isolation, non-return, branches)", ["Vessels and tanks", "Pumps", "Heat exchangers", "Isolation", "Non-return", "Branches"].every(w => pt.includes(w)), pt.slice(0, 200)); }
+  await p.fill(".partsp .catsearch", "isolation"); await settle(200);
+  const iso = await p.$$eval(".partsp .catgrp .cattile", els => els.map(e => e.dataset.kind));
+  check("searching a use (isolation) finds the isolation valves", JSON.stringify(iso) === JSON.stringify(["gate", "ball", "butterfly"]), JSON.stringify(iso));
+  await p.fill(".partsp .catsearch", ""); await settle(150);
+  const nEq = (await state()).p.equipment.length;
+  await p.dblclick('.partsp .cattile[data-kind="pump"]'); await settle(600);
+  check("double-clicking equipment places it at once, and the Parts panel stays open", (await state()).p.equipment.length === nEq + 1 && await p.isVisible(".partsp"));
+  check("what was used shows under Recent", (await p.textContent(".partsp .recentgrp").catch(() => "")).includes("pump"));
+  await p.keyboard.press("Control+z"); await settle(400);
   await p.selectOption("select.ctxunits", "US"); await settle(500);
   check("the context bar switches units", (await state()).p.units === "US");
   await p.selectOption("select.ctxunits", "SI"); await settle(400);
@@ -571,13 +581,11 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
   st = await state();
   check("(11) a plant opens coloured by line, with its key", !!(await p.$(".v3d .legend.lcard")));
-  await p.click('.tree .ttabs button:has-text("Catalogue")'); await settle(200);
-  const tilesFit = await p.$$eval(".catbody .cattile", els => els.filter(e => { const r = e.getBoundingClientRect(); return r.bottom <= innerHeight - 60; }).length);
-  check("(10) the whole catalogue fits on screen", tilesFit === (await p.$$(".catbody .cattile")).length, String(tilesFit));
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  check("(10) the Parts panel scrolls rather than cutting parts off", await p.$eval(".partsp .catbody", el => getComputedStyle(el).overflowY === "auto"));
   await p.click('.catgrp > summary:has-text("Valves")'); await settle(150);
   check("(10) a catalogue group folds", !(await p.isVisible('.catgrp:has(summary:has-text("Valves")) .cattile')));
   await p.click('.catgrp > summary:has-text("Valves")'); await settle(100);
-  await p.click('.tree .ttabs button:has-text("Plant")'); await settle(200);
   const l1001 = st.p.lines.find(l => l.number.includes("1001"));
   const lineRow = await p.$(`.tree details.tline:has(.ti[data-id="${l1001.id}"])`);
   check("(1) a line in the tree holds its components", !!lineRow && (await lineRow.$$eval(".tlist .ti, :scope > .ti, :scope > button.ti", els => els.length).catch(() => 0)) >= 0 && /Strainer/.test(await lineRow.textContent()));

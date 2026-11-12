@@ -12,12 +12,12 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";
 import "./styles.css";
 import { invoke, listen, Out, Options, Shown, Typed } from "./api";
-import { setHintSlot, checkStale, setBottom, setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, scene, checked } from "./store";
+import { partsOpen, setHintSlot, checkStale, setBottom, setSel, setPicked, picked, out, setOut, backstage, setBackstage, setOpts, opts, dialogs, toast, loadOut, setThemeRaw, applyTheme, sel, project, mode, scene, checked } from "./store";
 import { C } from "./cmds";
 import { TitleBar, Ribbon, palette } from "./ribbon";
 import { Backstage, update, checkUpdate } from "./backstage";
 import { View3D } from "./view3d";
-import { Inspector, BottomPanel } from "./panels";
+import { Inspector, BottomPanel, PartsPanel } from "./panels";
 import { Flow, Tree, CtxBar, ToolStrip, grip, treeW, inspW, popShown } from "./shell";
 import { Menu, Toast } from "./ui";
 import { setUnitTable } from "./units";
@@ -116,6 +116,7 @@ const App = () => {
             <Tree />
             <div class="vgrip" onPointerDown={e => grip(e, "tree")} title="Drag to widen or narrow the tree" />
             <ToolStrip />
+            <Show when={partsOpen()}><PartsPanel /></Show>
             <div class="center">
               <div class="viewwrap">
                 <View3D />

@@ -5,12 +5,12 @@
 // the tool strip beside the tree (the open tab's most used tools). Nothing here calculates: every
 // fact comes from the engine's output.
 import { For, Show, JSX, createSignal, createEffect } from "solid-js";
-import { project, out, sel, setSel, picked, setPicked, tab, setTab, mode, checked, checkStale, hidden, setHidden, isolated, setIsolated, colourBy, setColourBy, ColourBy, section, setBottom, openMenu, act, elev, setElev, setBackstage, setFocus, setOpts, opts } from "./store";
+import { partsOpen, setPartsOpen, project, out, sel, setSel, picked, setPicked, tab, setTab, mode, checked, checkStale, hidden, setHidden, isolated, setIsolated, colourBy, setColourBy, ColourBy, section, setBottom, openMenu, act, elev, setElev, setBackstage, setFocus, setOpts, opts } from "./store";
 import { C } from "./cmds";
 import { Icon } from "./ui";
 import { Help } from "./help";
 import { EQUIP, ITEMS, NPS, RATINGS, SUPPORTS, inch, Issue } from "./api";
-import { catalogue, CataloguePanel } from "./panels";
+import { catalogue } from "./panels";
 import { fmt, toU, fromU, unit } from "./units";
 
 const Ic = (p: { n: string }) => <svg class="tic"><use href={`#i-${p.n}`} /></svg>;
@@ -42,7 +42,7 @@ export const flowSteps = (): FlowStep[] => {
   ];
 };
 export const goStep = (i: number) => {
-  setTab(STEP_TABS[i]); setTreeTab("plant");
+  setTab(STEP_TABS[i]);
   requestAnimationFrame(() => document.querySelectorAll(".tree .step")[i]?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
 };
 
@@ -56,14 +56,15 @@ export const Flow = () => (
       </button>)}</For>
     <span class="fgrow" />
     <span class="fcap">Tools</span>
-    <button class="fextra" data-tool="catalogue" classList={{ on: treeTab() === "catalogue" }} title="The catalogue: equipment, valves, fittings, pipe classes and packs" onClick={() => setTreeTab(treeTab() === "catalogue" ? "plant" : "catalogue")}><Ic n="list" /><span>Catalogue</span></button>
+    <button class="fextra" data-tool="parts" classList={{ on: partsOpen() }} title="The Parts panel: equipment, valves and fittings to place (opens beside the tree)" onClick={() => setPartsOpen(!partsOpen())}><Ic n="list" /><span>Parts</span></button>
     <button class="fextra" data-tool="library" title="The library: every pipe class and parts table, with its source" onClick={() => import("./library").then(k => k.library())}><Ic n="library" /><span>Library</span></button>
     <button class="fextra" title="Options" onClick={() => setBackstage("options")}><Ic n="opts" /><span>Options</span></button>
   </nav>
 );
 
 // ------------------------------------------------------------------ the tree
-export const [treeTab, setTreeTab] = createSignal<"plant" | "catalogue">("plant");
+/** Opens the Parts panel (what used to be the tree's Catalogue tab). */
+export const setTreeTab = (t: "plant" | "catalogue") => { if (t === "catalogue") setPartsOpen(true); };
 type Mark = { ok: boolean; why?: string } | null;
 const Branch = (p: { t: string; icon: string; n?: number; note?: string; mark?: Mark; help?: string; add?: () => void; addText?: string; open?: boolean; eye?: number[]; children?: JSX.Element }) => (
   <details class="tgrp" open={p.open ?? (p.n === undefined || p.n <= 15)}>
@@ -159,13 +160,12 @@ export const Tree = () => {
   const listIssues = () => (out()?.issues ?? []).filter(i => i.kind === "list");
   // An empty plant opens on the catalogue; the first item placed brings the plant tree back.
   let wasEmpty = false;
-  createEffect(() => { const e = !!p() && !p()!.equipment.length && !p()!.lines.length; if (e && !wasEmpty) setTreeTab("catalogue"); if (!e && wasEmpty) setTreeTab("plant"); wasEmpty = e; });
+  createEffect(() => { const e = !!p() && !p()!.equipment.length && !p()!.lines.length; if (e && !wasEmpty) setPartsOpen(true); wasEmpty = e; });
   return (
     <aside class="tree">
-      <div class="ttabs" role="tablist"><button role="tab" classList={{ on: treeTab() === "plant" }} onClick={() => setTreeTab("plant")}>Plant</button><button role="tab" classList={{ on: treeTab() === "catalogue" }} onClick={() => setTreeTab("catalogue")}>Catalogue</button><Help k="tree" /></div>
-      <div class="tcat" style={{ display: treeTab() === "catalogue" ? undefined : "none" }}><CataloguePanel /></div>
-      <Show when={treeTab() === "plant"}><label class="tfilter"><svg class="ic"><use href="#i-search" /></svg><input type="search" placeholder="Filter the tree" value={treeFilter()} onInput={e => setTreeFilter(e.currentTarget.value)} /></label></Show>
-      <div class="tbody" ref={el => createEffect(() => { treeFilter(); project(); setTimeout(() => applyFilter(el, treeFilter()), 0); })} style={{ display: treeTab() === "plant" ? undefined : "none" }}>
+      <div class="ttabs" role="tablist"><button role="tab" class="on">Plant</button><Help k="tree" /></div>
+      <Show when={true}><label class="tfilter"><svg class="ic"><use href="#i-search" /></svg><input type="search" placeholder="Filter the tree" value={treeFilter()} onInput={e => setTreeFilter(e.currentTarget.value)} /></label></Show>
+      <div class="tbody" ref={el => createEffect(() => { treeFilter(); project(); setTimeout(() => applyFilter(el, treeFilter()), 0); })} >
         <Show when={p()}>{pp => <>
           <div class="troot" title="The plant's name, plot and units" onClick={() => C.selectPlot()}><img src="logo.svg" alt="" /><b>{pp().name}</b><small>{pp().unit} · {pp().units}</small></div>
           <Step n={1} f={fs()[0]}>

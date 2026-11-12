@@ -2,10 +2,10 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { SUPPORTS, SupportKind, CatalogueOut, EQUIP, ITEMS, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
-import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
+import { SUPPORTS, SupportKind, CatalogueOut, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
-import { Help } from "./help";
+import { Help, helpCard } from "./help";
 import { Icon } from "./ui";
 import { fmt, toU, fromU, unit, parseQ, Q } from "./units";
 
@@ -18,32 +18,64 @@ const dragStart = (type: "item" | "equip", kind: string) => (e: DragEvent) => {
   if (e.dataTransfer) e.dataTransfer.effectAllowed = "copy";
 };
 
-export const CataloguePanel = () => {
+/** Where a component's dimensions are in the Library (equipment: its help). */
+const LIB_PAGE: Record<string, string> = { gate: "valves", globe: "valves", check: "valves", ball: "valves", butterfly: "valves", strainer: "valves", flange_pair: "flanges", reducer: "reducers", tee: "tees", cross: "tees", weldolet: "olets", sockolet: "olets" };
+/** A free spot for equipment placed by a double-click: the plot's middle, stepped east past what is there. */
+const freeSpot = (): V3 => {
+  const p = project()!; const { e, n, ground } = p.plot;
+  let x = (e[0] + e[1]) / 2; const y = (n[0] + n[1]) / 2;
+  for (let k = 0; k < 40 && p.equipment.some(q => Math.hypot(q.pos[0] - x, q.pos[1] - y) < 4); k++) x += 4;
+  return [Math.min(x, e[1] - 2), y, ground];
+};
+/** The Parts panel (0.2.12, after Datum Mesh's parts panel): what can be placed, docked beside the
+ *  tree and open while you work. Drag a part in, click it (equipment: then click the plot; a
+ *  component: onto the selected line), or double-click equipment to place it at once. */
+export const PartsPanel = () => {
   const [q, setQ] = createSignal("");
-  const has = (s: string) => s.toLowerCase().includes(q().toLowerCase());
-  const Tile = (p: { type: "item" | "equip"; kind: string; label: string; icon: string; hint: string; run: () => void }) => (
-    <Show when={has(p.label)}>
-      <button class="cattile" draggable="true" onDragStart={dragStart(p.type, p.kind)} onDragEnd={() => { (window as any).__drag = undefined; }} onClick={p.run} title={p.hint}>
-        <Icon n={p.icon} size={26} /><span>{p.label}</span>
-      </button>
-    </Show>
-  );
+  const all = (): [string, string, string, "equip" | "item"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"])];
+  const part = (k: string) => all().find(x => x[0] === k);
+  const words = (k: string, g = "", sub = "") => `${part(k)?.[1] ?? k} ${PART_WORDS[k] ?? ""} ${g} ${sub}`.toLowerCase();
+  const has = (k: string, g = "", sub = "") => { const t = q().trim().toLowerCase(); return !t || t.split(/\s+/).every(w => words(k, g, sub).includes(w)); };
+  const use = (k: string) => {
+    const x = part(k); if (!x) return; useRecent(k);
+    if (x[3] === "equip") C.place(k as EquipKind); else C.dropOnSelected(k as ItemKind);
+  };
+  const Tile = (t: { k: string }) => {
+    const x = () => part(t.k)!;
+    const lib = () => LIB_PAGE[t.k];
+    return <Show when={part(t.k)}>
+      <button class="cattile" data-kind={t.k} draggable="true" onDragStart={e => { useRecent(t.k); dragStart(x()[3], t.k)(e); }} onDragEnd={() => { (window as any).__drag = undefined; }}
+        onClick={() => use(t.k)} onDblClick={() => { if (x()[3] === "equip" && project()) { C.cancelTool(); act({ AddEquipment: { kind: t.k, pos: freeSpot() } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[0] })); } }}
+        title={x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
+        <Icon n={x()[2]} size={22} /><span>{x()[1].replace(/ \(.*\)$/, "")}</span>
+        <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
+      </button></Show>;
+  };
   const addPack = async () => { const w = await call<string[] | null>("add_pack"); if (w) { refetchCatalogue(); toast(w.length ? `Pack added with ${w.length} warning(s): ${w[0]}` : "Pack added to the catalogue.", !w.length); } };
   return (
-    <aside class="catp">
-      <header>Catalogue <Help k="catalogue" /></header>
+    <aside class="catp partsp">
+      <header>Parts <Help k="catalogue" /><span class="grow" /><button class="x" title="Close the Parts panel (Tools › Parts opens it again)" onClick={() => setPartsOpen(false)}>×</button></header>
       <div class="catbody">
-        <input class="catsearch" placeholder="Search the catalogue" value={q()} onInput={e => setQ(e.currentTarget.value)} />
-        <details class="catgrp" open><summary>Equipment</summary><div class="catgrid"><For each={EQUIP}>{([k, l, i]) => <Tile type="equip" kind={k} label={l} icon={i} hint={`${l}: drag onto the plot, or click and then click the plot`} run={() => C.place(k)} />}</For></div></details>
-        <details class="catgrp" open><summary>Valves</summary><div class="catgrid"><For each={ITEMS.slice(0, 6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe; it snaps, takes the line's size and class and splits the pipe`} run={() => C.dropOnSelected(k)} />}</For></div></details>
-        <details class="catgrp" open><summary>Fittings</summary><div class="catgrid"><For each={ITEMS.slice(6)}>{([k, l, i]) => <Tile type="item" kind={k} label={l} icon={i} hint={`${l}: drag onto a pipe`} run={() => C.dropOnSelected(k)} />}</For></div></details>
+        <input class="catsearch" type="search" placeholder="Search: pump, isolation, olet…" value={q()} onInput={e => setQ(e.currentTarget.value)} />
+        <Show when={!q() && recent().filter(k => part(k)).length}>
+          <div class="catgrp recentgrp"><div class="csub">Recent</div><div class="catgrid"><For each={recent().filter(k => part(k))}>{k => <Tile k={k} />}</For></div></div>
+        </Show>
+        <For each={PART_GROUPS}>{g => <Show when={g.subs.some(([sub, ks]) => ks.some(k => has(k, g.g, sub)))}>
+          <details class="catgrp" open><summary>{g.g}</summary>
+            <For each={g.subs}>{([sub, ks]) => <Show when={ks.some(k => has(k, g.g, sub))}>
+              <div class="csub">{sub}</div>
+              <div class="catgrid"><For each={ks.filter(k => has(k, g.g, sub))}>{k => <Tile k={k} />}</For></div>
+            </Show>}</For>
+          </details></Show>}</For>
+        <Show when={q() && !all().some(([k]) => has(k))}><p class="muted small">Nothing called that. Try a kind (pump, valve, branch) or a use (isolation, non-return).</p></Show>
         <Show when={!q()}>
-          <h4>Pipe classes <Help k="spec" /></h4>
+          <details class="catgrp"><summary>Pipe classes and packs</summary>
           <For each={catalogue()?.cat.classes ?? []}>{c => <div class="catclass" role="button" title="Open in the Library" onClick={() => import("./library").then(k => k.library(`class:${c.name}`))}><b>{c.name}</b><span>{c.description}</span><small>{inch(c.sizes[0] ?? "")}–{inch(c.sizes[c.sizes.length - 1] ?? "")} · class {c.ratings.join(", ")}</small></div>}</For>
           <h4>Plug-in packs <Help k="packs" /></h4>
           <For each={catalogue()?.cat.packs ?? []} fallback={<p class="muted">Company pipe classes and extra parts, as a folder of CSV and JSON files.</p>}>{p => <div class="catpack"><span>{p}</span><button class="x" title="Remove the pack" onClick={async () => { await call("remove_pack", { name: p }); refetchCatalogue(); }}>×</button></div>}</For>
           <Show when={catalogue()?.cat.warnings.length}><details class="catwarn"><summary>{catalogue()!.cat.warnings.length} row(s) not used</summary><For each={catalogue()!.cat.warnings}>{w => <p>{w}</p>}</For></details></Show>
           <button class="btn sm" onClick={addPack}>Add a pack…</button>
+          </details>
         </Show>
       </div>
     </aside>

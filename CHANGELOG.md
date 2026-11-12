@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.2.12 — 2026-11-12
+The Parts panel: what you place, always to hand.
+
+- **Docked beside the tree** and open while you work: place an item and keep going, without switching tabs. Tools › Parts (or its ×) shows or hides it, and the app remembers your choice.
+- **Sub-groups** as you look for things: vessels and tanks, columns, pumps, heat exchangers; isolation, regulating and non-return valves, strainers; in-line fittings, branches, supports.
+- **Search by name or by use**: "isolation" finds the gate, ball and butterfly valves; "olet", "nrv" or "separator" work too.
+- **Recent**: the parts you used last, at the top.
+- **Double-click** equipment to place it at once in a free spot; drag and click work as before.
+- **"i" on a part** opens its dimensions in the Library (or, for equipment, how it is drawn).
+- **Clearer names**: **Parts** is what you place; the **Library** holds the pipe classes and dimension tables. The tree shows only your plant; pipe classes and packs sit at the bottom of the Parts panel.
+
 ## 0.2.11 — 2026-11-10
 The eleven changes agreed from the marked-up screenshots.
 

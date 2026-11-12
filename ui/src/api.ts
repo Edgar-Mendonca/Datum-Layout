@@ -69,6 +69,19 @@ export const ITEMS: [ItemKind, string, string][] = [
   ["strainer", "Strainer", "strainer"], ["flange_pair", "Flange pair", "flange"], ["tee", "Tee (starts a branch)", "tee"], ["reducer", "Reducer", "reducer"], ["cross", "Cross (two branches)", "cross"], ["weldolet", "Weldolet (branch outlet)", "weldolet"], ["sockolet", "Sockolet (small branch)", "sockolet"],
   ["support", "Pipe support", "support"],
 ];
+/** The Parts panel's groups (0.2.12): group, then sub-groups of part kinds (equipment and components). */
+export const PART_GROUPS: { g: string; subs: [string, string[]][] }[] = [
+  { g: "Equipment", subs: [["Vessels and tanks", ["vertical_vessel", "horizontal_drum", "tank"]], ["Columns", ["column"]], ["Pumps", ["pump"]], ["Heat exchangers", ["exchanger"]]] },
+  { g: "Valves", subs: [["Isolation", ["gate", "ball", "butterfly"]], ["Regulating", ["globe"]], ["Non-return", ["check"]], ["Strainers", ["strainer"]]] },
+  { g: "Fittings", subs: [["In-line", ["flange_pair", "reducer"]], ["Branches", ["tee", "cross", "weldolet", "sockolet"]], ["Supports", ["support"]]] },
+];
+/** More words each part is found by in the Parts search. */
+export const PART_WORDS: Record<string, string> = {
+  vertical_vessel: "drum separator knock-out receiver accumulator vessel", horizontal_drum: "vessel separator receiver accumulator", tank: "storage atmospheric api tank",
+  column: "tower distillation absorber stripper", pump: "centrifugal rotating machine", exchanger: "heat exchanger cooler heater condenser shell tube",
+  gate: "isolation block on off valve", ball: "isolation quarter turn valve", butterfly: "isolation quarter turn valve", globe: "regulating throttling control valve", check: "non-return nrv swing valve", strainer: "filter y-strainer",
+  flange_pair: "flange joint spool break", reducer: "concentric eccentric size change", tee: "branch equal reducing", cross: "branch four-way", weldolet: "branch olet outlet", sockolet: "branch olet outlet small bore", support: "rest guide anchor line stop shoe",
+};
 export const EQUIP: [EquipKind, string, string][] = [
   ["vertical_vessel", "Vertical vessel", "vvessel"], ["horizontal_drum", "Horizontal drum", "drum"], ["tank", "Storage tank", "tank"],
   ["column", "Column", "column"], ["pump", "Centrifugal pump", "pump"], ["exchanger", "Shell-and-tube exchanger", "exchanger"],

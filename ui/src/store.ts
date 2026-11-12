@@ -57,6 +57,13 @@ export { bottom };
 export const [bottomOpen, setBottomOpen] = createSignal(false);
 /** Shows a tab of the bottom panel, opening it. */
 export const setBottom = (k: BottomTab) => { setBottomRaw(k); setBottomOpen(true); window.dispatchEvent(new Event("resize")); };
+/** The Parts panel beside the tree (0.2.12): open while you work; kept for next time. */
+const keepB = (k: string, d: boolean) => { try { const v = localStorage.getItem(k); return v === null ? d : v === "1"; } catch { return d; } };
+export const [partsOpen, setPartsOpenRaw] = createSignal(keepB("dl.parts", true));
+export const setPartsOpen = (v: boolean) => { setPartsOpenRaw(v); try { localStorage.setItem("dl.parts", v ? "1" : "0"); } catch { /* private window */ } window.dispatchEvent(new Event("resize")); };
+/** The parts used last (newest first), shown at the top of the Parts panel. */
+export const [recent, setRecentRaw] = createSignal<string[]>((() => { try { return JSON.parse(localStorage.getItem("dl.recent") ?? "[]"); } catch { return []; } })());
+export const useRecent = (k: string) => { const v = [k, ...recent().filter(x => x !== k)].slice(0, 6); setRecentRaw(v); try { localStorage.setItem("dl.recent", JSON.stringify(v)); } catch { /* private window */ } };
 /** The status bar's slot for the view's hints (after Datum Mesh: hints in the status bar, not over the model). */
 export const [hintSlot, setHintSlot] = createSignal<HTMLElement>();
 
