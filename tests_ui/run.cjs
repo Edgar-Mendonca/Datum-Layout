@@ -226,7 +226,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   // 7h. The Library (0.2.0): classes and parts tables with their sources.
   await open("pumps");
   await p.click('.flow button[data-tool="library"]'); await settle(600);
-  check("the Library lists every pipe class, a New class button and the eight parts tables", (await p.$$('.libx .mlist > button')).length === 17, String((await p.$$('.libx .mlist > button')).length));
+  check("the Library lists every pipe class, a New class button and the nine parts tables", (await p.$$('.libx .mlist > button')).length === 18, String((await p.$$('.libx .mlist > button')).length));
   await p.click('.libx .mlist > button:has-text("CS300")'); await settle(300);
   const lt = await p.textContent(".libpage");
   check("a class page shows its wall by size and allowed components", lt.includes("Class 300") && /½"\s*80/.test(lt) && lt.includes("Gate valve"), lt.slice(0, 300));
@@ -589,6 +589,32 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const ck = (await ask("check")).ok;
   check("placed apart, they do not clash", !ck.some(i => i.kind === "clash"), JSON.stringify(ck.map(i => i.text).slice(0, 3)));
   if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("all-equipment"); }
+
+  // 8g. Steel (0.3.0): two columns, a beam between their tops, a brace; the card changes a section.
+  await open(null); await settle(300);
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  await p.keyboard.press("2"); await settle(400); // plan view: clicks land where they look
+  const g0 = await screenOf([10, 10, 0]), g1 = await screenOf([16, 10, 0]);
+  await p.click('.partsp .cattile[data-kind="steel_column"]'); await settle(150);
+  await p.mouse.click(g0.x, g0.y); await settle(400); await p.mouse.click(g1.x, g1.y); await settle(400);
+  st = await state();
+  check("Column, then two clicks, stands two columns from grade to the working elevation", st.p.steel.length === 2 && st.p.steel.every(m => m.role === "column" && Math.abs(m.a[2]) < 1e-9 && Math.abs(m.b[2] - 3) < 1e-9 && m.section === "HEB 200"), JSON.stringify(st.p.steel.map(m => [m.a, m.b])));
+  await p.keyboard.press("Escape"); await settle(100);
+  await p.click('.partsp .cattile[data-kind="steel_beam"]'); await settle(150);
+  const sb0 = await screenOf([10.3, 10.2, 3]), sb1 = await screenOf([15.7, 9.8, 3]);
+  await p.mouse.click(sb0.x, sb0.y); await settle(250); await p.mouse.click(sb1.x, sb1.y); await settle(500);
+  st = await state();
+  const bm = st.p.steel.find(m => m.role === "beam");
+  check("a beam's ends snap to the column tops", !!bm && Math.hypot(bm.a[0] - 10, bm.a[1] - 10, bm.a[2] - 3) < 1e-6 && Math.hypot(bm.b[0] - 16, bm.b[1] - 10, bm.b[2] - 3) < 1e-6, JSON.stringify(bm));
+  await p.keyboard.press("Escape"); await settle(150);
+  check("the beam's card shows its section, length and weight", (await p.textContent(".insp")).includes("IPE 300") && (await p.textContent(".insp")).includes("kg/m"));
+  await p.selectOption('.insp select:near(:text("Section"))', "IPE 400").catch(async () => { const s = await p.$$(".insp select"); await s[1].selectOption("IPE 400"); }); await settle(400);
+  check("changing the section on the card changes the member", (await state()).p.steel.find(m => m.id === bm.id).section === "IPE 400");
+  check("steel is in the tree and the 3D scene", (await p.textContent(".tree")).includes("BM-1") && (await ask("scene")).ok.parts.filter(q => q.kind === "steel").length === 3);
+  check("with steel on it, the plot is not called empty", !(await p.$(".v3d .empty")));
+  if (shots) { await p.click(".v3d .vhome"); await settle(500); await shot("steel"); }
+  await p.keyboard.press("Delete"); await settle(400);
+  check("Delete removes the selected member", (await state()).p.steel.length === 2);
 
   // 8f. Templates (0.2.14): an item saved as set up, placed again, deleted.
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);

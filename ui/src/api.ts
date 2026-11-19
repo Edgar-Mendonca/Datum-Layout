@@ -24,7 +24,14 @@ export type Flat = "none" | "top" | "bottom";
 export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string; support: SupportKind; flat: Flat }
 export interface Line { id: number; uid: string; number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; radius: "long" | "short"; from: End; to: End; pts: V3[]; items: Item[]; area: number }
 export interface Settings { clearance: number; nps: string; class: string; rating: number }
-export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[] }
+export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[]; steel: Member[] }
+export type MemberRole = "column" | "beam" | "brace";
+export interface Member { id: number; uid: string; tag: string; role: MemberRole; section: string; a: V3; b: V3; roll: number; area: number }
+export interface SteelRow { name: string; family: string; h: number; b: number; tw: number; tf: number; r: number; area: number; source: string }
+/** The steel parts (0.3.0): part key ("steel_" + role), label, icon, default section. */
+export const STEEL: [string, string, string, string][] = [["steel_column", "Column", "scol", "HEB 200"], ["steel_beam", "Beam", "sbeam", "IPE 300"], ["steel_brace", "Brace", "sbrace", "HEA 100"]];
+/** A member's role from its part key. */
+export const roleOf = (k: string) => k.replace(/^steel_/, "") as MemberRole;
 export interface SavedView { name: string; eye: V3; target: V3; colour_by: string; hidden: number[]; isolated: number[] | null; section: [V3, V3] | null }
 export interface ListedLine { number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; from: string; to: string; notes: string; uid: string; components: string[] }
 export interface Issue { kind: "routing" | "clash" | "open" | "mismatch" | "class" | "number" | "list" | "rule"; text: string; at: V3; line: number; item: number; equip: number; line2?: number; item2?: number }
@@ -37,7 +44,7 @@ export interface Scene { pos: string; nor: string; idx: string; parts: PartRef[]
 export interface PipeRow { nps: string; dn: number; od: number; schedule: string; wall: number; source: string }
 export interface BranchRule { header_min?: string | null; header_max?: string | null; branch?: string | null; branch_min?: string | null; branch_max?: string | null; fitting: string }
 export interface PipeClass { branches?: BranchRule[]; name: string; description: string; material: string; ratings: number[]; sizes: string[]; schedules: [string, string][]; elbow: string; components: { kind: string; min: string | null; max: string | null }[]; source: string }
-export interface Catalogue { pipes: PipeRow[]; fittings: any[]; flanges: any[]; valves: any[]; tees: { nps: string; nps_branch: string; c: number; m: number; source: string }[]; reducers: { nps: string; nps_small: string; h: number; source: string }[]; olets: { kind: string; same: boolean; nps_branch: string; height: number; base_od: number; top_od: number; weight_lb: number | null; source: string }[]; weights: WeightRow[]; templates: Template[]; classes: PipeClass[]; packs: string[]; warnings: string[] }
+export interface Catalogue { pipes: PipeRow[]; fittings: any[]; flanges: any[]; valves: any[]; tees: { nps: string; nps_branch: string; c: number; m: number; source: string }[]; reducers: { nps: string; nps_small: string; h: number; source: string }[]; olets: { kind: string; same: boolean; nps_branch: string; height: number; base_od: number; top_od: number; weight_lb: number | null; source: string }[]; weights: WeightRow[]; templates: Template[]; steel: SteelRow[]; classes: PipeClass[]; packs: string[]; warnings: string[] }
 export interface Template { name: string; equip: Equipment; origin: string }
 export interface CatalogueOut { own?: string[]; base?: string[]; cat: Catalogue; fields: [EquipKind, string, [string, string][]][] }
 
@@ -75,6 +82,7 @@ export const PART_GROUPS: { g: string; subs: [string, string[]][] }[] = [
   { g: "Equipment", subs: [["Vessels and tanks", ["vertical_vessel", "horizontal_drum", "tank", "sphere", "filter", "agitated"]], ["Columns and heaters", ["column", "heater"]], ["Pumps and compressors", ["pump", "inline_pump", "compressor", "recip_compressor"]], ["Heat exchangers", ["exchanger", "kettle", "plate_hx", "air_cooler"]], ["Packages", ["package"]]] },
   { g: "Valves", subs: [["Isolation", ["gate", "ball", "butterfly"]], ["Regulating", ["globe"]], ["Non-return", ["check"]], ["Strainers", ["strainer"]]] },
   { g: "Fittings", subs: [["In-line", ["flange_pair", "reducer"]], ["Branches", ["tee", "cross", "weldolet", "sockolet"]], ["Supports", ["support"]]] },
+  { g: "Steel", subs: [["Members", ["steel_column", "steel_beam", "steel_brace"]]] },
 ];
 /** More words each part is found by in the Parts search. */
 export const PART_WORDS: Record<string, string> = {
@@ -84,6 +92,7 @@ export const PART_WORDS: Record<string, string> = {
   inline_pump: "vertical centrifugal rotating machine", compressor: "centrifugal gas rotating machine blower", recip_compressor: "piston gas rotating machine",
   kettle: "reboiler heat exchanger", plate_hx: "gasketed heat exchanger", air_cooler: "fin fan heat exchanger cooler condenser", package: "skid vendor unit dosing injection",
   gate: "isolation block on off valve", ball: "isolation quarter turn valve", butterfly: "isolation quarter turn valve", globe: "regulating throttling control valve", check: "non-return nrv swing valve", strainer: "filter y-strainer",
+  steel_column: "steel structure post upright member", steel_beam: "steel structure girder member", steel_brace: "steel structure diagonal bracing member",
   flange_pair: "flange joint spool break", reducer: "concentric eccentric size change", tee: "branch equal reducing", cross: "branch four-way", weldolet: "branch olet outlet", sockolet: "branch olet outlet small bore", support: "rest guide anchor line stop shoe",
 };
 export const EQUIP: [EquipKind, string, string][] = [

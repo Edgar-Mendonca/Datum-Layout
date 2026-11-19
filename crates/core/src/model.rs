@@ -31,6 +31,20 @@ impl Default for Plot {
     fn default() -> Self { Self { grid: 1.0, e: [0.0, 40.0], n: [0.0, 30.0], north: 0.0, ground: 0.0 } }
 }
 
+/// What a steel member is for: it sets its default section and how it is placed.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum MemberRole { #[default] Column, Beam, Brace }
+
+/// A structural steel member (0.3.0): a rolled section (by name, from the steel table) between
+/// two points; `roll` turns the section about its own axis (degrees).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Member { pub id: u32, pub uid: String, pub tag: String, pub role: MemberRole, pub section: String, pub a: P3, pub b: P3, pub roll: f64, pub area: u32 }
+impl Default for Member {
+    fn default() -> Self { Self { id: 0, uid: String::new(), tag: String::new(), role: MemberRole::Column, section: "HEB 200".into(), a: [0.0; 3], b: [0.0, 0.0, 4.0], roll: 0.0, area: 0 } }
+}
+
 /// An area of the plot (a box), the level below the plant in the hierarchy plant › unit › area.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default)]
@@ -429,10 +443,12 @@ pub struct Project {
     /// The plant's own pipe classes: new ones, or edited copies of the catalogue's (same name: the
     /// plant's wins). They travel with the file.
     pub classes: Vec<crate::catalogue::PipeClass>,
+    /// Structural steel: columns, beams and braces.
+    pub steel: Vec<Member>,
 }
 impl Default for Project {
     fn default() -> Self {
-        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![] }
+        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![], steel: vec![] }
     }
 }
 
@@ -458,7 +474,7 @@ impl Project {
         self.lines.iter().find(|l| l.id == id)
     }
     pub fn max_id(&self) -> u32 {
-        let ids = self.equipment.iter().map(|e| e.id).chain(self.areas.iter().map(|a| a.id)).chain(self.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id))));
+        let ids = self.equipment.iter().map(|e| e.id).chain(self.steel.iter().map(|m| m.id)).chain(self.areas.iter().map(|a| a.id)).chain(self.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id))));
         ids.max().unwrap_or(0)
     }
     /// A fresh id.
@@ -507,6 +523,14 @@ impl Project {
             fresh(&mut a.id, &mut a.uid, &mut seen, &mut w, "An area");
             p3(&mut a.min); p3(&mut a.max);
             for k in 0..3 { if a.max[k] < a.min[k] { std::mem::swap(&mut a.max[k], &mut a.min[k]); } }
+        }
+        self.steel.truncate(100_000);
+        for m in &mut self.steel {
+            fresh(&mut m.id, &mut m.uid, &mut seen, &mut w, &format!("Member {}", m.tag));
+            p3(&mut m.a); p3(&mut m.b);
+            fin(&mut m.roll, -360.0, 360.0, 0.0);
+            if crate::parts::norm(crate::parts::sub(m.b, m.a)) < 0.01 { m.b = [m.a[0], m.a[1], m.a[2] + 1.0]; w.push(format!("Member {} had no length; it was made 1 m tall.", m.tag)); }
+            m.section = m.section.trim().chars().take(40).collect();
         }
         for e in &mut self.equipment {
             fresh(&mut e.id, &mut e.uid, &mut seen, &mut w, &format!("Equipment {}", e.tag));

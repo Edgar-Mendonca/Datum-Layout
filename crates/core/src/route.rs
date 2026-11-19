@@ -226,6 +226,9 @@ fn name(l: &Line) -> String {
 /// Builds every part of the project.
 pub fn build(p: &Project, cat: &Catalogue) -> Built {
     let mut b = Built::default();
+    for m in &p.steel {
+        b.parts.push(Part { kind: "steel", line: 0, equip: 0, item: m.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: crate::steel::shapes(m, cat), length: crate::steel::length(m), corner: None, bolts: None, note: m.section.clone(), insulation: 0.0 });
+    }
     for e in &p.equipment {
         let (body, noz) = equipment::shapes(e, cat);
         b.parts.push(Part { kind: "equipment", line: 0, equip: e.id, item: 0, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: body, length: 0.0, corner: None, bolts: None, note: e.tag.clone(), insulation: 0.0 });

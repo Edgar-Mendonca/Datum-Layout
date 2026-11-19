@@ -1,6 +1,6 @@
 // Commands: what the ribbon, menus, keys and Tell Me run.
 import { SUPPORTS, SupportKind, SavedView, Out, V3, ItemKind, EquipKind, Issue, Lists, inch, NPS } from "./api";
-import { checked, checkStale, colourBy, setColourBy, ColourBy, isolated, hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
+import { setSteelTool, checked, checkStale, colourBy, setColourBy, ColourBy, isolated, hidden, setHidden, setIsolated, section, setSection, scene, picked, setPicked, out, setOut, act, call, sel, setSel, setBackstage, loadOut, toast, project, setMode, setRoute, route, setPlacing, setChecked, setCheckStale, setBottom, selLine, selEquip, setFocus, mode, elev, setElev } from "./store";
 import * as D from "./dialogs";
 import { RouteFrom } from "./store";
 
@@ -201,13 +201,16 @@ export const C = {
     if (s.kind === "nozzle") { const e = selEquip(); if (e) { act({ SetEquipment: { ...e, nozzles: e.nozzles.filter(n => n.tag !== s.tag) } }).then(o => o && setSel({ kind: "equip", id: e.id })); return; } }
     if (s.kind === "run") return toast("A run is part of its line: select the line to delete it, or move the run.");
     if (s.kind === "plot") return;
+    // (A steel member is deleted by its id, as equipment is.)
     act({ Delete: { ids: [s.id] } }).then(o => o && setSel(null));
   },
   rotate: (deg: number) => { const e = selEquip(); if (!e) return toast("Select an equipment item first."); act({ SetEquipment: { ...e, rot: ((e.rot + deg) % 360 + 360) % 360 } }); },
 
   // ---------- piping ----------
   route: () => { setPlacing(null); setRoute({ from: null, start: null, via: [], nps: project()?.settings.nps ?? "6" }); setMode("route"); },
-  cancelTool: () => { setRoute(null); setPlacing(null); setMode("select"); },
+  cancelTool: () => { setRoute(null); setPlacing(null); setSteelTool(null); setMode("select"); },
+  /** Places steel: a column with one click (grade to the working elevation), a beam or brace with two. */
+  steel: (role: "column" | "beam" | "brace") => { setRoute(null); setPlacing(null); setSel(null); setSteelTool({ role, first: null }); setMode("steel"); },
   measure: () => { setRoute(null); setPlacing(null); setMode(mode() === "measure" ? "select" : "measure"); },
   /** Drops a component onto a line near a point: the engine snaps it to the nearest free place. */
   drop: async (line: number, kind: ItemKind, at: V3, support?: SupportKind) => {

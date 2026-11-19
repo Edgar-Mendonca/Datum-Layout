@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { STEEL, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, openDialog, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help, helpCard } from "./help";
@@ -39,23 +39,23 @@ const freeSpot = (kind: string): V3 => {
 export const PartsPanel = () => {
   const [q, setQ] = createSignal("");
   const templates = () => (catalogue()?.cat.templates ?? []).filter(t => { const w = q().trim().toLowerCase(); return !w || `${t.name} ${t.equip.kind.replace("_", " ")} template`.toLowerCase().includes(w); });
-  const all = (): [string, string, string, "equip" | "item"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"])];
+  const all = (): [string, string, string, "equip" | "item" | "steel"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"]), ...STEEL.map(([k, l, i]) => [k, l, i, "steel"] as [string, string, string, "steel"])];
   const part = (k: string) => all().find(x => x[0] === k);
   const words = (k: string, g = "", sub = "") => `${part(k)?.[1] ?? k} ${PART_WORDS[k] ?? ""} ${g} ${sub}`.toLowerCase();
   const has = (k: string, g = "", sub = "") => { const t = q().trim().toLowerCase(); return !t || t.split(/\s+/).every(w => words(k, g, sub).includes(w)); };
   const use = (k: string) => {
     const x = part(k); if (!x) return; useRecent(k);
-    if (x[3] === "equip") C.place(k as EquipKind); else C.dropOnSelected(k as ItemKind);
+    if (x[3] === "equip") C.place(k as EquipKind); else if (x[3] === "steel") C.steel(roleOf(k)); else C.dropOnSelected(k as ItemKind);
   };
   const Tile = (t: { k: string }) => {
     const x = () => part(t.k)!;
     const lib = () => LIB_PAGE[t.k];
     return <Show when={part(t.k)}>
-      <button class="cattile" data-kind={t.k} draggable="true" onDragStart={e => { useRecent(t.k); dragStart(x()[3], t.k)(e); }} onDragEnd={() => { (window as any).__drag = undefined; }}
+      <button class="cattile" data-kind={t.k} draggable="true" onDragStart={e => { useRecent(t.k); dragStart(x()[3] as "item" | "equip", t.k)(e); }} onDragEnd={() => { (window as any).__drag = undefined; }}
         onClick={() => use(t.k)} onDblClick={() => { if (x()[3] === "equip" && project()) { C.cancelTool(); act({ AddEquipment: { kind: t.k, pos: freeSpot(t.k) } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[0] })); } }}
-        title={x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
+        title={x()[3] === "steel" ? `${x()[1]}: click, then click the plot (${x()[0] === "steel_column" ? "one click a column, grade to the working elevation" : "its two ends; they snap to member ends"}); or drag it in` : x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
         <Icon n={x()[2]} size={22} /><span>{x()[1].replace(/ \(.*\)$/, "")}</span>
-        <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
+        <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (x()[3] === "steel") import("./library").then(k => k.library("steel")); else if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
       </button></Show>;
   };
   const addPack = async () => { const w = await call<string[] | null>("add_pack"); if (w) { refetchCatalogue(); toast(w.length ? `Pack added with ${w.length} warning(s): ${w[0]}` : "Pack added to the catalogue.", !w.length); } };
@@ -184,6 +184,27 @@ const EquipInsp = (p: { e: Equipment }) => {
   </>);
 };
 
+/** A steel member's card (0.3.0): section, ends, roll; its length and weight. */
+const SteelInsp = (p: { m: Member }) => {
+  const set = (m: Partial<Member>) => act({ SetMember: { ...p.m, ...m } });
+  const rows = () => catalogue()?.cat.steel ?? [];
+  const row = () => rows().find(r => r.name === p.m.section);
+  const len = () => Math.hypot(p.m.b[0] - p.m.a[0], p.m.b[1] - p.m.a[1], p.m.b[2] - p.m.a[2]);
+  return (<>
+    <Row l="Tag"><input value={p.m.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
+    <Row l="Kind"><select onChange={e => set({ role: e.currentTarget.value as MemberRole })}><For each={STEEL}>{([k, l]) => <option value={roleOf(k)} selected={p.m.role === roleOf(k)}>{l}</option>}</For></select></Row>
+    <Row l="Section" h="steel"><select onChange={e => set({ section: e.currentTarget.value })}>
+      <For each={[...new Set(rows().map(r => r.family))]}>{f => <optgroup label={f}><For each={rows().filter(r => r.family === f)}>{r => <option value={r.name} selected={r.name === p.m.section}>{r.name}</option>}</For></optgroup>}</For>
+    </select></Row>
+    <Row l="Turned about its axis"><select onChange={e => set({ roll: +e.currentTarget.value })}><option value="0" selected={Math.abs(p.m.roll) < 1}>0° (web upright)</option><option value="90" selected={Math.abs(p.m.roll - 90) < 1}>90° (on its side)</option></select></Row>
+    <h4>Ends</h4>
+    <Row l="Start (E, N, EL)"><V3In v={p.m.a} set={v => set({ a: v })} /></Row>
+    <Row l="End (E, N, EL)"><V3In v={p.m.b} set={v => set({ b: v })} /></Row>
+    <p class="muted iwhat">Length {fmt("len", len())}{row() ? ` · ${(row()!.area * 7850).toFixed(1)} kg/m · ${fmt("mass", row()!.area * 7850 * len())}` : ""}{row() ? ` · depth ${fmt("dim", row()!.h)}, width ${fmt("dim", row()!.b)}` : ""}</p>
+    <p class="ibtns"><button class="btn sm" onClick={() => act({ Delete: { ids: [p.m.id] } }).then(o => o && setSel(null))}>Delete</button></p>
+  </>);
+};
+
 const LineInsp = (p: { l: Line }) => {
   const set = (l: Partial<Line>) => act({ SetLine: { ...p.l, ...l } });
   const len = () => (out()?.paths.find(x => x[0] === p.l.id)?.[1] ?? []).reduce((s, q, i, a) => i ? s + Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1], q[2] - a[i - 1][2]) : 0, 0);
@@ -275,7 +296,7 @@ const AreaInsp = (p: { id: number }) => {
 };
 
 export const Inspector = () => {
-  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
+  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "steel") { const m = project()?.steel?.find(x => x.id === s.id); return m ? `${m.tag} · ${m.section}` : "Member"; } if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
   return (
     <aside class="insp">
       <header><b>{title()}</b><Help k="inspector" /><button class="x" title="Close (Esc)" onClick={() => { setSel(null); setPicked([]); }}>×</button></header>
@@ -291,6 +312,7 @@ export const Inspector = () => {
           <Show when={(sel()?.kind === "line" || sel()?.kind === "run" || sel()?.kind === "corner") && selLine()} keyed>{l => <LineInsp l={l} />}</Show>
           <Show when={sel()?.kind === "item" && selLine()} keyed>{l => <ItemInsp l={l} id={(sel() as any).id} />}</Show>
           <Show when={sel()?.kind === "area"}><AreaInsp id={(sel() as any).id} /></Show>
+          <Show when={sel()?.kind === "steel" && project()?.steel?.find(m => m.id === (sel() as any).id)} keyed>{m => <SteelInsp m={m} />}</Show>
           <Show when={!sel() || sel()!.kind === "plot"}><PlotInsp /></Show>
         </Show>
       </div>

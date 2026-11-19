@@ -4,6 +4,7 @@
 // right button), the context bar under the ribbon (the settings used most, whatever the tab) and
 // the tool strip beside the tree (the open tab's most used tools). Nothing here calculates: every
 // fact comes from the engine's output.
+import { STEEL } from "./api";
 import { For, Show, JSX, createSignal, createEffect } from "solid-js";
 import { partsOpen, setPartsOpen, project, out, sel, setSel, picked, setPicked, tab, setTab, mode, checked, checkStale, hidden, setHidden, isolated, setIsolated, colourBy, setColourBy, ColourBy, section, setBottom, openMenu, act, elev, setElev, setBackstage, setFocus, setOpts, opts } from "./store";
 import { C } from "./cmds";
@@ -160,7 +161,7 @@ export const Tree = () => {
   const listIssues = () => (out()?.issues ?? []).filter(i => i.kind === "list");
   // An empty plant opens on the catalogue; the first item placed brings the plant tree back.
   let wasEmpty = false;
-  createEffect(() => { const e = !!p() && !p()!.equipment.length && !p()!.lines.length; if (e && !wasEmpty) setPartsOpen(true); wasEmpty = e; });
+  createEffect(() => { const e = !!p() && !p()!.equipment.length && !p()!.lines.length && !p()!.steel?.length; if (e && !wasEmpty) setPartsOpen(true); wasEmpty = e; });
   return (
     <aside class="tree">
       <div class="ttabs" role="tablist"><button role="tab" class="on">Plant</button><Help k="tree" /></div>
@@ -178,6 +179,8 @@ export const Tree = () => {
               <For each={pp().equipment}>{e => <details class="tsub"><summary><Leaf id={e.id} kind="equip" icon={EQ_ICON[e.kind] ?? "vvessel"} label={e.tag} sub={EQ_NAME[e.kind]} bad={issuesOf(e.id)[0]?.text} /></summary>
                 <For each={e.nozzles}>{n => { const l = pp().lines.find(x => (x.from.kind === "nozzle" && x.from.equip === e.id && x.from.nozzle === n.tag) || (x.to.kind === "nozzle" && x.to.equip === e.id && x.to.nozzle === n.tag)); return <Row2 icon="flange" label={`${n.tag}${n.service ? ` · ${n.service}` : ""}`} sub={`${inch(n.nps)} · ${l ? l.number : "free"}`} dim={!l} on={sel()?.kind === "nozzle" && (sel() as { id: number; tag: string }).id === e.id && (sel() as { tag: string }).tag === n.tag} run={() => { setPicked([]); setSel({ kind: "nozzle", id: e.id, tag: n.tag }); }} />; }}</For>
               </details>}</For>
+            <Show when={pp().steel?.length}><Branch t="Steel" icon="scol" n={pp().steel.length} help="steel" eye={pp().steel.map(m => m.id)}>
+              <For each={pp().steel}>{m => <Row2 icon={STEEL.find(x => x[0] === `steel_${m.role}`)?.[2] ?? "scol"} label={m.tag} sub={m.section} on={sel()?.kind === "steel" && (sel() as { id: number }).id === m.id} run={() => { setPicked([]); setSel({ kind: "steel", id: m.id }); }} />}</For></Branch></Show>
           </Step>
           <Step n={3} f={fs()[2]} count={pp().lines.length || undefined} eye={pp().lines.map(l => l.id)} add={() => C.route()}>
             <Show when={!pp().lines.length}><button class="ti ghost" onClick={() => C.route()}><Ic n="new" /><span>Route a line (R)</span></button></Show>

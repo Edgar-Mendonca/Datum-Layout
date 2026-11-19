@@ -839,3 +839,29 @@ fn templates_place_an_item_as_it_was_set_up() {
     cat.add_templates("My templates", &serde_json::to_string(&serde_json::json!([{ "name": "Bad", "equip": bad }])).unwrap());
     assert!(cat.templates.iter().all(|t| t.name != "Bad") && cat.warnings.iter().any(|w| w.contains("Bad")));
 }
+
+#[test]
+fn steel_members_are_added_changed_moved_and_deleted() {
+    use crate::model::MemberRole;
+    let cat = Catalogue::builtin();
+    let mut d = Doc::new(Project::new());
+    let c = d.apply(Op::AddMember { role: MemberRole::Column, section: "heb200".into(), a: [0.0, 0.0, 0.0], b: [0.0, 0.0, 5.0] }, &cat).unwrap()[0];
+    let m = d.p.steel.iter().find(|m| m.id == c).unwrap().clone();
+    assert_eq!((m.tag.as_str(), m.section.as_str()), ("COL-1", "HEB 200"), "the section's name as the table writes it");
+    assert!(d.apply(Op::AddMember { role: MemberRole::Beam, section: "W 12x26".into(), a: [0.0; 3], b: [5.0, 0.0, 0.0] }, &cat).unwrap_err().contains("not in the steel table"));
+    assert!(d.apply(Op::AddMember { role: MemberRole::Beam, section: "IPE 300".into(), a: [0.0; 3], b: [0.01, 0.0, 0.0] }, &cat).is_err());
+    d.apply(Op::SetMember(crate::model::Member { section: "HEB 300".into(), roll: 90.0, ..m.clone() }), &cat).unwrap();
+    assert_eq!(d.p.steel[0].section, "HEB 300");
+    // Moved with a group, and drawn in the scene; steel is not a clash with itself.
+    d.apply(Op::MoveGroup { ids: vec![c], delta: [2.0, 3.0, 0.0] }, &cat).unwrap();
+    assert_eq!(d.p.steel[0].a, [2.0, 3.0, 0.0]);
+    d.apply(Op::AddMember { role: MemberRole::Beam, section: "IPE 300".into(), a: [2.0, 3.0, 5.0], b: [8.0, 3.0, 5.0] }, &cat).unwrap();
+    let b = build(&d.p, &cat);
+    assert_eq!(of(&b, "steel").len(), 2);
+    assert!(crate::checks::clashes(&d.p, &b).is_empty());
+    // Kept in the file; deleted by id.
+    let back: Project = serde_json::from_str(&serde_json::to_string(&d.p).unwrap()).unwrap();
+    assert_eq!(back.steel, d.p.steel);
+    d.apply(Op::Delete { ids: vec![c] }, &cat).unwrap();
+    assert_eq!(d.p.steel.len(), 1);
+}

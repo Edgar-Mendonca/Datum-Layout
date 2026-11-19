@@ -73,7 +73,7 @@
     {
       "v": "0.2",
       "title": "Pipe classes and fittings",
-      "when": "Next",
+      "when": "Done",
       "items": [
         "The Library: every pipe class and parts table, browsable, with its source (0.2.0)",
         "From the P&ID: read a plant package, place its equipment, route its lines with their components in order, and check the 3D model against it (0.2.1)",
@@ -97,46 +97,70 @@
     {
       "v": "0.3",
       "title": "Steel",
-      "when": "Soon",
+      "when": "Now",
       "items": [
-        "Pipe racks, platforms, ladders and stairs as parametric steel",
-        "Supports standing on the steel, and their loads from Datum Pipe"
+        "Steel sections and members: columns, beams and braces in IPE, HEA and HEB (0.3.0)",
+        "Pipe racks as one object, with lines on their tiers",
+        "Supports standing on the steel",
+        "Platforms and ladders on vessels and columns",
+        "Free-standing platforms, stairs and an access check",
+        "Steel in the take-off and the clash check"
       ]
     },
     {
       "v": "0.4",
-      "title": "Drawings and quantities",
-      "when": "Later",
+      "title": "Routing",
+      "when": "Next",
       "items": [
-        "Plot plan and general arrangement drawings with dimensions",
-        "Full material take-off",
-        "IFC export"
+        "Sloped lines",
+        "Route Again that avoids clashes",
+        "Auto-route between two nozzles, along racks",
+        "Nozzles moved and turned in 3D",
+        "Line spacing on racks"
       ]
     },
     {
       "v": "0.5",
-      "title": "From Schema",
+      "title": "Catalogue",
       "when": "Later",
       "items": [
-        "Datum Schema exports the plant package that Layout already reads",
-        "Round trips with Schema's examples; changes on the P&ID shown in the layout"
+        "More valve weights",
+        "Spectacle blinds, spades and spacers",
+        "Control and relief valves",
+        "In-line instruments",
+        "Small-bore fittings"
       ]
     },
     {
       "v": "0.6",
-      "title": "CAD exchange",
+      "title": "Drawings",
       "when": "Later",
       "items": [
-        "An optional engine downloaded on first use: STEP import of vendor equipment models as catalogue parts, STEP export of the model"
+        "Plot plan",
+        "General arrangement drawings with dimensions",
+        "Title blocks and revisions",
+        "Nozzle orientation drawings",
+        "Take-off report and DXF"
       ]
     },
     {
       "v": "0.7",
-      "title": "Big models and teams",
+      "title": "Exchange",
+      "when": "Later",
+      "items": [
+        "STEP import of vendor equipment",
+        "IFC export",
+        "More equipment detail"
+      ]
+    },
+    {
+      "v": "0.8",
+      "title": "Big plants and teams",
       "when": "Later",
       "items": [
         "Thousands of lines with levels of detail and areas loaded on demand",
-        "A project database with history; several users with claimed areas"
+        "A project database with history",
+        "Several users with claimed areas"
       ]
     },
     {

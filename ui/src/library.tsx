@@ -48,6 +48,7 @@ export const library = (start?: string) => openDialog(() => {
       { k: "olets", label: "Branch outlets", group: "Parts tables", sub: `${k.olets.length} rows` },
       { k: "valves", label: "Valves and strainers", group: "Parts tables", sub: `${k.valves.length} rows` },
       { k: "weights", label: "Weights", group: "Parts tables", sub: `${k.weights.length} rows` },
+      { k: "steel", label: "Steel sections", group: "Parts tables", sub: `${k.steel.length} sections` },
     ];
   });
   const shownPages = () => { const t = q().toLowerCase(); return pages().filter(x => !t || `${x.label} ${x.sub ?? ""} ${x.group}`.toLowerCase().includes(t) || !x.k.startsWith("class:")); };
@@ -105,6 +106,9 @@ export const library = (start?: string) => openDialog(() => {
           <Show when={!editing() && page() === "valves"}>
             <h3>Valves and strainers <small class="muted">face to face, flanged, by size and class</small></h3>
             <Tbl head={["Type", "Size", "Class", "Face to face", "Source"]} right={[3]} rows={[...(cat()?.valves ?? [])].sort((a: any, b: any) => a.kind.localeCompare(b.kind) || a.rating - b.rating || byNps(a, b)).filter((r: any) => has(r.kind, VALVE[r.kind] ?? "", r.nps, inch(r.nps), r.rating)).map((r: any) => [VALVE[r.kind] ?? r.kind, inch(r.nps), String(r.rating), mm(r.f2f), <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
+          <Show when={!editing() && page() === "steel"}>
+            <h3>Steel sections <small class="muted">rolled I and H sections: depth, width, web, flange, root radius, area and mass per metre</small></h3>
+            <Tbl head={["Section", "Depth", "Width", "Web", "Flange", "Root radius", "Area", "Mass", "Source"]} right={[1, 2, 3, 4, 5, 6, 7]} rows={(cat()?.steel ?? []).filter(r => has(r.name, r.family)).map(r => [r.name, mm(r.h), mm(r.b), mm(r.tw), mm(r.tf), mm(r.r), `${(r.area * 1e4).toFixed(1)} cm²`, `${(r.area * 7850).toFixed(1)} kg/m`, <small class="muted src" title={r.source}>{r.source}</small>])} /></Show>
           <Show when={!editing() && page() === "weights"}>
             <h3>Weights <small class="muted">fittings by wall (STD, XS), flanges and valves by class; pipe is weighed from its diameter and wall</small></h3>
             <p class="small muted">A schedule whose wall is neither STD nor XS is scaled by its wall from the nearer of the two (marked ≈ in the take-off). Weights are the makers' approximate figures: check them with your supplier.</p>

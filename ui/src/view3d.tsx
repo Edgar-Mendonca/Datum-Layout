@@ -8,8 +8,8 @@ import { onMount, onCleanup, createEffect, on, Show, For, createSignal } from "s
 import { Portal } from "solid-js/web";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line } from "./api";
-import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection, hintSlot, checked, checkStale } from "./store";
+import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line, STEEL, Out, roleOf } from "./api";
+import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection, hintSlot, checked, checkStale, steelTool, setSteelTool } from "./store";
 import { C, setFit, setStdView, setCamHook, finishRoute, branchSize } from "./cmds";
 import { fmt, toU, fromU, unit } from "./units";
 
@@ -19,7 +19,7 @@ const E = (v: THREE.Vector3): V3 => [v.x, -v.z, v.y];
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
 
 const COLOURS: Record<string, string> = {
-  equipment: "#A7B3BF", nozzle: "#8B97A4", pipe: "#4F6F8F", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
+  equipment: "#A7B3BF", nozzle: "#8B97A4", pipe: "#4F6F8F", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", steel: "#9E8C5C", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
   flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", butterfly: "#B8742A", strainer: "#9C6B3A", support: "#7C8B5A",
 };
 const SELECTED = new THREE.Color("#2F8CFF"), PROBLEM = new THREE.Color("#D64545");
@@ -54,7 +54,7 @@ export const View3D = () => {
   const [legend, setLegend] = createSignal<[string, string][]>([]);
   const [legendFolded, setLegendFolded] = createSignal(false);
   /** Whether a part is drawn (hidden and isolated items are not). */
-  const shown = (q: PartRef) => { const id = q.line || q.equip, iso = isolated(); return iso ? iso.includes(id) : !hidden().includes(id); };
+  const shown = (q: PartRef) => { const id = q.line || q.equip || (q.kind === "steel" ? q.item : 0), iso = isolated(); return iso ? iso.includes(id) : !hidden().includes(id); };
   // The section box: six clipping planes (three.js axes: plant east = x, north = −z, up = y).
   const clip = [0, 1, 2, 3, 4, 5].map(() => new THREE.Plane());
   const boxHelper = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color("#2F8CFF"));
@@ -180,8 +180,10 @@ export const View3D = () => {
   /** Which parts the selection covers. */
   const selected = (q: PartRef) => {
     const g = picked();
-    if (g.length) return g.includes(q.equip) || g.includes(q.line);
+    if (g.length) return g.includes(q.equip) || g.includes(q.line) || (q.kind === "steel" && g.includes(q.item));
     const s = sel(); if (!s) return false;
+    if (s.kind === "steel") return q.kind === "steel" && q.item === s.id;
+    if (q.kind === "steel") return false;
     if (s.kind === "equip") return q.equip === s.id;
     if (s.kind === "nozzle") return q.equip === s.id && q.kind === "nozzle";
     if (s.kind === "line") return q.line === s.id;
@@ -613,6 +615,7 @@ export const View3D = () => {
       setMeasure(m.length >= 2 ? [q] : [...m, q]);
       return;
     }
+    if (mode() === "steel") { steelClick(e); return; }
     if (mode() === "place") { const k = placing(); const p = onPlane(e, project()?.plot.ground ?? 0); if (k && p) { const s = project()?.plot.grid ?? 1; act({ AddEquipment: { kind: k, pos: [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0] } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[0] }); }); } setMode("select"); setPlacing(null); return; }
     if (corners.children.length) {
       ray.setFromCamera(ndc(e), camera);
@@ -623,13 +626,34 @@ export const View3D = () => {
     if (!hit) { setSel(null); setPicked([]); return; }
     const [q] = hit;
     // Ctrl+click builds a group of equipment and lines.
-    if (e.ctrlKey || e.metaKey) { C.pick(q.line || q.equip); return; }
+    if (e.ctrlKey || e.metaKey) { C.pick(q.line || q.equip || (q.kind === "steel" ? q.item : 0)); return; }
     setPicked([]);
-    if (q.line === 0) setSel(q.kind === "nozzle" && e.altKey ? { kind: "equip", id: q.equip } : { kind: "equip", id: q.equip });
+    if (q.kind === "steel") setSel({ kind: "steel", id: q.item });
+    else if (q.line === 0) setSel(q.kind === "nozzle" && e.altKey ? { kind: "equip", id: q.equip } : { kind: "equip", id: q.equip });
     else if (q.item) setSel({ kind: "item", id: q.item, line: q.line });
     else if (q.kind === "pipe" && (sel()?.kind === "line" || sel()?.kind === "run" || sel()?.kind === "corner") && (sel() as { id: number }).id === q.line) setSel({ kind: "run", id: q.line, seg: q.seg });
     else if (q.kind === "pipe" && e.shiftKey) setSel({ kind: "run", id: q.line, seg: q.seg });
     else setSel({ kind: "line", id: q.line });
+  };
+  /** A point for steel: on the working elevation (or grade), drawn to the nearest member end within 0.6 m in plan. */
+  const steelPoint = (e: MouseEvent, z: number): V3 | null => {
+    const g = project()?.plot.grid ?? 1;
+    const p = onPlane(e, z); if (!p) return null;
+    let best: V3 | null = null, bd = 0.6;
+    for (const m of project()?.steel ?? []) for (const q of [m.a, m.b]) { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = [q[0], q[1], z]; } }
+    return best ?? [snap(p[0], g / 2), snap(p[1], g / 2), z];
+  };
+  const steelClick = (e: MouseEvent) => {
+    const t = steelTool(); const p = project(); if (!t || !p) return;
+    const grade = p.plot.ground, top = Math.max(elev(), grade + 1);
+    const section = STEEL.find(x => x[0] === `steel_${t.role}`)![3];
+    const done = (o: Out | null) => { if (o?.created.length) { setSel({ kind: "steel", id: o.created[o.created.length - 1] }); } };
+    if (t.role === "column") { const q = steelPoint(e, grade); if (q) act({ AddMember: { role: "column", section, a: q, b: [q[0], q[1], top] } }).then(done); return; }
+    // A beam lies at the working elevation; a brace runs from grade to it.
+    const q = steelPoint(e, t.first ? top : t.role === "brace" ? grade : top); if (!q) return;
+    if (!t.first) { setSteelTool({ ...t, first: q }); return; }
+    act({ AddMember: { role: t.role, section, a: t.first, b: q } }).then(done);
+    setSteelTool({ ...t, first: null });
   };
   const routeClick = (e: MouseEvent) => {
     const r = route() ?? { from: null, start: null, via: [], nps: project()?.settings.nps ?? "6" };
@@ -727,6 +751,7 @@ export const View3D = () => {
       const p = onPlane(e, project()?.plot.ground ?? 0); if (!p) return;
       const s = project()?.plot.grid ?? 1;
       const pos: V3 = [snap(p[0], s / 2), snap(p[1], s / 2), project()?.plot.ground ?? 0];
+      if ((d.type as string) === "steel") { C.steel(roleOf(d.kind)); steelClick(e); return; }
       const tm = (d as { template?: object }).template;
       act(tm ? { AddFromTemplate: { equip: tm, pos } } : { AddEquipment: { kind: d.kind, pos } }).then(o => { if (o?.created.length) setSel({ kind: "equip", id: o.created[o.created.length - 1] }); });
     }
@@ -810,7 +835,7 @@ export const View3D = () => {
           <Show when={cubeZone()}>{z => <polygon class="zone" points={z().pts}><title>{z().name}</title></polygon>}</Show>
         </svg>
       </div>
-      <Show when={p() && !p()!.equipment.length && !p()!.lines.length && mode() === "select"}>
+      <Show when={p() && !p()!.equipment.length && !p()!.lines.length && !p()!.steel?.length && mode() === "select"}>
         <div class="empty"><b>An empty plot</b><span>Drag equipment from the catalogue on the left onto the plot, or choose it on the Equipment tab. Then route lines between nozzles with Piping › Route Line.</span>
           <span class="ibtns"><button class="btn" onClick={() => C.place("vertical_vessel")}>Place a vessel</button><button class="btn" onClick={() => C.newProject("pumps")}>Open an example</button></span></div>
       </Show>
@@ -818,6 +843,7 @@ export const View3D = () => {
       <Show when={dragInfo2()}><div class="toolhint">{dragInfo2()}<span class="muted"> · Shift: finer · Esc puts it back</span></div></Show>
       <Show when={mode() === "route"}><div class="toolhint">{route()?.start ? "Click to add a corner (orthogonal to the last point) · click a nozzle to end there · double-click or right-click to end at a free point · Esc to cancel" : "Click a nozzle, a tee's branch end or a point on the plot to start the line"}<span class="muted"> · Elevation {fmt("coord", elev())} · Shift: use the working elevation</span></div></Show>
       <Show when={mode() === "measure"}><div class="toolhint">{measure().length === 2 ? (() => { const [a, b] = measure(); const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; return <span><b>{fmt("len", Math.hypot(d[0], d[1], d[2]))}</b> · ΔE {fmt("len", d[0])} · ΔN {fmt("len", d[1])} · ΔEL {fmt("len", d[2])} · horizontal {fmt("len", Math.hypot(d[0], d[1]))}</span>; })() : measure().length === 1 ? "Click the second point" : "Measure: click a point on a part or on the plot"}<span class="muted"> · Esc to finish</span></div></Show>
+      <Show when={mode() === "steel" && steelTool()}>{t => <div class="toolhint">{t().role === "column" ? `Click where each column stands: from grade to the working elevation (${fmt("coord", elev())})` : t().first ? `Click the ${t().role}'s other end (at ${fmt("coord", elev())}); it snaps to member ends` : t().role === "brace" ? "Click the brace's foot at grade (it snaps to a column)" : `Click the beam's first end at the working elevation (${fmt("coord", elev())}); it snaps to column tops`}<span class="muted"> · Esc to stop</span></div>}</Show>
       <Show when={mode() === "place"}><div class="toolhint">Click on the plot to place the {placing()?.replace("_", " ")} · Esc to cancel</div></Show>
       <Show when={!dragInfo2() && (sel()?.kind === "equip" || picked().length > 0) && mode() === "select"}><div class="toolhint sub">Drag it across the plot (or its arrows) · arrow keys nudge it a grid step · right-click to turn or type a position</div></Show>
       <Show when={selLine() && sel()?.kind === "line"}><div class="toolhint sub">Click a straight run to move it · click an amber corner dot to move the corner · Piping › Add Jog steps a run over an obstacle · drag components from the catalogue onto the pipe</div></Show>

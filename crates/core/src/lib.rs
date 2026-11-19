@@ -18,6 +18,7 @@ pub mod parts;
 pub mod pcf;
 pub mod route;
 pub mod scene;
+pub mod steel;
 pub mod units;
 #[cfg(test)]
 mod geometry_tests;

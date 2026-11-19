@@ -76,6 +76,10 @@ pub enum Op {
     SetEccentric { line: u32, item: u32, flat: Flat },
     /// The plant's saved views (replaces the list).
     SetViews(Vec<SavedView>),
+    /// A new steel member from `a` to `b` (a section from the steel table), with the next free tag.
+    AddMember { role: crate::model::MemberRole, section: String, a: P3, b: P3 },
+    /// Changes a member (its section, ends, roll or tag).
+    SetMember(crate::model::Member),
     /// A new equipment item made from a template (its type, sizes, nozzles and datasheet), with
     /// the next free tag, its base at `pos`.
     AddFromTemplate { equip: Equipment, pos: P3 },
@@ -219,7 +223,12 @@ fn group(p: &mut Project, ids: &[u32], pt: impl Fn(P3) -> P3, dir: impl Fn(P3) -
         for it in &mut l.items { it.dir = dir(it.dir); }
         any = true;
     }
-    if !any { return Err("Select equipment or lines first.".into()); }
+    for m in p.steel.iter_mut().filter(|m| set.contains(&m.id)) {
+        m.a = pt(m.a);
+        m.b = pt(m.b);
+        any = true;
+    }
+    if !any { return Err("Select equipment, lines or steel first.".into()); }
     Ok(())
 }
 
@@ -451,6 +460,24 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             e.pos = pos;
             created.push(e.id);
             p.equipment.push(e);
+        }
+        Op::AddMember { role, section, a, b } => {
+            if crate::parts::norm(sub(b, a)) < 0.05 { return Err("A member needs two ends at least 50 mm apart.".into()); }
+            if cat.steel_section(&section).is_none() { return Err(format!("{section} is not in the steel table.")); }
+            let pre = match role { crate::model::MemberRole::Column => "COL", crate::model::MemberRole::Beam => "BM", crate::model::MemberRole::Brace => "BR" };
+            let mut k = p.steel.iter().filter(|m| m.tag.starts_with(pre)).count() + 1;
+            while p.steel.iter().any(|m| m.tag == format!("{pre}-{k}")) { k += 1; }
+            let id = p.id();
+            p.steel.push(crate::model::Member { id, tag: format!("{pre}-{k}"), role, section: cat.steel_section(&section).map(|s| s.name.clone()).unwrap_or(section), a, b, ..Default::default() });
+            created.push(id);
+        }
+        Op::SetMember(m) => {
+            if m.tag.trim().is_empty() { return Err("A member needs a tag (for example COL-1).".into()); }
+            if p.steel.iter().any(|x| x.id != m.id && x.tag == m.tag) { return Err(format!("{} is already used by another member.", m.tag)); }
+            if crate::parts::norm(sub(m.b, m.a)) < 0.05 { return Err("A member needs two ends at least 50 mm apart.".into()); }
+            if cat.steel_section(&m.section).is_none() { return Err(format!("{} is not in the steel table.", m.section)); }
+            let x = p.steel.iter_mut().find(|x| x.id == m.id).ok_or("That member no longer exists.")?;
+            *x = crate::model::Member { section: cat.steel_section(&m.section).map(|s| s.name.clone()).unwrap_or(m.section.clone()), ..m };
         }
         Op::AddFromTemplate { equip, pos } => {
             let mut e = equip;
@@ -845,6 +872,7 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
                 l.items.retain(|i| !ids.contains(&i.id));
             }
             p.equipment.retain(|e| !ids.contains(&e.id));
+            p.steel.retain(|m| !ids.contains(&m.id));
             p.lines.retain(|l| !ids.contains(&l.id));
             p.areas.retain(|a| !ids.contains(&a.id));
             for e in &mut p.equipment { if ids.contains(&e.area) { e.area = 0; } }

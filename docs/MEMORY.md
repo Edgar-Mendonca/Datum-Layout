@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.2.14 (2026-11-12) |
+| **Current version** | 0.3.0 (2026-11-19) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -49,6 +49,7 @@ Coordinates: metres, X east, Y north, Z up, in the engine, the file and PCF; the
 | `ui/src/view3d.tsx` | The 3D view: plot (ground, grid, coordinates, plant north), areas, parts from one buffer with colours per part, picking, selection colours, labels, ports and the route preview, snap marker while dragging, axis arrows (gizmo), standard views and fit, the orbit speed check |
 | `catalogue/tees_reducing.csv`, `reducers.csv`, `olets.csv`, `weights.csv` | Researched tables (Texas Flange, Bonney Forge, Wermac) with sources on every row |
 | `ui/src/classedit.tsx` | The pipe class editor inside the Library (draft in a Solid store; saved with `Op::SetClass`) |
+| `crates/core/src/steel.rs`, `catalogue/steel.csv` | Steel members: frame, shapes (web and flanges), length and weight; the sections table |
 | `crates/core/src/package.rs`, `docs/formats/` | The plant package (P&ID → layout): read, import (place/update equipment, list lines), route listed lines; the format document and a worked example |
 | `ui/src/library.tsx` | The Library: pipe classes and parts tables with sources |
 | `ui/src/shell.tsx` | The workspace after Datum Mesh: steps bar (`Flow`), plant tree (`Tree`: steps, branches, counts, marks, eyes, filter, menus), context bar (`CtxBar`), tool strip (`ToolStrip`), pane grips and the properties card |
@@ -140,6 +141,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.13 | New equipment is parametric like the first six (shapes from a few sizes, typical nozzles editable), checked by the engine test that every nozzle face is outside the body and faces out; DEXPI classes used: Vessel, Filter, Furnace, CentrifugalPump, CentrifugalCompressor, ReciprocatingCompressor, TubularHeatExchanger, PlateHeatExchanger, AirCooledHeatExchanger, CustomEquipment (package) | Generated, never downloaded; nozzles always routable |
 | 0.2.13 | The Parts panel's Recent row has a fixed height (three parts): a click that updated it moved the list, so a double-click's second click folded a group | Nothing moves under the pointer |
 | 0.2.14 | Templates are app-level, not in the plant file: `templates.json` beside `options.json` (the shell reads it into the catalogue at load; `save_template`/`delete_template` rewrite it and reload). Teams share them through packs (`templates/*.json`). Placing goes through `Op::AddFromTemplate`, which validates nozzles via `SetEquipment` | A template is reused across plants; one op keeps undo simple |
+| 0.3.0 | Steel members (`model::Member`: role, section by name, two ends, roll) drawn as web and two flanges from `steel.csv` (56 IPE/HEA/HEB rows copied from Datum Mesh's table, each row's area checked against its dimensions); a sloping or level member stands web-up, a vertical one has its web east. Steel is left out of the clash check until 0.3.5 (beams meet columns; pipes will rest on beams) | Family copy, sourced; clashes need the rules of 0.3.2 first |
+| 0.3.0 | The plan after 0.2.14: `docs/PLAN-0.3-ON.md` (steel, routing, catalogue, drawings, exchange; three-part version numbers, one checked step at a time) | Agreed with the user 2026-11-19 |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -176,11 +179,13 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.13 | Eleven more equipment types (`EquipKind` Sphere, Filter, Agitated, Heater, InlinePump, Compressor, RecipCompressor, Kettle, PlateHx, AirCooler, Package): shapes, typical nozzles, datasheets, DEXPI classes, prefixes; package `kind_of` words; Equipment ribbon from `PART_GROUPS`; free-spot placing by size; Recent fixed at one row | ✅ |
 | 0.2.14 | Equipment templates: `catalogue::Template`, `Catalogue::add_templates` (user's `templates.json` beside the options; packs' `templates/*.json`), `Op::AddFromTemplate` (new id and tag, nozzles checked as an edit); Save as a template… on the card; Parts › My templates (click, drag, delete) | ✅ |
 | 0.2 Pipe classes and fittings | Sloped lines (the class editor shipped in 0.2.10) | 🔜 |
-| 0.3 Steel | Racks, platforms, ladders, stairs; supports standing on steel (pipe supports themselves came in 0.2.2) | ⬜ |
-| 0.4 Drawings and quantities | Plot plan and GA drawings; full take-off; IFC | ⬜ |
-| 0.5 From Schema | Schema's own export of the package (brief written); round trip with Schema's examples | ⬜ |
-| 0.6 CAD exchange | Optional engine on first use; STEP import and export | ⬜ |
-| 0.7 Big models and teams | Level of detail, areas on demand, project database with history, several users | ⬜ |
+| 0.3.0 | Steel sections (`steel.csv`, 56 IPE/HEA/HEB rows from Datum Mesh, area checked) and members (`model::Member`, `Op::AddMember`/`SetMember`, `steel.rs` shapes, build parts "steel", Parts › Steel and the steel tool, member card, tree, Library page) | ✅ |
+| 0.3.x Steel | 0.3.0 sections and members ✅; 0.3.1 racks; 0.3.2 supports on steel; 0.3.3 platforms and ladders on vessels; 0.3.4 free platforms, stairs, access check; 0.3.5 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | 🔜 |
+| 0.4.x Routing | Sloped lines; Route Again avoiding clashes; auto-route; nozzles moved in 3D; rack spacing | ⬜ |
+| 0.5.x Catalogue gaps | Valve/cap/gasket/bolt weights; spectacle blinds; control and relief valves; instruments; small bore | ⬜ |
+| 0.6.x Drawings | Plot plan; GA with dimensions; title blocks; nozzle orientations; take-off report and DXF | ⬜ |
+| 0.7.x Exchange | STEP import; IFC export; equipment detail | ⬜ |
+| 0.8.x Big plants and teams | Areas on demand, history, several users; From Schema alongside | ⬜ |
 | Parked | Datum Library: the shared data repo for every app's tables (see Decisions, 2026-11-08) | 💭 |
 | 1.0 | Catalogue validated against its sources, user guide, signed installer | ⬜ |
 
@@ -241,6 +246,10 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - 2026-11-12: the user found the library small and hard to reach; agreed plan 0.2.12 Parts panel, 0.2.13 more equipment, 0.2.14 the user's own templates.
 - 0.2.12 Parts panel, 0.2.13 eleven equipment types, 0.2.14 templates, shipped as agreed (the user checks next morning).
 - Disk filled once (target 25 GB): build with `CARGO_INCREMENTAL=0`; Mesh's target removed.
+
+### 2026-11-19: Session 6 (0.3.0)
+- Full checks on 0.2.14 (49 engine, 157 UI, licences, Datum Pipe 21/21); a comparison with the established tools for the user; the plan `docs/PLAN-0.3-ON.md` agreed.
+- 0.3.0: steel sections and members (column, beam, brace): Parts › Steel, the steel tool in the view (snaps to member ends), the member card, the tree, the Library page.
 
 ## 5. Known limits
 

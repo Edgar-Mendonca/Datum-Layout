@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.3.0 — 2026-11-19
+Steel, first step: sections and members. The start of the 0.3 series (racks, platforms, ladders and stairs follow, one step at a time; the plan is in `docs/PLAN-0.3-ON.md`).
+
+- **Steel sections:** a table of 56 rolled I and H sections (IPE, HEA, HEB), each row with its source, and its area checked against its own dimensions. The Library shows them under **Steel sections**, with mass per metre.
+- **Columns, beams and braces** from Parts › Steel:
+  - **Column:** one click per column; it stands from grade to the working elevation on the bar.
+  - **Beam:** two clicks at the working elevation; each end snaps to a nearby column top.
+  - **Brace:** its foot at grade, then its top.
+  - Esc stops; drag a member in from the panel as well.
+- **The member card:** tag, kind, section (from the table), turn (web upright or on its side), both ends, and the length, mass per metre and weight. Delete removes it.
+- **In the plant:** members are listed under Steel in the tree (with the eye to hide them), drawn as their real section in the 3D view and in the glTF export, and move with a group.
+- **Not yet:** steel is left out of the clash check until supports can stand on it (0.3.2, 0.3.5), because beams meet columns and pipes will rest on beams.
+
 ## 0.2.14 — 2026-11-12
 Your own equipment templates.
 

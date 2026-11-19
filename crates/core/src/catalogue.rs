@@ -69,6 +69,10 @@ pub const LB: f64 = 0.453_592_37;
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ValveRow { pub kind: String, pub rating: u32, pub nps: String, pub f2f: f64, pub source: String }
 
+/// A rolled steel section (m; area m²): depth h, width b, web tw, flange tf, root radius r.
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct SteelRow { pub name: String, pub family: String, pub h: f64, pub b: f64, pub tw: f64, pub tf: f64, pub r: f64, pub area: f64, pub source: String }
+
 /// One component a class allows, with the sizes it is allowed in.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default)]
@@ -138,6 +142,7 @@ pub struct Catalogue {
     pub weights: Vec<WeightRow>,
     pub classes: Vec<PipeClass>,
     pub templates: Vec<Template>,
+    pub steel: Vec<SteelRow>,
     pub packs: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -198,6 +203,7 @@ impl Catalogue {
         c.add_table("reducers.csv", include_str!("../../../catalogue/reducers.csv"));
         c.add_table("olets.csv", include_str!("../../../catalogue/olets.csv"));
         c.add_table("weights.csv", include_str!("../../../catalogue/weights.csv"));
+        c.add_table("steel.csv", include_str!("../../../catalogue/steel.csv"));
         c.add_class("classes/CS1.json", include_str!("../../../catalogue/classes/CS1.json"));
         c.add_class("classes/CS150.json", include_str!("../../../catalogue/classes/CS150.json"));
         c.add_class("classes/CS300.json", include_str!("../../../catalogue/classes/CS300.json"));
@@ -304,7 +310,19 @@ impl Catalogue {
                     _ => bad(w, i, "the kind, size or weight is not valid"),
                 }
             },
-            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing, reducers, olets or weights .csv).")),
+            "steel.csv" => for (i, r) in table(name, text, &["family", "size", "h_mm", "b_mm", "tw_mm", "tf_mm", "area_cm2", "source"], w).into_iter().enumerate() {
+                let fam = r["family"].trim().to_uppercase();
+                match (fam.is_empty() || fam.len() > 12, f(&r, "h_mm"), f(&r, "b_mm"), f(&r, "tw_mm"), f(&r, "tf_mm"), f(&r, "area_cm2")) {
+                    (false, Some(h), Some(b), Some(tw), Some(tf), Some(a)) if 2.0 * tf < h && tw < b => {
+                        let mm = 1e-3;
+                        let row = SteelRow { name: format!("{fam} {}", r["size"].trim()), family: fam, h: h * mm, b: b * mm, tw: tw * mm, tf: tf * mm, r: f(&r, "r_mm").unwrap_or(0.0) * mm, area: a * 1e-4, source: r["source"].clone() };
+                        self.steel.retain(|x| x.name != row.name);
+                        self.steel.push(row);
+                    }
+                    _ => bad(w, i, "the family or a dimension is not valid"),
+                }
+            },
+            _ => w.push(format!("{name}: not a catalogue table Datum Layout knows (pipe, fittings, flanges, valves, tees_reducing, reducers, olets, weights or steel .csv).")),
         }
     }
 
@@ -389,6 +407,12 @@ impl Catalogue {
             if let Some(b) = &r.branch { if b != "same" && !size_ok(b) { return Err(format!("Class {name}, branch rule {}: {b} is not a pipe size.", i + 1)); } }
         }
         Ok(())
+    }
+    /// A steel section by its name ("HEB 200"; case and spacing do not matter).
+    pub fn steel_section(&self, name: &str) -> Option<&SteelRow> {
+        let k = |s: &str| s.split_whitespace().collect::<String>().to_uppercase();
+        let n = k(name);
+        self.steel.iter().find(|s| k(&s.name) == n)
     }
     pub fn class(&self, name: &str) -> Option<&PipeClass> {
         self.classes.iter().find(|c| c.name == name)
