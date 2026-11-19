@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.3.0 (2026-11-19) |
+| **Current version** | 0.3.1 (2026-11-19) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -143,6 +143,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.14 | Templates are app-level, not in the plant file: `templates.json` beside `options.json` (the shell reads it into the catalogue at load; `save_template`/`delete_template` rewrite it and reload). Teams share them through packs (`templates/*.json`). Placing goes through `Op::AddFromTemplate`, which validates nozzles via `SetEquipment` | A template is reused across plants; one op keeps undo simple |
 | 0.3.0 | Steel members (`model::Member`: role, section by name, two ends, roll) drawn as web and two flanges from `steel.csv` (56 IPE/HEA/HEB rows copied from Datum Mesh's table, each row's area checked against its dimensions); a sloping or level member stands web-up, a vertical one has its web east. Steel is left out of the clash check until 0.3.5 (beams meet columns; pipes will rest on beams) | Family copy, sourced; clashes need the rules of 0.3.2 first |
 | 0.3.0 | The plan after 0.2.14: `docs/PLAN-0.3-ON.md` (steel, routing, catalogue, drawings, exchange; three-part version numbers, one checked step at a time) | Agreed with the user 2026-11-19 |
+| 0.3.1 | The look after Datum Pipe 0.7.3: RoomEnvironment through PMREM (`scene.environment`, intensity 0.65), NeutralToneMapping, a sky light and a key light on the camera; two finishes as draw groups over the one merged mesh (painted equipment and nozzles; steel for the rest), vertex colours kept for colour-by and selection; outlines by an inverted hull pushed out in clip space (Pipe's shader), edges at 35° rebuilt with what is shown; zoom to the pointer; 28 segments round (40 at high detail). Over 600 parts no outlines, edges or room light (`data-outlined` 0) | Copied from the family; large plants keep their speed |
+| 0.3.1 | The look comes before racks: the user judged the 3D objects poor next to Pipe's; steel steps renumbered (racks 0.3.5) | Agreed 2026-11-19 |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -180,7 +182,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.2.14 | Equipment templates: `catalogue::Template`, `Catalogue::add_templates` (user's `templates.json` beside the options; packs' `templates/*.json`), `Op::AddFromTemplate` (new id and tag, nozzles checked as an edit); Save as a template… on the card; Parts › My templates (click, drag, delete) | ✅ |
 | 0.2 Pipe classes and fittings | Sloped lines (the class editor shipped in 0.2.10) | 🔜 |
 | 0.3.0 | Steel sections (`steel.csv`, 56 IPE/HEA/HEB rows from Datum Mesh, area checked) and members (`model::Member`, `Op::AddMember`/`SetMember`, `steel.rs` shapes, build parts "steel", Parts › Steel and the steel tool, member card, tree, Library page) | ✅ |
-| 0.3.x Steel | 0.3.0 sections and members ✅; 0.3.1 racks; 0.3.2 supports on steel; 0.3.3 platforms and ladders on vessels; 0.3.4 free platforms, stairs, access check; 0.3.5 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | 🔜 |
+| 0.3.1 | Light and lines (after Pipe 0.7.3): room light, tone mapping, painted and steel finishes, outlines, edges, zoom to the pointer, 28 segments; plain drawing over 600 parts | ✅ |
+| 0.3.x The look, and steel | 0.3.0 sections and members ✅; 0.3.1 light and lines ✅; 0.3.2 fittings, 0.3.3 equipment, 0.3.4 steel and supports as built; 0.3.5 racks; 0.3.6 supports on steel; 0.3.7 platforms and ladders; 0.3.8 stairs and access; 0.3.9 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | 🔜 |
 | 0.4.x Routing | Sloped lines; Route Again avoiding clashes; auto-route; nozzles moved in 3D; rack spacing | ⬜ |
 | 0.5.x Catalogue gaps | Valve/cap/gasket/bolt weights; spectacle blinds; control and relief valves; instruments; small bore | ⬜ |
 | 0.6.x Drawings | Plot plan; GA with dimensions; title blocks; nozzle orientations; take-off report and DXF | ⬜ |
@@ -250,6 +253,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 ### 2026-11-19: Session 6 (0.3.0)
 - Full checks on 0.2.14 (49 engine, 157 UI, licences, Datum Pipe 21/21); a comparison with the established tools for the user; the plan `docs/PLAN-0.3-ON.md` agreed.
 - 0.3.0: steel sections and members (column, beam, brace): Parts › Steel, the steel tool in the view (snaps to member ends), the member card, the tree, the Library page.
+
+- 0.3.1: light and lines from Datum Pipe 0.7.3 (room light, finishes, outlines, edges, zoom to the pointer, smoother curves); before/after close-ups compared.
 
 ## 5. Known limits
 

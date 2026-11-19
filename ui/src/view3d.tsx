@@ -8,6 +8,7 @@ import { onMount, onCleanup, createEffect, on, Show, For, createSignal } from "s
 import { Portal } from "solid-js/web";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { V3, f32, u32, PartRef, PortRef, Scene, inch, ITEMS, invoke, NPS, Line, STEEL, Out, roleOf } from "./api";
 import { scene, project, out, sel, setSel, opts, themeTick, mode, setMode, route, setRoute, elev, act, toast, focus, setFocus, openMenu, selLine, placing, setPlacing, loaded, measure, setMeasure, picked, setPicked, colourBy, hidden, isolated, section, setSection, hintSlot, checked, checkStale, steelTool, setSteelTool } from "./store";
 import { C, setFit, setStdView, setCamHook, finishRoute, branchSize } from "./cmds";
@@ -19,7 +20,7 @@ const E = (v: THREE.Vector3): V3 => [v.x, -v.z, v.y];
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
 
 const COLOURS: Record<string, string> = {
-  equipment: "#A7B3BF", nozzle: "#8B97A4", pipe: "#4F6F8F", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", steel: "#9E8C5C", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
+  equipment: "#A3AEB9", nozzle: "#8F9BA8", pipe: "#7F8C99", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", steel: "#9E8C5C", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
   flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", butterfly: "#B8742A", strainer: "#9C6B3A", support: "#7C8B5A",
 };
 const SELECTED = new THREE.Color("#2F8CFF"), PROBLEM = new THREE.Color("#D64545");
@@ -47,9 +48,31 @@ export const View3D = () => {
   sc.add(world);
   const plotG = new THREE.Group(), partsG = new THREE.Group(), toolG = new THREE.Group();
   world.add(plotG, partsG, toolG);
-  sc.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(30, 60, 20); sc.add(sun);
-  const sun2 = new THREE.DirectionalLight(0xffffff, 0.5); sun2.position.set(-30, 20, -40); sc.add(sun2);
+  // The look (0.3.1, after Datum Pipe 0.7.3): a soft room's light reflected by the steel, a low sky
+  // light and a key light from over the viewer's shoulder; tone mapping so colours read true.
+  const sky = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.55);
+  sc.add(sky);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-2, 4, 3);
+  camera.add(sun); sc.add(camera);
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  let roomLight: THREE.Texture | null = null;
+  /** Outlines: each solid drawn again from behind, pushed out about a pixel and a half on screen,
+   *  in the ink colour (Datum Pipe's way of drawing a part's edges). */
+  const px = { value: new THREE.Vector2(0.002, 0.003) };
+  const outlineMat = (color: string) => {
+    const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), side: THREE.BackSide, clippingPlanes: clip });
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uPx = px;
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform vec2 uPx;").replace("#include <project_vertex>", `#include <project_vertex>
+  vec2 dn = (projectionMatrix * modelViewMatrix * vec4(normal, 0.0)).xy;
+  if (length(dn) > 1e-6) gl_Position.xy += normalize(dn) * uPx * gl_Position.w;`);
+    };
+    return m;
+  };
+  /** Over this many parts, outlines, edges and the room's reflections are left off (they cost the most and show least from far off). */
+  const BIG = 600;
+  let outlineMesh: THREE.Mesh | null = null, edgeLines: THREE.LineSegments | null = null;
+  const isDark = () => document.documentElement.dataset.theme === "dark";
   let mesh: THREE.Mesh | null = null, insMesh: THREE.Mesh | null = null, colours: Float32Array | null = null, sceneData: Scene | null = null, idx0: Uint32Array | null = null;
   const [legend, setLegend] = createSignal<[string, string][]>([]);
   const [legendFolded, setLegendFolded] = createSignal(false);
@@ -89,7 +112,7 @@ export const View3D = () => {
     for (let x = Math.ceil(e[0] / step) * step; x <= e[1] + 1e-9; x += step) (Math.abs(x / maj - Math.round(x / maj)) < 1e-6 ? major : minor).push(x, n[0], g, x, n[1], g);
     for (let y = Math.ceil(n[0] / step) * step; y <= n[1] + 1e-9; y += step) (Math.abs(y / maj - Math.round(y / maj)) < 1e-6 ? major : minor).push(e[0], y, g, e[1], y, g);
     const lines = (a: number[], c: string, o: number) => { const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(a, 3)); plotG.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: new THREE.Color(c), transparent: true, opacity: o }))); };
-    lines(minor, css("--line"), 0.7); lines(major, css("--line3"), 0.9);
+    lines(minor, css("--line"), 0.45); lines(major, css("--line3"), 0.6);
     // Plant north arrow at the plot's north-west corner.
     const sz = Math.max(1.5, Math.min(e[1] - e[0], n[1] - n[0]) * 0.06);
     const shape = new THREE.Shape(); shape.moveTo(0, sz); shape.lineTo(sz * 0.38, -sz * 0.5); shape.lineTo(0, -sz * 0.22); shape.lineTo(-sz * 0.38, -sz * 0.5); shape.closePath();
@@ -107,7 +130,7 @@ export const View3D = () => {
     for (const a of p.areas) {
       const box = new THREE.Box3(new THREE.Vector3(...a.min), new THREE.Vector3(...a.max));
       const h = new THREE.Box3Helper(box, new THREE.Color(sel()?.kind === "area" && sel()!.id === a.id ? "#2F8CFF" : css("--blue")));
-      (h.material as THREE.LineBasicMaterial).transparent = true; (h.material as THREE.LineBasicMaterial).opacity = 0.6;
+      (h.material as THREE.LineBasicMaterial).transparent = true; (h.material as THREE.LineBasicMaterial).opacity = 0.35;
       plotG.add(h);
       tag(`area${a.id}`, [a.min[0], a.max[1], a.max[2]], a.name, "nlabel area");
     }
@@ -161,8 +184,32 @@ export const View3D = () => {
       for (let t = q.t0 * 3; t < q.t1 * 3; t++) { const v = idx[t]; colours[v * 3] = c.r; colours[v * 3 + 1] = c.g; colours[v * 3 + 2] = c.b; } }
     base = colours.slice();
     idx0 = idx.slice();
-    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.25, roughness: 0.55, clippingPlanes: clip, clipShadows: true }));
+    // Two finishes: painted equipment, and steel (pipe, fittings, flanges, valves, members). Each
+    // part's triangles are one run of the index, so runs of the same finish become draw groups.
+    const painted = (k: string) => k === "equipment" || k === "nozzle";
+    const big = s.parts.length > BIG;
+    let run: { start: number; n: number; m: number } | null = null;
+    for (const q of [...s.parts].sort((a, b) => a.t0 - b.t0)) {
+      const m = painted(q.kind) ? 0 : 1;
+      if (q.t1 <= q.t0) continue;
+      if (run && run.m === m && run.start + run.n === q.t0 * 3) run.n += (q.t1 - q.t0) * 3;
+      else { if (run) geo.addGroup(run.start, run.n, run.m); run = { start: q.t0 * 3, n: (q.t1 - q.t0) * 3, m }; }
+    }
+    if (run) geo.addGroup(run.start, run.n, run.m);
+    const mats = [
+      new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.1, roughness: 0.7, envMapIntensity: 0.45, clippingPlanes: clip, clipShadows: true }),
+      new THREE.MeshStandardMaterial({ vertexColors: true, metalness: big ? 0.3 : 0.55, roughness: 0.4, clippingPlanes: clip, clipShadows: true }),
+    ];
+    mesh = new THREE.Mesh(geo, mats);
     partsG.add(mesh);
+    sc.environment = big ? null : roomLight;
+    // The outline and the edges where pieces meet, on all but large plants.
+    outlineMesh = null; edgeLines = null;
+    if (!big) {
+      outlineMesh = new THREE.Mesh(geo, outlineMat(isDark() ? "#05080C" : "#3B4652"));
+      outlineMesh.raycast = () => {};
+      partsG.add(outlineMesh);
+    }
     if (s.ins_idx.length > 4) {
       const ig = new THREE.BufferGeometry();
       ig.setAttribute("position", new THREE.BufferAttribute(f32(s.ins_pos), 3)); ig.setAttribute("normal", new THREE.BufferAttribute(f32(s.ins_nor), 3)); ig.setIndex(new THREE.BufferAttribute(u32(s.ins_idx), 1));
@@ -174,6 +221,7 @@ export const View3D = () => {
     applySection();
     paintSelection();
     buildLabels();
+    host.dataset.outlined = String(outlineMesh ? s.parts.length : 0);
     buildPorts();
   };
 
@@ -227,6 +275,13 @@ export const View3D = () => {
     if (!all) for (const q of sceneData.parts) if (!shown(q)) { const v = idx0[q.t0 * 3]; idx.fill(v, q.t0 * 3, q.t1 * 3); }
     mesh.geometry.index!.needsUpdate = true;
     if (insMesh) insMesh.visible = all;
+    if (outlineMesh) {
+      if (edgeLines) { partsG.remove(edgeLines); edgeLines.geometry.dispose(); }
+      const eg = new THREE.EdgesGeometry(mesh.geometry, 35);
+      edgeLines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: new THREE.Color(isDark() ? "#000000" : "#2B3440"), transparent: true, opacity: 0.45, clippingPlanes: clip }));
+      edgeLines.raycast = () => {};
+      partsG.add(edgeLines);
+    }
     if (redraw) { buildLabels(); buildGizmo(); draw(); }
   };
   const applySection = () => {
@@ -764,6 +819,8 @@ export const View3D = () => {
     controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = false;
     controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+    controls.zoomToCursor = true;
+    { const pm = new THREE.PMREMGenerator(renderer); roomLight = pm.fromScene(new RoomEnvironment(), 0.04, 0.1, 100, { size: 64 }).texture; pm.dispose(); sc.environmentIntensity = 0.65; if (mesh && (sceneData?.parts.length ?? 0) <= BIG) sc.environment = roomLight; }
     controls.addEventListener("change", draw);
     const resize = () => { const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); draw(); };
     const ro = new ResizeObserver(resize); ro.observe(host); resize();
@@ -801,7 +858,7 @@ export const View3D = () => {
 
   let firstScene = true;
   createEffect(on(scene, () => { buildParts(); if (firstScene && scene()) { firstScene = false; fit(); } }, { defer: true }));
-  createEffect(on(() => [project()?.plot, project()?.areas, themeTick(), sel()?.kind === "area" ? sel() : null], () => { liveTags = new Set([...liveTags].filter(k => k.startsWith("eq") || k.startsWith("ln"))); buildPlot(); buildLabels(); draw(); }, { defer: true }));
+  createEffect(on(() => [project()?.plot, project()?.areas, themeTick(), sel()?.kind === "area" ? sel() : null], () => { liveTags = new Set([...liveTags].filter(k => k.startsWith("eq") || k.startsWith("ln"))); buildPlot(); buildLabels(); if (outlineMesh) (outlineMesh.material as THREE.MeshBasicMaterial).color.set(isDark() ? "#05080C" : "#3B4652"); if (edgeLines) (edgeLines.material as THREE.LineBasicMaterial).color.set(isDark() ? "#000000" : "#2B3440"); draw(); }, { defer: true }));
   createEffect(on([sel, picked], paintSelection, { defer: true }));
   createEffect(on(colourBy, () => buildParts(), { defer: true }));
   createEffect(on([hidden, isolated], () => applyShown(), { defer: true }));

@@ -5,16 +5,24 @@ tools and chose to close the gaps in small numbered steps, built and checked one
 Order agreed: steel, routing, catalogue, drawings, exchange; then big plants and validation.
 A real job tried on the user's Windows PC runs alongside; whatever it finds goes first.
 
-## 0.3.x Steel
+## 0.3.x Steel, and first the look
+
+On 2026-11-19 the user found the 3D objects poor next to Datum Pipe's (its 0.7.3–0.7.5 made the
+model look as built). The look comes first, copied from Pipe and Mesh into Layout's own code (in
+the engine where it is geometry, so glTF gets it too); the steel steps move up by four.
 
 | Step | What |
 | --- | --- |
 | 0.3.0 | Steel sections table (IPE, HEA, HEB; sourced, area checked) and single members: column, beam, brace |
-| 0.3.1 | Pipe rack as one object (bents, spacing, tiers, width); lines snap to tier elevations |
-| 0.3.2 | Supports stand on steel; Check reports a support with nothing under it |
-| 0.3.3 | Platforms and ladders on vessels and columns |
-| 0.3.4 | Free-standing platforms and stairs; access check (valves reachable from grade or a platform) |
-| 0.3.5 | Steel in the take-off with weights; clashes with steel; steel in glTF |
+| 0.3.1 | Light and lines: room light and tone mapping, painted and steel finishes, outlines and edges, zoom to the pointer, smoother curves, plainer large plants |
+| 0.3.2 | Fittings as they look: flanges with bolts, nuts and hubs; recognisable valve bodies with handwheels or levers; shaped reducers, tees and olets; weld beads |
+| 0.3.3 | Equipment as built: 2:1 heads, skirts and base rings, saddles, flanged nozzles; a pump with baseplate, volute, coupling guard and motor; the rest of the 17 types |
+| 0.3.4 | Steel and supports as built: members from their section outline with end plates; shoes, guides, stops and anchors |
+| 0.3.5 | Pipe rack as one object (bents, spacing, tiers, width); lines snap to tier elevations |
+| 0.3.6 | Supports stand on steel; Check reports a support with nothing under it |
+| 0.3.7 | Platforms and ladders on vessels and columns |
+| 0.3.8 | Free-standing platforms and stairs; access check (valves reachable from grade or a platform) |
+| 0.3.9 | Steel in the take-off with weights; clashes with steel |
 
 ## 0.4.x Routing
 

@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.3.1 — 2026-11-19
+A better 3D model, part 1: the light and the lines (after Datum Pipe).
+
+- **Light.** The plant is lit as in a room: soft reflections that show a pipe's roundness, a key light from over your shoulder and a low sky light, with colours that read true.
+- **Two finishes.** Equipment is painted (matt); pipe, fittings, flanges, valves and steel are steel (with a soft sheen).
+- **Outlines.** Every solid has a thin dark outline, and a fine line marks the edges where pieces meet, as drawings show them.
+- **Smoother curves.** Pipes and bends have 28 sides instead of 18, so they stay round close up.
+- **Zoom to the pointer.** The mouse wheel zooms towards the pointer, as CAD programs do.
+- **A quieter plot.** The grid and area boxes are fainter, so the model stands out.
+- **Large plants** (over 600 parts) are drawn without outlines, edges or reflections, so they stay quick.
+
+Next: fittings, equipment, and steel and supports drawn as they are built (0.3.2 to 0.3.4). The steel steps that follow are renumbered (racks are now 0.3.5); the plan is in `docs/PLAN-0.3-ON.md`.
+
 ## 0.3.0 — 2026-11-19
 Steel, first step: sections and members. The start of the 0.3 series (racks, platforms, ladders and stairs follow, one step at a time; the plan is in `docs/PLAN-0.3-ON.md`).
 

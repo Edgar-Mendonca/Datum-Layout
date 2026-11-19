@@ -96,14 +96,15 @@
     },
     {
       "v": "0.3",
-      "title": "Steel",
+      "title": "The look, and steel",
       "when": "Now",
       "items": [
         "Steel sections and members: columns, beams and braces in IPE, HEA and HEB (0.3.0)",
+        "Light and lines: room light, outlines and edges, smoother curves, zoom to the pointer (0.3.1)",
+        "Fittings, equipment, steel and supports drawn as they are built",
         "Pipe racks as one object, with lines on their tiers",
         "Supports standing on the steel",
-        "Platforms and ladders on vessels and columns",
-        "Free-standing platforms, stairs and an access check",
+        "Platforms, ladders and stairs, and an access check",
         "Steel in the take-off and the clash check"
       ]
     },

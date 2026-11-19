@@ -73,7 +73,7 @@ pub const LARGE: usize = 1500;
 
 /// Segments round a circle for a level of detail (0 low, 1 normal, 2 high).
 pub fn segments(lod: u32) -> usize {
-    match lod { 0 => 10, 2 => 28, _ => 18 }
+    match lod { 0 => 10, 2 => 40, _ => 28 }
 }
 
 /// The mesh of every part, one after another; returns the mesh and each part's triangle range.

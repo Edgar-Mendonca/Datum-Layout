@@ -567,6 +567,9 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
   check("valves and flanges go to Datum Pipe with their weight", /VALVE\n(?:    .*\n)*?    WEIGHT \d/.test((await ask("export_pcf", {})).ok));
 
+  // 8b2. The look (0.3.1): room light, outlines and edges on a normal plant.
+  check("a plant is drawn with outlines round its parts (0.3.1)", +(await p.$eval(".v3d", el => el.dataset.outlined ?? "0")) > 0);
+
   // 8c. The first look (0.3.0): a plant just opened, the bottom panel folded, nothing selected.
   if (await p.$(".console.open")) { await p.click(".console .cchev"); await settle(200); }
   check("the chevron folds the bottom panel", !(await p.$(".console.open")));
@@ -724,6 +727,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await settle(4000);
   const perf = await p.evaluate(() => window.__orbit(60));
   console.log(`     orbit: ${perf.triangles} triangles, mean ${perf.mean.toFixed(1)} ms, worst ${perf.worst.toFixed(1)} ms a frame`);
+  check("a large plant is drawn plainly (no outlines), to stay quick", (await p.$eval(".v3d", el => el.dataset.outlined ?? "x")) === "0");
   check("a 2,000-component plant is drawn and orbits quickly", perf.triangles > 100000 && perf.mean < 250, JSON.stringify(perf));
 
   // 12. Help: every card, the getting started page and the glossary; no product names anywhere.
