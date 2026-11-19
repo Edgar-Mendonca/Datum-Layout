@@ -164,6 +164,15 @@
       ]
     },
     {
+      "v": "Alongside",
+      "title": "From Schema",
+      "when": "With Datum Schema",
+      "items": [
+        "Datum Schema exports the plant package that Layout already reads",
+        "Round trips with Schema's examples; changes on the P&ID shown in the layout"
+      ]
+    },
+    {
       "v": "1.0",
       "title": "Validated",
       "when": "Goal",

@@ -69,7 +69,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("the update card names Datum Layout", (await p.textContent(".card .brand")).includes("Datum Layout"));
   seen.push(await allText());
   for (const k of ["Export", "Options", "Roadmap", "Updates"]) { await p.click(`.bs aside button:has-text("${k}")`); await settle(150); seen.push(await allText()); }
-  check("File › Roadmap lists the next release and From Schema", seen[seen.length - 2].includes("Pipe classes and fittings") && seen[seen.length - 2].includes("From Schema"));
+  check("File › Roadmap lists the current series (Steel), what follows, and From Schema", seen[seen.length - 2].includes("Steel") && seen[seen.length - 2].includes("Routing") && seen[seen.length - 2].includes("From Schema"));
 
   // 2. An empty plot: grid coordinates and plant north, an empty state that offers the first action.
   await open(null);
