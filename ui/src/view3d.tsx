@@ -21,7 +21,7 @@ const css = (v: string) => getComputedStyle(document.documentElement).getPropert
 
 const COLOURS: Record<string, string> = {
   equipment: "#A3AEB9", nozzle: "#8F9BA8", pipe: "#7F8C99", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", steel: "#9E8C5C", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
-  flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", butterfly: "#B8742A", strainer: "#9C6B3A", support: "#7C8B5A",
+  flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", bolts: "#3E454D", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", butterfly: "#B8742A", strainer: "#9C6B3A", support: "#7C8B5A",
 };
 const SELECTED = new THREE.Color("#2F8CFF"), PROBLEM = new THREE.Color("#D64545");
 /** Colours for "colour by": distinct, readable on light and dark, none close to the selection blue or the problem red. */

@@ -101,7 +101,8 @@
       "items": [
         "Steel sections and members: columns, beams and braces in IPE, HEA and HEB (0.3.0)",
         "Light and lines: room light, outlines and edges, smoother curves, zoom to the pointer (0.3.1)",
-        "Fittings, equipment, steel and supports drawn as they are built",
+        "Fittings drawn as they are built: flanges with bolts and nuts, valves with handwheels and levers, weld beads (0.3.2)",
+        "Equipment, steel and supports drawn as they are built",
         "Pipe racks as one object, with lines on their tiers",
         "Supports standing on the steel",
         "Platforms, ladders and stairs, and an access check",

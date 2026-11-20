@@ -62,11 +62,16 @@ fn every_generated_part_matches_its_table() {
         let fl = cat.flange(nps, 150).unwrap();
         for q in of(&b, "flange") {
             assert!((dist(q.ports[0].p, q.ports[1].p) - fl.wn_length).abs() < 1e-9);
-            let Shape::Frustum { r1, .. } = q.shapes[0] else { panic!() };
+            // Raised face, then the plate at the table's outside diameter.
+            let Shape::Frustum { r1, .. } = q.shapes[1] else { panic!() };
             assert!((2.0 * r1 - fl.od).abs() < 1e-12);
+            let Shape::Frustum { r1: rf, .. } = q.shapes[0] else { panic!() };
+            assert!(rf < r1);
         }
         assert_eq!(of(&b, "gasket").len(), 2);
         assert_eq!(of(&b, "bolts")[0].bolts.unwrap().0, fl.bolts);
+        // Drawn: a stud and two nuts for each bolt.
+        assert_eq!(of(&b, "bolts")[0].shapes.len(), 3 * fl.bolts as usize);
         if k > 0 {
             let r = of(&b, "reducer")[0];
             let big = NPS[k];

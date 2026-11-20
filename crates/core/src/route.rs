@@ -74,7 +74,7 @@ pub struct Built {
 }
 
 /// Where a size's dimensions are missing from the catalogue, these stand in (and are reported).
-struct Dimens { od: f64, elbow: f64, tee: f64, red: f64, cap: f64, fl_od: f64, fl_t: f64, fl_y: f64, gasket: f64, bolts: (u32, f64), blind_t: f64 }
+struct Dimens { od: f64, elbow: f64, tee: f64, red: f64, cap: f64, fl_od: f64, fl_t: f64, fl_y: f64, gasket: f64, bolts: (u32, f64), blind_t: f64, fl_rf: f64 }
 
 fn dimens(cat: &Catalogue, nps: &str, class: &str, rating: u32, radius: Radius) -> Dimens {
     let od = cat.pipe(nps, class).map(|p| p.od).unwrap_or_else(|| cat.od(nps));
@@ -94,6 +94,7 @@ fn dimens(cat: &Catalogue, nps: &str, class: &str, rating: u32, radius: Radius) 
         fl_y: fl.map(|f| f.wn_length).unwrap_or(od * 0.5),
         gasket: fl.map(|f| f.gasket).unwrap_or(0.003),
         bolts: fl.map(|f| (f.bolts, f.bolt)).unwrap_or((4, 0.016)),
+        fl_rf: fl.map(|f| f.raised_face).unwrap_or(od * 1.3),
     }
 }
 
@@ -239,7 +240,17 @@ pub fn build(p: &Project, cat: &Catalogue) -> Built {
     for l in &p.lines {
         line(p, cat, l, &mut b);
     }
+    for q in b.parts.iter_mut().filter(|q| matches!(q.kind, "elbow90" | "elbow45" | "tee" | "cross" | "reducer" | "cap" | "flange" | "weldolet")) {
+        let beads: Vec<Shape> = q.ports.iter().filter(|pt| pt.end == "BW").map(|pt| bead(pt.p, pt.d, cat.od(&pt.nps))).collect();
+        q.shapes.extend(beads);
+    }
     b
+}
+
+/// A weld bead: a thin ring round a pipe's end (drawing only).
+fn bead(p: P3, d: P3, od: f64) -> Shape {
+    let (u, _) = frame(d);
+    Shape::Torus { centre: p, axis: d, start: mul(u, od / 2.0), angle: std::f64::consts::TAU, r: (od * 0.02).clamp(0.0015, 0.006) }
 }
 
 /// One flanged joint's parts going along +u from s0: [flange?] gasket [flange?]. Used by the
@@ -280,10 +291,33 @@ impl Run<'_> {
         let (face, weld) = if face_at_start { (s0, s1) } else { (s1, s0) };
         let toward = if face_at_start { 1.0 } else { -1.0 };
         let hub_end = face + toward * d.fl_t;
-        q.shapes = vec![Shape::tube(self.at(face), self.at(hub_end), d.fl_od / 2.0), Shape::Frustum { a: self.at(hub_end), b: self.at(weld), r1: (r * 1.35).min(d.fl_od / 2.0), r2: r * 1.02 }];
+        // Raised face (2 mm, drawn), plate, and the hub tapering to the pipe (drawing proportions).
+        let rf = (d.fl_t * 0.15).min(0.002);
+        q.shapes = vec![
+            Shape::tube(self.at(face), self.at(face + toward * rf), (d.fl_rf / 2.0).min(d.fl_od / 2.0 * 0.95)),
+            Shape::tube(self.at(face + toward * rf), self.at(hub_end), d.fl_od / 2.0),
+            Shape::Frustum { a: self.at(hub_end), b: self.at(weld), r1: (r * 1.35).min(d.fl_od / 2.0), r2: r * 1.02 },
+        ];
         q.ports = vec![self.port(face, face_at_start, nps, self.l.rating, "FL"), self.port(weld, !face_at_start, nps, 0, "BW")];
         q.length = d.fl_y;
         self.push(q, item);
+    }
+    /// Studs and nuts round a joint whose gasket's middle is at `mid` (for the picture: the bolt
+    /// circle half way between the raised face and the rim).
+    fn bolt_shapes(&self, mid: f64, d: &Dimens, len: f64) -> Vec<Shape> {
+        let (n, bd) = (d.bolts.0.clamp(2, 64), d.bolts.1);
+        let pcd = (d.fl_rf / 2.0 + d.fl_od / 2.0) / 2.0;
+        let (u, v) = frame(self.u);
+        let back = d.gasket / 2.0 + d.fl_t;
+        let mut out = Vec::with_capacity(n as usize * 3);
+        for k in 0..n {
+            let t = std::f64::consts::TAU * (k as f64 + 0.5) / n as f64;
+            let off = add(mul(u, pcd * t.cos()), mul(v, pcd * t.sin()));
+            let at = |s: f64| add(self.at(mid + s), off);
+            out.push(Shape::tube(at(-len / 2.0), at(len / 2.0), bd / 2.0));
+            for sg in [-1.0, 1.0] { out.push(Shape::tube(at(sg * back), at(sg * (back + bd * 0.9)), bd * 0.85)); }
+        }
+        out
     }
     /// A gasket from s0 to s0 + g, and the joint's bolt set.
     fn gasket(&mut self, s0: f64, d: &Dimens, nps: &str, item: u32) {
@@ -301,6 +335,7 @@ impl Run<'_> {
         let len = 2.0 * d.fl_t + d.gasket + 2.0 * d.bolts.1 + 0.012;
         let len = (len / 0.005).ceil() * 0.005;
         bt.bolts = Some((d.bolts.0, d.bolts.1, len));
+        bt.shapes = self.bolt_shapes(s0 + d.gasket / 2.0, d, len);
         self.push(bt, item);
     }
 }
@@ -584,7 +619,12 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
             q.nps2 = bn.clone();
             let cp = run.at(c);
             let m = branch_len(cat, nin, &bn, d.tee);
-            q.shapes = vec![Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0), Shape::tube(cp, add(cp, mul(bd, m)), ob / 2.0)];
+            q.shapes = vec![
+                Shape::tube(run.at(x0), run.at(x0 + 2.0 * d.tee), d.od / 2.0),
+                Shape::tube(cp, add(cp, mul(bd, m)), ob / 2.0),
+                // The forged shoulder round the branch's root.
+                Shape::Frustum { a: add(cp, mul(bd, d.od * 0.3)), b: add(cp, mul(bd, (d.od / 2.0 + ob * 0.35).min(m * 0.8))), r1: (ob / 2.0 * 1.3).min(d.od / 2.0), r2: ob / 2.0 },
+            ];
             q.ports = vec![run.port(x0, true, nin, 0, "BW"), run.port(x0 + 2.0 * d.tee, false, nin, 0, "BW"), Port { p: add(cp, mul(bd, m)), d: bd, nps: bn, rating: 0, end: "BW" }];
             q.length = 2.0 * d.tee;
             q.corner = Some(cp);
@@ -650,42 +690,81 @@ fn valve_shapes(run: &Run, k: ItemKind, v0: f64, len: f64, d: &Dimens, want: P3)
     let (fr, ft) = (d.fl_od / 2.0, d.fl_t.min(len * 0.25));
     let mid = v0 + len / 2.0;
     let stem = branch_dir(run.u, if norm(want) > 0.0 { want } else { [0.0, 0.0, 1.0] });
+    let side = unit(cross(stem, run.u));
     let c = run.at(mid);
+    let at = |h: f64| add(c, mul(stem, h));
+    let ax = [run.u, stem, side];
+    // End flanges and the necks into the body.
     let mut s = vec![
         Shape::tube(run.at(v0), run.at(v0 + ft), fr),
         Shape::tube(run.at(v0 + len - ft), run.at(v0 + len), fr),
-        Shape::Frustum { a: run.at(v0 + ft), b: c, r1: r * 1.05, r2: r * 1.6 },
-        Shape::Frustum { a: c, b: run.at(v0 + len - ft), r1: r * 1.6, r2: r * 1.05 },
+        Shape::Frustum { a: run.at(v0 + ft), b: run.at(mid - len * 0.18), r1: r * 1.05, r2: r * 1.25 },
+        Shape::Frustum { a: run.at(mid + len * 0.18), b: run.at(v0 + len - ft), r1: r * 1.25, r2: r * 1.05 },
     ];
+    // A handwheel: rim, two spokes and a hub, square to the stem at height `h`.
+    let wheel = |s: &mut Vec<Shape>, h: f64, rad: f64| {
+        let (u1, _) = frame(stem);
+        let t = (rad * 0.07).max(0.005);
+        s.push(Shape::Torus { centre: at(h), axis: stem, start: mul(u1, rad), angle: std::f64::consts::TAU, r: t });
+        s.push(Shape::Cuboid { centre: at(h), axes: [u1, stem, cross(stem, u1)], half: [rad, t * 0.7, t * 0.7] });
+        s.push(Shape::Cuboid { centre: at(h), axes: [cross(stem, u1), stem, u1], half: [rad, t * 0.7, t * 0.7] });
+        s.push(Shape::tube(at(h - t * 1.5), at(h + t * 1.5), t * 2.2));
+    };
     match k {
         ItemKind::Gate | ItemKind::Globe => {
-            let h = (r * 4.0).max(0.15);
-            s.push(Shape::Frustum { a: add(c, mul(stem, r)), b: add(c, mul(stem, h * 0.8)), r1: r * 0.9, r2: r * 0.35 });
-            s.push(Shape::tube(add(c, mul(stem, h * 0.8)), add(c, mul(stem, h * 1.05)), (r * 0.08).max(0.006)));
-            let (u1, _) = frame(stem);
-            s.push(Shape::Torus { centre: add(c, mul(stem, h * 1.05)), axis: stem, start: mul(u1, (r * 1.1).max(0.06)), angle: std::f64::consts::TAU, r: (r * 0.08).max(0.006) });
+            let h = (r * 4.6).max(0.18);
+            if k == ItemKind::Gate {
+                // The body: a cylinder across the run, round at the bottom.
+                s.push(Shape::tube(at(-r * 1.0), at(r * 1.25), r * 1.3));
+                s.push(Shape::Head { base: at(-r * 1.0), dir: mul(stem, -1.0), r: r * 1.3, depth: r * 0.5 });
+            } else {
+                // The globe body.
+                s.push(Shape::Head { base: c, dir: stem, r: r * 1.55, depth: r * 1.2 });
+                s.push(Shape::Head { base: c, dir: mul(stem, -1.0), r: r * 1.55, depth: r * 1.2 });
+            }
+            let b0 = if k == ItemKind::Gate { r * 1.25 } else { r * 1.1 };
+            // Bonnet flange and bonnet, the yoke's two posts and crosshead, the stem and the wheel.
+            s.push(Shape::tube(at(b0), at(b0 + r * 0.22), r * 1.45));
+            s.push(Shape::Frustum { a: at(b0 + r * 0.22), b: at(h * 0.55), r1: r * 1.0, r2: r * 0.55 });
+            let (y0, y1) = (h * 0.55, h * 0.95);
+            for sg in [-1.0, 1.0] {
+                s.push(Shape::Cuboid { centre: add(at((y0 + y1) / 2.0), mul(side, sg * r * 0.5)), axes: ax, half: [r * 0.12, (y1 - y0) / 2.0, r * 0.1] });
+            }
+            s.push(Shape::Cuboid { centre: at(y1), axes: ax, half: [r * 0.25, r * 0.12, r * 0.65] });
+            s.push(Shape::tube(at(h * 0.5), at(h * 1.18), (r * 0.08).max(0.004)));
+            wheel(&mut s, h * 1.08, (r * 1.25).max(0.07));
         }
         ItemKind::Ball => {
-            s.push(Shape::tube(add(c, mul(stem, r)), add(c, mul(stem, r * 1.6)), (r * 0.12).max(0.006)));
+            // A round body, the stem and its lever.
+            s.push(Shape::Head { base: c, dir: stem, r: r * 1.45, depth: r * 1.45 });
+            s.push(Shape::Head { base: c, dir: mul(stem, -1.0), r: r * 1.45, depth: r * 1.45 });
+            s.push(Shape::tube(at(r * 1.3), at(r * 1.75), (r * 0.18).max(0.006)));
             let lever = rotate(run.u, stem, 0.0);
-            s.push(Shape::Cuboid { centre: add(add(c, mul(stem, r * 1.65)), mul(lever, r * 1.6)), axes: [lever, stem, cross(lever, stem)], half: [r * 1.8, (r * 0.06).max(0.004), (r * 0.15).max(0.006)] });
-        }
-        ItemKind::Butterfly => {
-            // The disc's stem and a gearbox with its handwheel.
-            let h = (r * 2.2).max(0.12);
-            s.push(Shape::tube(add(c, mul(stem, r * 1.5)), add(c, mul(stem, h)), (r * 0.12).max(0.008)));
-            let side = cross(run.u, stem);
-            s.push(Shape::Cuboid { centre: add(c, mul(stem, h + r * 0.35)), axes: [run.u, stem, side], half: [r * 0.45, r * 0.35, r * 0.5] });
-            let wheel = add(add(c, mul(stem, h + r * 0.35)), mul(side, r * 0.75));
-            let (u1, _) = frame(side);
-            s.push(Shape::Torus { centre: wheel, axis: side, start: mul(u1, (r * 0.7).max(0.05)), angle: std::f64::consts::TAU, r: (r * 0.06).max(0.005) });
+            s.push(Shape::Cuboid { centre: add(at(r * 1.8), mul(lever, r * 1.7)), axes: [lever, stem, cross(lever, stem)], half: [r * 1.9, (r * 0.07).max(0.004), (r * 0.17).max(0.007)] });
         }
         ItemKind::Check => {
-            s.push(Shape::Cuboid { centre: add(c, mul(stem, r * 1.4)), axes: [run.u, stem, cross(run.u, stem)], half: [len * 0.22, r * 0.25, r * 0.9] });
+            // A swing check: the body, and its bolted cover on top.
+            s.push(Shape::tube(at(-r * 0.9), at(r * 1.1), r * 1.35));
+            s.push(Shape::Head { base: at(-r * 0.9), dir: mul(stem, -1.0), r: r * 1.35, depth: r * 0.4 });
+            s.push(Shape::tube(at(r * 1.1), at(r * 1.35), r * 1.55));
+            s.push(Shape::Head { base: at(r * 1.35), dir: stem, r: r * 1.2, depth: r * 0.35 });
+        }
+        ItemKind::Butterfly => {
+            // The disc's stem, a gearbox and its handwheel.
+            let h = (r * 2.2).max(0.12);
+            s.push(Shape::tube(add(c, mul(stem, r * 1.5)), add(c, mul(stem, h)), (r * 0.12).max(0.008)));
+            s.push(Shape::Cuboid { centre: add(c, mul(stem, h + r * 0.35)), axes: [run.u, stem, side], half: [r * 0.45, r * 0.35, r * 0.5] });
+            let wc = add(add(c, mul(stem, h + r * 0.35)), mul(side, r * 0.75));
+            let (u1, _) = frame(side);
+            s.push(Shape::Torus { centre: wc, axis: side, start: mul(u1, (r * 0.7).max(0.05)), angle: std::f64::consts::TAU, r: (r * 0.06).max(0.005) });
         }
         ItemKind::Strainer => {
+            // The Y leg with its screen cap and drain plug.
             let leg = unit(add(mul(stem, -1.0), mul(run.u, 0.8)));
-            s.push(Shape::Frustum { a: c, b: add(c, mul(leg, r * 3.2)), r1: r * 0.9, r2: r * 0.8 });
+            let e = add(c, mul(leg, r * 3.0));
+            s.push(Shape::Frustum { a: c, b: e, r1: r * 0.95, r2: r * 0.85 });
+            s.push(Shape::tube(e, add(e, mul(leg, r * 0.3)), r * 1.15));
+            s.push(Shape::tube(add(e, mul(leg, r * 0.3)), add(e, mul(leg, r * 0.55)), r * 0.3));
         }
         _ => {}
     }

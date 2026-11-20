@@ -136,9 +136,11 @@ impl Mesh {
     /// Adds a shape at `seg` segments round a circle.
     pub fn shape(&mut self, s: &Shape, seg: usize) {
         let seg = seg.clamp(6, 64);
+        // A thin torus (a weld bead or a handwheel's rim) needs few sides round its small circle.
+        let ring_n = match s { Shape::Torus { start, r, .. } if *r < norm(*start) * 0.15 => 6, _ => seg };
         let circle = |c: P3, d: P3, r: f64| -> Vec<(P3, P3)> {
             let (u, v) = frame(d);
-            (0..seg).map(|i| { let t = std::f64::consts::TAU * i as f64 / seg as f64; let n = add(mul(u, t.cos()), mul(v, t.sin())); (add(c, mul(n, r)), n) }).collect()
+            (0..ring_n).map(|i| { let t = std::f64::consts::TAU * i as f64 / ring_n as f64; let n = add(mul(u, t.cos()), mul(v, t.sin())); (add(c, mul(n, r)), n) }).collect()
         };
         match s {
             Shape::Frustum { a, b, r1, r2 } => {

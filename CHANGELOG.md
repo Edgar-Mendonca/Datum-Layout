@@ -1,5 +1,17 @@
 # What's new in Datum Layout
 
+## 0.3.2 — 2026-11-20
+A better 3D model, part 2: fittings as they look (after Datum Pipe).
+
+- **Flanges** have a raised face, a plate and a hub tapering to the pipe.
+- **Bolts and nuts.** Every flanged joint is drawn with its studs on the bolt circle and a nut on each side. The count, diameter and length are the ones the take-off already lists.
+- **Valves you can recognise.** Gate valves have a body, bonnet, yoke, stem and handwheel. Globe and ball valves have round bodies, and ball valves a lever. Check valves have a bolted cover, butterfly valves a gearbox and wheel, and strainers a leg with its cap.
+- **Tees** have a shoulder where the branch leaves the run.
+- **Weld beads.** A thin ring marks each butt weld at an elbow, tee, reducer, cap, olet or weld-neck flange.
+- The glTF export carries the same detail. Bolt sets are left out of the clash check, as they sit inside their flanges.
+
+Next: equipment as built (0.3.3).
+
 ## 0.3.1 — 2026-11-19
 A better 3D model, part 1: the light and the lines (after Datum Pipe).
 
