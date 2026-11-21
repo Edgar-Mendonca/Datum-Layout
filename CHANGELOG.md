@@ -1,5 +1,16 @@
 # What's new in Datum Layout
 
+## 0.3.6 — 2026-11-21
+Supports stand on the steel.
+
+- **On the steel.** A pipe support on a level run looks for the top of a beam under it: a single beam, or a rack's tier beam or strut. Where the beam is lower than the shoe, the support gets a stool down to it, with a plate on the beam (within 1.5 m).
+- **Check reports a support with nothing under it.** A support with no beam within 1.5 m below its base is listed under Check, with where it is and what to do: put a beam or a rack tier under it, or move it onto one.
+- **The rack example** has its supports on the rack's bents: guides at the ends, a rest and an anchor on each line.
+- **The "Find the clashes" example** has its planted vessel V-303 between two bents, still under line B.
+- Riser clamps on upright pipes are not checked yet. They bear on steel beside the pipe.
+
+Next: platforms and ladders on vessels and columns (0.3.7).
+
 ## 0.3.5 — 2026-11-21
 The pipe rack as one object.
 

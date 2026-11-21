@@ -246,6 +246,22 @@ pub fn build(p: &Project, cat: &Catalogue) -> Built {
     for l in &p.lines {
         line(p, cat, l, &mut b);
     }
+    // Supports stand on steel (0.3.6): a shoe above a beam (within 1.5 m) gets a stool down to it.
+    let tops = crate::rack::tops(p, cat);
+    if !tops.is_empty() {
+        for q in b.parts.iter_mut().filter(|q| q.kind == "support") {
+            let Some((base, u)) = crate::rack::support_base(q, cat) else { continue };
+            let Some(tos) = crate::rack::steel_under(&tops, base, crate::rack::REACH) else { continue };
+            let gap = base[2] - tos;
+            if gap < 0.005 { continue; }
+            let z: P3 = [0.0, 0.0, 1.0];
+            let side = unit(cross(z, u));
+            let bw = (cat.od(&q.nps) * 0.6).max(0.1);
+            let at = |h: f64| [base[0], base[1], tos + h];
+            q.shapes.push(Shape::Cuboid { centre: at(gap / 2.0), axes: [u, side, z], half: [0.06, bw * 0.3, gap / 2.0] });
+            if gap > 0.03 { q.shapes.push(Shape::Cuboid { centre: at(0.006), axes: [u, side, z], half: [0.12, bw / 2.0, 0.006] }); }
+        }
+    }
     for q in b.parts.iter_mut().filter(|q| matches!(q.kind, "elbow90" | "elbow45" | "tee" | "cross" | "reducer" | "cap" | "flange" | "weldolet")) {
         let beads: Vec<Shape> = q.ports.iter().filter(|pt| pt.end == "BW").map(|pt| bead(pt.p, pt.d, cat.od(&pt.nps))).collect();
         q.shapes.extend(beads);

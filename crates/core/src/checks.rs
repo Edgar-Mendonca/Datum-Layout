@@ -145,8 +145,8 @@ pub fn connection_issues(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> 
 /// close: the flow runs from a line's start to its end, or away from a pump's discharge); a pipe piece between fittings too short
 /// to weld well (6 to 50 mm; under 6 mm the fittings are welded straight together).
 pub fn design_rules(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
-    let _ = cat;
     let mut out = vec![];
+    let tops = crate::rack::tops(p, cat);
     let name = |id: u32| p.line(id).map(|l| if l.number.is_empty() { "(no number)".to_string() } else { l.number.clone() }).unwrap_or_default();
     for q in &b.parts {
         let mid = if q.ports.len() >= 2 { crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5) } else { q.ports.first().map(|x| x.p).unwrap_or_default() };
@@ -166,6 +166,15 @@ pub fn design_rules(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
                 let back = p.line(q.line).is_some_and(|l| pump(&l.to, "D") || pump(&l.from, "S"));
                 if (if back { -u[2] } else { u[2] }) < -0.9 {
                     out.push(iss(format!("Line {}: a swing check valve in a run flowing down cannot close; put it in a level run or one flowing up (or reverse the line if it is drawn against the flow).", name(q.line))));
+                }
+            }
+            // A support on a level run needs steel under it (0.3.6).
+            "support" => {
+                if let Some((base, _)) = crate::rack::support_base(q, cat) {
+                    if crate::rack::steel_under(&tops, base, crate::rack::REACH).is_none() {
+                        let what = p.line(q.line).and_then(|l| l.items.iter().find(|i| i.id == q.item)).map(|i| i.support.name().to_lowercase()).unwrap_or_else(|| "support".into());
+                        out.push(Issue { kind: "rule", text: format!("Line {}: the {what} at E {:.2}, N {:.2} has nothing under it: no beam within {:.1} m below its base. Put a beam or a rack tier under it, or move it onto one.", name(q.line), base[0], base[1], crate::rack::REACH), at: base, line: q.line, item: q.item, equip: 0, ..Default::default() });
+                    }
                 }
             }
             "pipe" if q.length >= 0.006 && q.length < 0.05 => {

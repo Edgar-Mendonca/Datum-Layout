@@ -5,8 +5,8 @@
 //! near a tier is put on it, its shoe standing on the beam.
 
 use crate::catalogue::Catalogue;
-use crate::model::{Member, MemberRole, Rack, P3};
-use crate::parts::{add, mul, norm, sub};
+use crate::model::{Member, MemberRole, Project, Rack, P3};
+use crate::parts::{add, dot, mul, norm, sub};
 
 /// A shoe's depth under a pipe of radius `rp` insulated to `ri`: clear of the insulation by
 /// 50 mm, at least 100 mm (the support drawing uses the same).
@@ -72,6 +72,55 @@ pub fn members(r: &Rack, cat: &Catalogue) -> Vec<Member> {
     out
 }
 
+/// The top of a level steel member, for finding what a support stands on: its axis ends, the
+/// half width of its top in plan, and how far its top is above its axis.
+#[derive(Clone, Debug)]
+pub struct Top { pub a: P3, pub b: P3, pub half: f64, pub rise: f64 }
+
+/// The tops of every level member: single members and the racks' members.
+pub fn tops(p: &Project, cat: &Catalogue) -> Vec<Top> {
+    let mut all: Vec<Member> = p.steel.clone();
+    for r in &p.racks { all.extend(members(r, cat)); }
+    all.iter().filter_map(|m| {
+        let (u, d, f) = crate::steel::frame(m);
+        if u[2].abs() > 0.05 { return None; }
+        let s = cat.steel_section(&m.section)?;
+        if d[2].abs() > 0.9 { Some(Top { a: m.a, b: m.b, half: s.b / 2.0, rise: s.h / 2.0 }) }
+        else if f[2].abs() > 0.9 { Some(Top { a: m.a, b: m.b, half: s.h / 2.0, rise: s.b / 2.0 }) }
+        else { None }
+    }).collect()
+}
+
+/// The highest top of steel under `at` (in plan) from `at`'s height down to `reach` below it.
+pub fn steel_under(tops: &[Top], at: P3, reach: f64) -> Option<f64> {
+    let mut best: Option<f64> = None;
+    for t in tops {
+        let d = [t.b[0] - t.a[0], t.b[1] - t.a[1], 0.0];
+        let l = norm(d);
+        if l < 1e-9 { continue; }
+        let u = mul(d, 1.0 / l);
+        let w = [at[0] - t.a[0], at[1] - t.a[1], 0.0];
+        let along = dot(w, u);
+        let across = (w[0] * u[1] - w[1] * u[0]).abs();
+        if along < -0.01 || along > l + 0.01 || across > t.half + 1e-6 { continue; }
+        let tos = t.a[2] + (t.b[2] - t.a[2]) * (along / l).clamp(0.0, 1.0) + t.rise;
+        if tos <= at[2] + 0.01 && tos >= at[2] - reach && best.is_none_or(|b| tos > b) { best = Some(tos); }
+    }
+    best
+}
+
+/// How far below a support's base steel is looked for.
+pub const REACH: f64 = 1.5;
+
+/// A support's base: (plan point and base height, along the pipe) for a support on a level run;
+/// none on an upright run (a riser clamp bears on steel beside the pipe).
+pub fn support_base(q: &crate::route::Part, cat: &Catalogue) -> Option<(P3, P3)> {
+    let crate::parts::Shape::Cuboid { axes, .. } = q.shapes.first()? else { return None };
+    let c = q.corner?;
+    let rp = cat.od(&q.nps) / 2.0;
+    Some(([c[0], c[1], c[2] - rp - shoe_depth(rp, rp + q.insulation)], axes[0]))
+}
+
 /// Whether a point lies over the rack in plan (within its width and length).
 pub fn over(r: &Rack, p: P3) -> bool {
     let (u, v, l) = axes(r);
@@ -135,5 +184,37 @@ mod tests {
         // Off the rack in plan, or far from every tier: no snap.
         assert!(snap(&racks, [9.0, 4.0, 5.3], od, 0.0).is_none());
         assert!(snap(&racks, [9.0, 1.0, 3.0], od, 0.0).is_none());
+    }
+
+    #[test]
+    fn the_rack_examples_supports_stand_on_its_beams() {
+        let cat = Catalogue::builtin();
+        let p = crate::examples::get("rack").unwrap();
+        let b = crate::route::build(&p, &cat);
+        let t = tops(&p, &cat);
+        let sups: Vec<_> = b.parts.iter().filter(|q| q.kind == "support").collect();
+        assert_eq!(sups.len(), 8);
+        for q in &sups {
+            let (base, _) = support_base(q, &cat).unwrap();
+            let tos = steel_under(&t, base, REACH).unwrap_or_else(|| panic!("nothing under the support at {base:?}"));
+            assert!((base[2] - tos).abs() < 1e-6, "the shoe stands on the beam: {base:?} {tos}");
+        }
+        assert!(!crate::checks::design_rules(&p, &cat, &b).iter().any(|i| i.text.contains("nothing under it")));
+        // Off the bents, a support has nothing under it; a beam below gives it a stool down to it.
+        let mut p2 = p.clone();
+        let la = p2.lines[0].id;
+        let mut d = crate::doc::Doc::new(p2.clone());
+        d.apply(crate::doc::Op::Drop { line: la, kind: crate::model::ItemKind::Support, at: [8.0, 10.0, 5.0], dir: [0.0, 0.0, 1.0], nps2: String::new() }, &cat).unwrap();
+        p2 = d.p.clone();
+        let b2 = crate::route::build(&p2, &cat);
+        let found = crate::checks::design_rules(&p2, &cat, &b2).into_iter().filter(|i| i.text.contains("nothing under it")).count();
+        assert_eq!(found, 1);
+        let r0 = &p2.racks[0];
+        p2.steel.push(Member { id: 9999, role: MemberRole::Beam, section: "IPE 200".into(), a: [8.0, r0.a[1] - 1.3, 4.0], b: [8.0, r0.a[1] + 1.3, 4.0], ..Default::default() });
+        let b3 = crate::route::build(&p2, &cat);
+        assert_eq!(crate::checks::design_rules(&p2, &cat, &b3).into_iter().filter(|i| i.text.contains("nothing under it")).count(), 0);
+        let at8 = |b: &crate::route::Built| b.parts.iter().find(|q| q.kind == "support" && q.corner.is_some_and(|c| (c[0] - 8.0).abs() < 0.01)).map(|q| q.shapes.len()).unwrap();
+        let (stool, plain) = (at8(&b3), at8(&b2));
+        assert!(stool > plain, "a stool down to the beam");
     }
 }

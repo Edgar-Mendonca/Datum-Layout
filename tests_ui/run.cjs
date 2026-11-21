@@ -282,7 +282,7 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await open("rack");
   st = await state();
   const nsup = st.p.lines.reduce((n, l) => n + l.items.filter(i => i.kind === "support").length, 0);
-  check("the rack example has its rests, guides and anchors", nsup === 9 && (await p.textContent(".tree")).includes("Pipe supports"), String(nsup));
+  check("the rack example has its rests, guides and anchors", nsup === 8 && (await p.textContent(".tree")).includes("Pipe supports"), String(nsup));
   const la = st.p.lines.find(l => l.number.includes("3001"));
   await p.click(".btabs > button:has-text(\"Lines\")"); await settle(200);
   await p.click(`.bbody tr.f:has-text(${JSON.stringify(la.number)})`); await settle(300);
@@ -296,6 +296,9 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const pcfA = (await ask("export_pcf", { line: la.id })).ok;
   check("supports go to Datum Pipe in the PCF", (pcfA.match(/^SUPPORT$/gm) ?? []).length === 5 && pcfA.includes("SKEY ANC") && pcfA.includes("SKEY GUI"), pcfA.slice(-400));
   check("supports raise no clash or class finding", !st.issues.some(i => i.kind === "class" || i.kind === "clash"), JSON.stringify(st.issues.map(i => i.text)));
+  // 0.3.6: the example's supports stand on the rack's beams; one off the bents has nothing under it.
+  const ck36 = (await ask("check")).ok.filter(i => i.text.includes("nothing under it"));
+  check("Check reports the support off the rack's beams, and only it", ck36.length === 1 && ck36[0].line === la.id, JSON.stringify(ck36.map(i => i.text)));
   if (shots) { await p.keyboard.press("Escape"); await settle(200); await p.evaluate(() => (window).__screen); await p.keyboard.press("f"); await settle(400); await shot("supports"); }
 
   // 7k. Moving made easy (0.2.3): drag equipment across the plot, Esc, arrow keys, the view cube, badges.

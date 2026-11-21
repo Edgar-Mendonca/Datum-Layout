@@ -185,17 +185,17 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
         let r = b.d.p.racks.iter().find(|r| r.id == id).cloned().expect("the rack just added");
         b.op(Op::SetRack(crate::model::Rack { width: 2.6, tiers: vec![t1, t2], ..r }));
     }
-    // Supports on the rack: rests every 4 m or so, guides near the ends, an anchor in the middle.
+    // Supports on the rack's bents (one every 6 m): guides at the ends, a rest, an anchor.
     {
         use crate::model::SupportKind as S;
-        for (x, k) in [(7.0, S::Guide), (10.5, S::Rest), (17.5, S::Anchor), (21.0, S::Guide)] { b.support(la, [x, 10.0, 5.0], k); }
-        for (x, k) in [(6.0, S::Guide), (10.0, S::Rest), (14.0, S::Anchor), (18.0, S::Rest), (22.0, S::Guide)] { b.support(lb, [x, 11.6, 6.0], k); }
+        for (x, k) in [(5.0, S::Guide), (11.0, S::Rest), (17.0, S::Anchor), (23.0, S::Guide)] { b.support(la, [x, 10.0, 5.0], k); }
+        for (x, k) in [(5.0, S::Guide), (11.0, S::Anchor), (17.0, S::Rest), (23.0, S::Guide)] { b.support(lb, [x, 11.6, 6.0], k); }
     }
     if planted {
         // A 2" utility line laid across line A at the rack level.
         b.line("2\"-U-3004-CS1", "2", blind(), blind(), vec![[10.0, 8.5, 5.0], [10.0, 11.0, 5.0]]);
         // A new vessel under line B's upper run.
-        b.equip(EquipKind::VerticalVessel, "V-303", [17.0, 12.2, 0.0], |e| { e.dims.d = 1.2; e.dims.h = 4.5; e.nozzles.retain(|n| n.tag != "N1"); e.nozzles[0].pos = [0.8, 0.0, 1.9]; e.nozzles[1].pos = [-0.8, 0.0, 5.0]; });
+        b.equip(EquipKind::VerticalVessel, "V-303", [14.0, 11.6, 0.0], |e| { e.dims.d = 1.0; e.dims.h = 4.5; e.nozzles.retain(|n| n.tag != "N1"); e.nozzles[0].pos = [0.8, 0.0, 1.9]; e.nozzles[1].pos = [-0.8, 0.0, 5.0]; });
         return b.done("Find the clashes", "A copy of the pipe rack run with three planted problems. Run Check › Clashes: a 2\" utility line crosses line A on the rack, the drain branch ends 10 mm above the ground, and vessel V-303 stands under line B's upper run.");
     }
     b.done("Small pipe rack run", "Example 3. Two lines run on a rack between two vessels: line A rises from V-301 to the rack at 5 m and drops into V-302; line B runs at 6 m. A 3\" branch drops from line A to a drain point.")

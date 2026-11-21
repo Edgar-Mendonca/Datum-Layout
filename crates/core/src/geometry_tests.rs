@@ -205,7 +205,8 @@ fn moving_equipment_drags_its_lines_along_and_keeps_them_square() {
                 d.apply(Op::SetEquipment(moved), &cat).unwrap();
                 let b = build(&d.p, &cat);
                 // Nothing comes apart: every joint meets square, nothing is open or mismatched.
-                let conn: Vec<_> = connection_issues(&d.p, &cat, &b).into_iter().map(|i| i.text).collect();
+                // (A support a move takes off its beam is reported, rightly; that is not coming apart.)
+                let conn: Vec<_> = connection_issues(&d.p, &cat, &b).into_iter().map(|i| i.text).filter(|t| !t.contains("nothing under it")).collect();
                 assert!(conn.is_empty(), "{id}: moving {} by {delta:?}: {conn:?}", e.tag);
                 if b.issues.is_empty() { joints_ok(&b); }
                 // A move the legs cannot take is reported (a tight turn, or a skewed end to route
