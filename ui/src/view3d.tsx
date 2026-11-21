@@ -847,6 +847,7 @@ export const View3D = () => {
       return { mean: times.reduce((a, b) => a + b, 0) / frames, worst: Math.max(...times), triangles: sceneData?.triangles ?? 0 };
     };
     // For the UI tests: where a plant point is on screen.
+    (window as any).__focus = (at: V3, r: number) => setFocus({ at, r });
     (window as any).__screen = (p: V3) => { const r = host.getBoundingClientRect(); const v = W(p).project(camera); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; };
     const el = renderer.domElement;
     el.addEventListener("pointerdown", onDown); el.addEventListener("pointermove", onMove); el.addEventListener("pointerup", onUp);

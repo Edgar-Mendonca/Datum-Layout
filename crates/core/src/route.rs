@@ -228,7 +228,7 @@ fn name(l: &Line) -> String {
 pub fn build(p: &Project, cat: &Catalogue) -> Built {
     let mut b = Built::default();
     for m in &p.steel {
-        b.parts.push(Part { kind: "steel", line: 0, equip: 0, item: m.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: crate::steel::shapes(m, cat), length: crate::steel::length(m), corner: None, bolts: None, note: m.section.clone(), insulation: 0.0 });
+        b.parts.push(Part { kind: "steel", line: 0, equip: 0, item: m.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: crate::steel::shapes(m, &p.steel, cat), length: crate::steel::length(m), corner: None, bolts: None, note: m.section.clone(), insulation: 0.0 });
     }
     for e in &p.equipment {
         let (body, noz) = equipment::shapes(e, cat);
@@ -633,7 +633,7 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
         ItemKind::Support => {
             let mut q = Part::new("support", l);
             q.nps = nin.into();
-            q.shapes = support_shapes(run.at(x0), run.u, d.od / 2.0 + l.insulation, it.support);
+            q.shapes = support_shapes(run.at(x0), run.u, d.od / 2.0, d.od / 2.0 + l.insulation, it.support);
             q.corner = Some(run.at(x0));
             q.note = it.support.skey().into();
             run.push(q, it.id);
@@ -661,26 +661,73 @@ fn place_item(p: &Project, cat: &Catalogue, run: &mut Run, it: &Item, x0: f64, n
     }
 }
 
-/// A pipe support at point `c` of a run along `u` (pipe or insulation radius `r`): on a level run,
-/// a shoe under the pipe (with side lugs for a guide, end lugs for a stop, both for an anchor); on
-/// a vertical run, a clamp with two lugs.
-pub fn support_shapes(c: P3, u: P3, r: f64, k: crate::model::SupportKind) -> Vec<Shape> {
+/// A pipe support at point `c` of a run along `u`, for a pipe of radius `rp` insulated to `ri`
+/// (drawn as built, after Datum Pipe 0.7.5). On a level run a welded shoe: a cradle under the pipe,
+/// a web (two on large pipes) and a base plate, deep enough to clear the insulation. A guide adds
+/// a guide angle each side of the base plate, a line stop a stop plate before and after it, an
+/// anchor stiffeners across the web and stop plates. On an upright run, a riser clamp: a band,
+/// paired lugs each side with their bolts, and gussets under the lugs for an anchor.
+pub fn support_shapes(c: P3, u: P3, rp: f64, ri: f64, k: crate::model::SupportKind) -> Vec<Shape> {
     use crate::model::SupportKind as S;
     let box_ = |centre: P3, axes: [P3; 3], half: P3| Shape::Cuboid { centre, axes, half };
+    let z: P3 = [0.0, 0.0, 1.0];
     if u[2].abs() > 0.7 {
-        let (a, b) = crate::parts::frame(u);
-        let mut v = vec![Shape::tube(add(c, mul(u, -0.03)), add(c, mul(u, 0.03)), r + 0.02)];
-        for s in [-1.0, 1.0] { v.push(box_(add(c, mul(a, s * (r + 0.09))), [a, b, u], [0.07, 0.01, 0.05])); }
-        if k == S::Anchor { v.push(box_(add(c, mul(b, r + 0.06)), [a, b, u], [0.04, 0.04, 0.04])); }
+        let (a, b) = frame(u);
+        let mut v = vec![Shape::tube(sub(c, mul(u, 0.04)), add(c, mul(u, 0.04)), rp + 0.012)];
+        let lug = 0.14;
+        for s in [-1.0, 1.0] {
+            let lc = add(c, mul(a, s * (rp + lug / 2.0)));
+            for g in [-1.0, 1.0] { v.push(box_(add(lc, mul(b, g * 0.015)), [a, b, u], [lug / 2.0, 0.005, 0.04])); }
+            for t in [0.035, lug - 0.03] {
+                let bc = add(c, mul(a, s * (rp + t)));
+                v.push(Shape::tube(sub(bc, mul(b, 0.035)), add(bc, mul(b, 0.035)), 0.008));
+            }
+            if k == S::Anchor {
+                let dn = if u[2] > 0.0 { mul(u, -1.0) } else { u };
+                v.push(box_(add(lc, mul(dn, 0.1)), [a, b, u], [lug / 2.0, 0.005, 0.06]));
+            }
+        }
         return v;
     }
-    let z: P3 = [0.0, 0.0, 1.0];
     let side = unit(cross(z, u));
-    let h = 0.1;
-    let base = add(c, mul(z, -(r + h / 2.0)));
-    let mut v = vec![box_(base, [u, side, z], [0.15, (r * 0.7).max(0.05), h / 2.0])];
-    if matches!(k, S::Guide | S::Anchor) { for s in [-1.0, 1.0] { v.push(box_(add(c, add(mul(side, s * (r + 0.03)), mul(z, -r * 0.5))), [u, side, z], [0.08, 0.012, r * 0.5 + 0.02])); } }
-    if matches!(k, S::Stop | S::Anchor) { for s in [-1.0, 1.0] { v.push(box_(add(c, add(mul(u, s * 0.17), mul(z, -r))), [u, side, z], [0.012, (r * 0.6).max(0.04), 0.04])); } }
+    let len = 0.3;
+    let hs = (ri - rp + 0.05).max(0.1);
+    let (tb, tw) = (0.012, 0.01);
+    let zb = -(rp + hs);
+    let bw = (rp * 1.2).max(0.1);
+    let at = |s: f64, y: f64, h: f64| add(c, add(mul(u, s), add(mul(side, y), mul(z, h))));
+    let ax = [u, side, z];
+    // Cradle: three plates round the bottom of the pipe.
+    let mut v = vec![];
+    for deg in [-125.0f64, -90.0, -55.0] {
+        let t = deg.to_radians();
+        let n = add(mul(side, t.cos()), mul(z, t.sin()));
+        let tang = cross(u, n);
+        v.push(box_(add(c, mul(n, rp + 0.004)), [u, n, tang], [len / 2.0, 0.004, rp * 0.33]));
+    }
+    // Web(s) from the pipe down to the base plate, and the base plate.
+    let webs: Vec<f64> = if rp > 0.15 { vec![-rp * 0.35, rp * 0.35] } else { vec![0.0] };
+    let mut web_mid = 0.0;
+    for y in &webs {
+        let top = -(rp * rp - y * y).sqrt() * 0.98;
+        let (z0, z1) = (zb + tb, top);
+        web_mid = (z0 + z1) / 2.0;
+        v.push(box_(at(0.0, *y, web_mid), ax, [len / 2.0, tw / 2.0, ((z1 - z0) / 2.0).max(0.005)]));
+    }
+    v.push(box_(at(0.0, 0.0, zb + tb / 2.0), ax, [len / 2.0, bw / 2.0, tb / 2.0]));
+    let web_h = (-(rp * 0.98) - (zb + tb)).max(0.01) / 2.0;
+    if k == S::Guide {
+        for s in [-1.0, 1.0] {
+            v.push(box_(at(0.0, s * (bw / 2.0 + 0.014), zb + 0.04), ax, [0.05, 0.004, 0.04]));
+            v.push(box_(at(0.0, s * (bw / 2.0 + 0.04), zb + 0.004), ax, [0.05, 0.03, 0.004]));
+        }
+    }
+    if matches!(k, S::Stop | S::Anchor) {
+        for s in [-1.0, 1.0] { v.push(box_(at(s * (len / 2.0 + 0.016), 0.0, zb + 0.04), ax, [0.006, bw / 2.0, 0.04])); }
+    }
+    if k == S::Anchor {
+        for s in [-len * 0.3, 0.0, len * 0.3] { v.push(box_(at(s, 0.0, web_mid), ax, [0.005, bw / 2.0 * 0.9, web_h * 0.9])); }
+    }
     v
 }
 

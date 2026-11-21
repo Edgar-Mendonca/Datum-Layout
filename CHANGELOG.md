@@ -1,5 +1,17 @@
 # What's new in Datum Layout
 
+## 0.3.4 — 2026-11-21
+A better 3D model, part 4: steel and supports as built (after Datum Pipe).
+
+- **Steel members** have the root fillets between web and flanges. A column stands on a base plate with four anchor bolts and nuts, and has a cap plate on top.
+- **Beams and braces stop at the face of the column** they frame into and end in an end plate. Before, they ran through to the column's centre.
+- **Pipe shoes:** a cradle under the pipe, a web (two on large pipes) and a base plate, deep enough to clear the insulation.
+- **Guides, stops and anchors:** a guide has a guide angle each side of the base plate, and a line stop a stop plate before and after it. An anchor has stiffeners across the web and stop plates.
+- **Riser clamps:** on an upright pipe, a support is a clamp with paired lugs and their bolts. An anchor adds gussets under the lugs.
+- Weights in the take-off are still the section's. The plates are for the picture only.
+
+Next: the pipe rack as one object (0.3.5).
+
 ## 0.3.3 — 2026-11-21
 A better 3D model, part 3: equipment as built.
 

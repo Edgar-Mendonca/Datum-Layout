@@ -103,7 +103,7 @@
         "Light and lines: room light, outlines and edges, smoother curves, zoom to the pointer (0.3.1)",
         "Fittings drawn as they are built: flanges with bolts and nuts, valves with handwheels and levers, weld beads (0.3.2)",
         "Equipment drawn as it is built: skirts, saddles, manways, pumps with casing, coupling guard and motor (0.3.3)",
-        "Steel and supports drawn as they are built",
+        "Steel and supports drawn as they are built: base plates, end plates, shoes, guides and stops (0.3.4)",
         "Pipe racks as one object, with lines on their tiers",
         "Supports standing on the steel",
         "Platforms, ladders and stairs, and an access check",
