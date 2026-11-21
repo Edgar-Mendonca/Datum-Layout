@@ -70,7 +70,9 @@ export interface EquipRow { id: number; tag: string; kind: string; at: V3; rot: 
 export interface MtoRow { line: string; group: string; what: string; nps: string; qty: number; unit: string; unit_kg: number | null; kg: number | null; est: boolean }
 export interface WeightRow { kind: string; nps: string; nps_small: string; wall: string; rating: number; kg: number; source: string }
 export interface ValveRow { line_id: number; item: number; tag: string; kind: string; nps: string; rating: number; line: string; at: V3; stem: string }
-export interface Lists { lines: LineRow[]; equipment: EquipRow[]; mto: MtoRow[]; valves: ValveRow[] }
+export interface Lists { lines: LineRow[]; equipment: EquipRow[]; mto: MtoRow[]; valves: ValveRow[]; steel: SteelTake[] }
+/** The steel take-off (0.3.9): rolled sections by section. */
+export interface SteelTake { section: string; family: string; count: number; length: number; kg_m: number | null; kg: number | null; from: string }
 
 export interface Example { id: string; name: string; what: string }
 export interface Shown { q: string; label: string; factor: number; offset: number; dim?: number[] }

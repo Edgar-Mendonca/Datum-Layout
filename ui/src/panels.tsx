@@ -436,6 +436,7 @@ export const BottomPanel = () => {
         <span class="grow" />
         <Show when={bottomOpen()}>
           <Show when={bottom() === "lines" || bottom() === "mto"}><button class="btn sm" onClick={() => C.exportCsv(mto() ? "mto" : "lines")}>CSV</button></Show>
+          <Show when={bottom() === "mto" && (lists()?.steel ?? []).length}><button class="btn sm steelcsv" onClick={() => C.exportCsv("steel")}>Steel CSV</button></Show>
           <Show when={bottom() === "equipment"}><button class="btn sm" onClick={() => C.exportCsv("equipment")}>CSV</button></Show>
           <Show when={bottom() === "valves"}><button class="btn sm" onClick={() => C.exportCsv("valves")}>CSV</button></Show>
           <Show when={bottom() === "clashes" || bottom() === "checks"}><Show when={checkStale()}><span class="muted">The plant changed since the check.</span></Show><button class="btn sm pri" onClick={C.check}>Check now</button></Show>
@@ -453,6 +454,13 @@ export const BottomPanel = () => {
           <table class="tbl lst"><thead><tr><th>Line</th><th>Group</th><th>Description</th><th>Size</th><th class="r">Quantity</th><th>Unit</th><th class="r">Weight ({unit("mass")})</th></tr></thead><tbody>
             <For each={lists()?.mto ?? []}>{r => <tr><td>{r.line}</td><td>{r.group}</td><td>{r.what}</td><td>{inch(r.nps)}</td><td class="r mono">{r.unit === "m" ? toU("len", r.qty).toFixed(2) : r.qty}</td><td>{r.unit === "m" ? unit("len") : r.unit}</td><td class="r mono" title={r.est ? "Estimated: scaled by the wall from the nearest listed wall" : r.kg == null ? "No catalogue weight" : ""}>{r.kg == null ? "—" : `${r.est ? "≈ " : ""}${toU("mass", r.kg).toFixed(1)}`}</td></tr>}</For>
           </tbody></table>
+          <Show when={(lists()?.steel ?? []).length}>
+            <h4 class="sttitle">Steel <span class="muted">· rolled sections of members, racks and platforms; grating, plates, stairs, ladders and handrails are not weighed</span></h4>
+            <table class="tbl lst steeltake"><thead><tr><th>Section</th><th class="r">Members</th><th class="r">Length ({unit("len")})</th><th class="r">kg/m</th><th class="r">Weight ({unit("mass")})</th><th>In</th></tr></thead><tbody>
+              <For each={lists()!.steel}>{r => <tr><td>{r.section}</td><td class="r mono">{r.count}</td><td class="r mono">{toU("len", r.length).toFixed(2)}</td><td class="r mono">{r.kg_m != null ? r.kg_m.toFixed(1) : "—"}</td><td class="r mono">{r.kg != null ? toU("mass", r.kg).toFixed(0) : "—"}</td><td class="muted">{r.from}</td></tr>}</For>
+              <tr class="tot"><td><b>Total</b></td><td class="r mono">{lists()!.steel.reduce((a, r) => a + r.count, 0)}</td><td class="r mono">{toU("len", lists()!.steel.reduce((a, r) => a + r.length, 0)).toFixed(2)}</td><td /><td class="r mono"><b>{toU("mass", lists()!.steel.reduce((a, r) => a + (r.kg ?? 0), 0)).toFixed(0)}</b></td><td /></tr>
+            </tbody></table>
+          </Show>
         </Show>
         <Show when={bottom() === "equipment"}>
           <table class="tbl lst"><thead><tr><th>Tag</th><th>Type</th><th>Nozzle</th><th>Size</th><th>Class</th><th>Service</th><th class="r">E</th><th class="r">N</th><th class="r">EL</th><th>Line</th></tr></thead><tbody>

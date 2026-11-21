@@ -22,7 +22,41 @@ pub struct MtoRow { pub line: String, pub group: &'static str, pub what: String,
 #[derive(Serialize, Clone, Debug)]
 pub struct ValveRow { pub line_id: u32, pub item: u32, pub tag: String, pub kind: String, pub nps: String, pub rating: u32, pub line: String, pub at: P3, pub stem: String }
 #[derive(Serialize, Clone, Debug, Default)]
-pub struct Lists { pub lines: Vec<LineRow>, pub equipment: Vec<EquipRow>, pub mto: Vec<MtoRow>, pub valves: Vec<ValveRow> }
+pub struct Lists { pub lines: Vec<LineRow>, pub equipment: Vec<EquipRow>, pub mto: Vec<MtoRow>, pub valves: Vec<ValveRow>, pub steel: Vec<SteelRow> }
+
+/// The steel take-off (0.3.9): rolled sections by section, from single members, racks and
+/// platforms; their number, total length, mass per metre and weight. Grating, plates, stairs,
+/// ladders and handrails are not weighed.
+#[derive(Serialize, Clone, Debug)]
+pub struct SteelRow { pub section: String, pub family: String, pub count: usize, pub length: f64, pub kg_m: Option<f64>, pub kg: Option<f64>, pub from: String }
+
+/// Every rolled member in the plant, with what it belongs to (a tag).
+pub fn members(p: &Project, cat: &Catalogue) -> Vec<(crate::model::Member, String)> {
+    let mut v: Vec<(crate::model::Member, String)> = p.steel.iter().map(|m| (m.clone(), m.tag.clone())).collect();
+    for r in &p.racks { v.extend(crate::rack::members(r, cat).into_iter().map(|m| (m, r.tag.clone()))); }
+    for d in &p.decks { v.extend(crate::structure::deck_members(d, cat).into_iter().map(|m| (m, d.tag.clone()))); }
+    v
+}
+
+/// The steel take-off, one row per section (by family and size).
+pub fn steel(p: &Project, cat: &Catalogue) -> Vec<SteelRow> {
+    // (Grating, plates, stairs, ladders and handrails are not weighed.)
+    let mut rows: BTreeMap<String, SteelRow> = BTreeMap::new();
+    for (m, from) in members(p, cat) {
+        let s = cat.steel_section(&m.section);
+        let len = crate::steel::length(&m);
+        let r = rows.entry(m.section.clone()).or_insert_with(|| SteelRow { section: m.section.clone(), family: s.map(|x| x.family.clone()).unwrap_or_default(), count: 0, length: 0.0, kg_m: s.map(|x| x.area * crate::steel::DENSITY), kg: s.map(|_| 0.0), from: String::new() });
+        r.count += 1;
+        r.length += len;
+        if let (Some(k), Some(kg)) = (r.kg_m, r.kg.as_mut()) { *kg += k * len; }
+        if !r.from.split(", ").any(|x| x == from) { if !r.from.is_empty() { r.from.push_str(", "); } r.from.push_str(&from); }
+    }
+    let mut v: Vec<SteelRow> = rows.into_values().collect();
+    let fam = |f: &str| ["IPE", "HEA", "HEB"].iter().position(|x| *x == f).unwrap_or(9);
+    v.sort_by(|a, b| (fam(&a.family), cat.steel_section(&a.section).map(|s| s.h).unwrap_or(0.0)).partial_cmp(&(fam(&b.family), cat.steel_section(&b.section).map(|s| s.h).unwrap_or(0.0))).unwrap_or(std::cmp::Ordering::Equal));
+    v
+}
+
 
 /// Where a valve's stem points, in words.
 fn stem_words(d: P3) -> String {
@@ -98,7 +132,7 @@ fn describe(q: &Part, class: &str, sched: &str, material: &str) -> Option<(&'sta
 
 pub fn lists(p: &Project, cat: &Catalogue) -> Lists {
     let b = build(p, cat);
-    let mut out = Lists::default();
+    let mut out = Lists { steel: steel(p, cat), ..Default::default() };
     // Butt welds: joints where both parts end in a bevel (pipe, fittings, a weld-neck's neck).
     let mut welds: BTreeMap<(u32, String), f64> = BTreeMap::new();
     for (&(i, j), &(a, c)) in &crate::checks::connections(&b) {
@@ -187,6 +221,11 @@ pub fn csv(l: &Lists, kind: &str) -> Result<String, String> {
         "lines" => {
             s += &row(&["Line number", "From", "To", "Size (in)", "Class", "Rating", "Fluid", "Insulation (mm)", "Length (m)", "Components", "Empty weight (kg)", "Parts without a weight"].map(String::from));
             for r in &l.lines { s += &row(&[r.number.clone(), r.from.clone(), r.to.clone(), r.nps.clone(), r.class.clone(), r.rating.to_string(), r.fluid.clone(), f(r.insulation * 1000.0, 0), f(r.length, 3), r.components.to_string(), f(r.weight, 1), r.unweighed.to_string()]); }
+        }
+        "steel" => {
+            s += &row(&["Section", "Family", "Members", "Length (m)", "kg/m", "Weight (kg)", "In"].map(String::from));
+            for r in &l.steel { s += &row(&[r.section.clone(), r.family.clone(), r.count.to_string(), f(r.length, 3), r.kg_m.map(|k| f(k, 1)).unwrap_or_default(), r.kg.map(|k| f(k, 0)).unwrap_or_default(), r.from.clone()]); }
+            s += &row(&["Total".to_string(), String::new(), l.steel.iter().map(|r| r.count).sum::<usize>().to_string(), f(l.steel.iter().map(|r| r.length).sum(), 3), String::new(), f(l.steel.iter().filter_map(|r| r.kg).sum(), 0), String::new()]);
         }
         "equipment" => {
             s += &row(&["Tag", "Type", "E (m)", "N (m)", "EL (m)", "Nozzle", "Size (in)", "Rating", "Facing", "Service", "Nozzle E (m)", "Nozzle N (m)", "Nozzle EL (m)", "Line"].map(String::from));

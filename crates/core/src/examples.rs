@@ -146,8 +146,8 @@ fn exchanger(cat: &Catalogue) -> Project {
     b.drop(cwr, ItemKind::Gate, [n4[0], 7.0, 0.5], [1.0, 0.0, 0.0]);
     // Operating platforms with stairs, so the valves at 3 m are within reach: PF-1 along the
     // exchanger's north side (the inlet gate and the bypass globe), PF-2 by the cooling water gate.
-    b.op(Op::AddDeck { a: [5.8, 10.4, 0.0], b: [11.5, 11.3, 0.0], el: 1.6 });
-    b.op(Op::AddStair { a: [3.4, 10.85, 0.0], b: [5.8, 10.85, 1.6] });
+    b.op(Op::AddDeck { a: [5.8, 10.5, 0.0], b: [11.5, 11.4, 0.0], el: 1.6 });
+    b.op(Op::AddStair { a: [3.4, 10.95, 0.0], b: [5.8, 10.95, 1.6] });
     b.op(Op::AddDeck { a: [13.2, 6.4, 0.0], b: [14.6, 7.6, 0.0], el: 1.6 });
     b.op(Op::AddStair { a: [13.9, 4.0, 0.0], b: [13.9, 6.4, 1.6] });
     b.done("Exchanger hook-up", "Example 2. A shell-and-tube exchanger: the process side enters and leaves through gate valves, with a bypass through a globe valve between two tees; cooling water comes in and out from the south.")
@@ -198,9 +198,12 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     }
     // Operating platforms with stairs, so the valves on the risers are within reach: PF-1 by line
     // A's gate valve, PF-2 by line B's globe valve.
-    b.op(Op::AddDeck { a: [3.9, 8.7, 0.0], b: [4.8, 9.7, 0.0], el: 0.9 });
-    b.op(Op::AddStair { a: [4.35, 7.5, 0.0], b: [4.35, 8.7, 0.9] });
-    b.op(Op::AddDeck { a: [25.3, 11.0, 0.0], b: [26.8, 12.4, 0.0], el: 2.8 });
+    // (Clear of the vessels' skirts and the rack's first bent.)
+    b.op(Op::AddDeck { a: [4.05, 8.3, 0.0], b: [4.6, 9.2, 0.0], el: 0.9 });
+    let st = b.op(Op::AddStair { a: [4.325, 7.1, 0.0], b: [4.325, 8.3, 0.9] })[0];
+    let narrow = b.d.p.stairs.iter().find(|s| s.id == st).cloned().map(|s| crate::model::Stair { width: 0.55, ..s }).expect("the stair just added");
+    b.op(Op::SetStair(narrow));
+    b.op(Op::AddDeck { a: [25.3, 11.15, 0.0], b: [26.8, 12.5, 0.0], el: 2.8 });
     b.op(Op::AddStair { a: [29.8, 11.7, 0.0], b: [26.8, 11.7, 2.8] });
     // Supports on the rack's bents (one every 6 m): guides at the ends, a rest, an anchor.
     {

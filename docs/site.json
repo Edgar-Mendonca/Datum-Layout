@@ -38,7 +38,8 @@
     "Line list, equipment and nozzle list, and material take-off per line, all to CSV; a line list CSV read back to check against",
     "PCF export that Datum Pipe reads unchanged, PCF import, and glTF 2.0 for any 3D viewer",
     "A catalogue of generated parts (½\" to 24\", flanges class 150 to 2500, valves in every class) with every row's source, eight example pipe classes, and plug-in packs",
-    "A Library of every pipe class and parts table, searchable, each row with its source"
+    "A Library of every pipe class and parts table, searchable, each row with its source",
+    "Steel as one plant with the piping: members, pipe racks whose tiers the lines go onto, supports standing on the steel, platforms, caged ladders and stairs, an access check for valves, and a steel take-off"
   ],
   "screenshots": [
     "docs/images/pumps-3d.png",
@@ -89,15 +90,13 @@
         "Clashes shown in 3D with N to step through them, line-by-line colours, a tree that holds each line's components, a tabbed properties card and a compact catalogue (0.2.11)",
         "A Parts panel beside the tree: sub-groups, search by use, recent parts, double-click to place (0.2.12)",
         "Seventeen equipment types: spheres, filters, agitated vessels, fired heaters, inline pumps, compressors, kettle reboilers, plate exchangers, air coolers and packages added (0.2.13)",
-        "Your own equipment templates: save an item as set up, place it again in any plant, share them in a pack (0.2.14)",
-        "Sloped lines",
-        "Design rules for supports and access (with 0.3's steel)"
+        "Your own equipment templates: save an item as set up, place it again in any plant, share them in a pack (0.2.14)"
       ]
     },
     {
       "v": "0.3",
       "title": "The look, and steel",
-      "when": "Now",
+      "when": "Done",
       "items": [
         "Steel sections and members: columns, beams and braces in IPE, HEA and HEB (0.3.0)",
         "Light and lines: room light, outlines and edges, smoother curves, zoom to the pointer (0.3.1)",
@@ -108,13 +107,13 @@
         "Supports standing on the steel, and Check finds one with nothing under it (0.3.6)",
         "Platforms and caged ladders on vessels and columns (0.3.7)",
         "Free-standing platforms and stairs, and an access check (0.3.8)",
-        "Steel in the take-off and the clash check"
+        "Steel in the take-off, by section with its weight, and in the clash check (0.3.9)"
       ]
     },
     {
       "v": "0.4",
       "title": "Routing",
-      "when": "Next",
+      "when": "Now",
       "items": [
         "Sloped lines",
         "Route Again that avoids clashes",

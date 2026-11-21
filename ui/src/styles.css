@@ -698,6 +698,9 @@ tr.behind td { background: var(--err-bg); }
 .iprow .pair { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .iprow .pair > * { flex: 1; min-width: 0; }
 .iprow .pair input[type=checkbox] { flex: none; width: auto; }
+.sttitle { margin: 12px 0 4px; font-size: 12px; }
+.sttitle .muted { font-weight: 400; }
+.steeltake tr.tot td { border-top: 1px solid var(--line3); }
 .pfcard { border-top: 1px solid var(--line2); padding-top: 8px; margin-top: 4px; }
 .iprow .inline { display: flex; gap: 4px; }
 .iprow .inline select { flex: 1; }

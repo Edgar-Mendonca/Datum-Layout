@@ -293,9 +293,9 @@ export const C = {
     if (text) download(`${safe(l?.number || p.name)}.pcf`, text, `${l ? `line ${l.number}` : "every line"} for Datum Pipe (File › Import there)`);
   },
   exportGltf: async () => { const d = await call<string>("export_gltf"); if (d) download(`${safe(project()?.name ?? "plant")}.glb`, d, "the 3D model (glTF)"); },
-  exportCsv: async (kind: "lines" | "equipment" | "mto" | "valves") => {
+  exportCsv: async (kind: "lines" | "equipment" | "mto" | "valves" | "steel") => {
     const text = await call<string>("export_csv", { kind });
-    if (text) download(`${safe(project()?.name ?? "plant")} ${kind === "mto" ? "material take-off" : kind === "lines" ? "line list" : "equipment list"}.csv`, text, kind === "mto" ? "the material take-off" : kind === "lines" ? "the line list" : "the equipment list");
+    if (text) download(`${safe(project()?.name ?? "plant")} ${kind === "mto" ? "material take-off" : kind === "steel" ? "steel take-off" : kind === "lines" ? "line list" : "equipment list"}.csv`, text, kind === "mto" ? "the material take-off" : kind === "steel" ? "the steel take-off" : kind === "lines" ? "the line list" : "the equipment list");
   },
   lists: () => call<Lists>("lists"),
   units: (u: "SI" | "US") => { const p = project(); if (p && p.units !== u) act({ SetMeta: { name: p.name, notes: p.notes, plant: p.plant, unit: p.unit, units: u } }); },
@@ -320,7 +320,7 @@ export const ALL_CMDS: [string, () => void, string?][] = [
   ["Add a strainer", () => C.dropOnSelected("strainer")], ["Add a flange pair", () => C.dropOnSelected("flange_pair")], ["Add a tee and start a branch", () => C.dropOnSelected("tee")], ["Add a cross (two branches)", () => C.dropOnSelected("cross")], ["Add a weldolet (branch outlet)", () => C.dropOnSelected("weldolet")], ["Add a sockolet (small branch)", () => C.dropOnSelected("sockolet")], ["Add a reducer", () => C.dropOnSelected("reducer")], ["Make the selected reducer eccentric, flat on top", () => { const s = sel(); const l = selLine(); if (s?.kind === "item" && l) act({ SetEccentric: { line: l.id, item: s.id, flat: "top" } }); else toast("Select a reducer first."); }], ["Add a rest (pipe support)", () => C.support("rest")], ["Add a guide", () => C.support("guide")], ["Add a line stop", () => C.support("stop")], ["Add an anchor", () => C.support("anchor")],
   ["Route the selected line again", () => C.reroute()], ["Make the line one size larger", () => C.step(true)], ["Make the line one size smaller", () => C.step(false)],
   ["Check clashes and errors", C.check, "F5"], ["Export the plant for Datum Pipe (.pcf)", () => C.exportPcf()], ["Export the selected line for Datum Pipe", () => { const l = selLine(); if (l) C.exportPcf(l.id); else toast("Select a line first."); }],
-  ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")],
+  ["Export the 3D model (glTF)", C.exportGltf], ["Export the line list (CSV)", () => C.exportCsv("lines")], ["Export the equipment list (CSV)", () => C.exportCsv("equipment")], ["Export the material take-off (CSV)", () => C.exportCsv("mto")], ["Export the steel take-off (CSV)", () => C.exportCsv("steel")],
   ["SI units", () => C.units("SI")], ["US units", () => C.units("US")], ["Add an area", C.addArea], ["Plot settings", C.selectPlot],
   ["Add a jog to the selected run", () => C.jog(), "J"], ["Take the jog out", () => C.removeJog()],
   ["Hide the selection", () => C.hide(), "H"], ["Show only the selection (isolate)", () => C.isolate(), "I"], ["Show everything", () => C.showAll(), "Shift+H"], ["Section box", () => C.sectionBox()],

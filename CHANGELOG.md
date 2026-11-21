@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.3.9 — 2026-11-21
+Steel in the take-off and the clash check. This closes the 0.3 series.
+
+- **Steel take-off:** the Take-off tab lists the rolled steel by section. Each row gives the number of members, the total length, the mass per metre and the weight, and which members, racks and platforms it is in, with a total. **Steel CSV** exports it. Grating, plates, stairs, ladders and handrails are not weighed.
+- **Clashes with steel:** Check finds pipes and equipment that touch or come within the clearance of steel members, pipe racks, platforms, stairs, and platforms on equipment ("Pipe–steel", "Equipment–steel"). A few pairs are left out because they meet by design:
+  - steel against steel;
+  - a support against the steel it stands on;
+  - a stair against its platform;
+  - an equipment platform against its own item.
+- **The examples are clean:** two of 0.3.8's operating platforms touched the vessels' skirts, and the exchanger's touched its rear head. They were moved and resized.
+
+The 0.3 series is done: the model looks as built, and the plant has its steel, racks, supports on steel, platforms, ladders and stairs, an access check, and a steel take-off. Next is 0.4, routing: sloped lines first.
+
 ## 0.3.8 — 2026-11-21
 Free-standing platforms, stairs and an access check.
 

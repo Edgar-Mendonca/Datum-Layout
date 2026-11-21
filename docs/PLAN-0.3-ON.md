@@ -24,6 +24,8 @@ the engine where it is geometry, so glTF gets it too); the steel steps move up b
 | 0.3.8 | Free-standing platforms and stairs; access check (valves reachable from grade or a platform) |
 | 0.3.9 | Steel in the take-off with weights; clashes with steel |
 
+All of 0.3 was released, 0.3.0 to 0.3.9 (2026-11-19 to 2026-11-21).
+
 ## 0.4.x Routing
 
 | Step | What |

@@ -690,6 +690,17 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   const reach1 = (await ask("check")).ok.filter(i => i.text.includes("out of reach"));
   check("Check finds valves out of reach once their platform is gone (and none before)", reach0 === 0 && reach1.length === 2, `${reach0} ${JSON.stringify(reach1.map(i => i.text))}`);
 
+  // 8k. Steel take-off and steel clashes (0.3.9).
+  await open("rack"); await settle(300);
+  if (!(await p.$(".btabs"))) await p.click(".cchev");
+  await p.click('.btabs > button:has-text("Take-off")'); await settle(700);
+  const steelText = await p.textContent(".steeltake").catch(() => "");
+  check("the Take-off lists the steel by section with its weight and a total", steelText.includes("HEB 300") && steelText.includes("PR-1") && steelText.includes("Total"), steelText.slice(0, 200));
+  const scsv = (await ask("export_csv", { kind: "steel" })).ok ?? "";
+  check("the steel take-off exports to CSV", scsv.startsWith("Section,Family,Members") && scsv.includes("HEB 300"), scsv.slice(0, 120));
+  check("the rack example's steel clashes with nothing", !(await ask("check")).ok.some(i => i.text.includes("steel")));
+  if (shots) await shot("steel-takeoff");
+
   // 8f. Templates (0.2.14): an item saved as set up, placed again, deleted.
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
   if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }

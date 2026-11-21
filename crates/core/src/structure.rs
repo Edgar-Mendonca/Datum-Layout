@@ -211,4 +211,28 @@ mod tests {
         let b = crate::route::build(&p, &cat);
         assert!(crate::checks::access(&p, &cat, &b).iter().any(|i| i.text.contains("rises at")));
     }
+
+    #[test]
+    fn steel_is_weighed_by_section_and_clashes_with_pipe_and_equipment() {
+        let cat = Catalogue::builtin();
+        let mut p = crate::examples::get("rack").unwrap();
+        let rows = crate::lists::steel(&p, &cat);
+        // The rack's columns (HEB 300), beams and struts, the platforms' legs and beams.
+        let heb = rows.iter().find(|r| r.section == "HEB 300").unwrap();
+        assert_eq!(heb.count, 8);
+        let s = cat.steel_section("HEB 300").unwrap();
+        assert!((heb.kg.unwrap() - s.area * crate::steel::DENSITY * heb.length).abs() < 1e-6);
+        assert!(heb.from.contains("PR-1") && rows.iter().any(|r| r.from.contains("PF-1")));
+        let csv = crate::lists::csv(&crate::lists::lists(&p, &cat), "steel").unwrap();
+        assert!(csv.starts_with("Section,Family,Members") && csv.contains("HEB 300") && csv.lines().last().unwrap().starts_with("Total"));
+        // A beam put through line A's run and into V-302 is found against both.
+        p.steel.push(Member { id: 9001, tag: "BM-9".into(), role: MemberRole::Beam, section: "IPE 300".into(), a: [20.0, 10.0, 3.0], b: [20.0, 10.0, 6.0], ..Default::default() });
+        p.steel.push(Member { id: 9002, tag: "BM-10".into(), role: MemberRole::Beam, section: "IPE 300".into(), a: [24.0, 10.0, 3.0], b: [26.0, 10.0, 3.0], ..Default::default() });
+        let b = crate::route::build(&p, &cat);
+        let cl: Vec<String> = crate::checks::clashes(&p, &b).into_iter().map(|i| i.text).collect();
+        assert!(cl.iter().any(|t| t.starts_with("Pipe–steel") && t.contains("6\"-P-3001") && t.contains("BM-9")), "{cl:?}");
+        assert!(cl.iter().any(|t| t.starts_with("Equipment–steel") && t.contains("V-302") && t.contains("BM-10")), "{cl:?}");
+        // Supports on the rack, and the rack's own members, raise nothing.
+        assert!(!cl.iter().any(|t| t.contains("support") || t.contains("pipe rack PR-1")), "{cl:?}");
+    }
 }

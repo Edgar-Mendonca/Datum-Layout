@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.3.8 (2026-11-21) |
+| **Current version** | 0.3.9 (2026-11-21) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -154,6 +154,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.3.6 | Supports on steel: `rack::tops` lists the tops of level members (single and rack members; web-up or on-side), `steel_under` finds the highest top under a point within `REACH` (1.5 m); `support_base` is a level support's base (riser clamps not checked). `route::build` adds a stool and a plate where the gap is over 5 mm; `checks::design_rules` reports "nothing under it" (kind rule). The rack example's supports moved onto the bents (8 supports); the "Find the clashes" vessel V-303 moved to E 14, N 11.6 (d 1.0) so it is still exactly one clash | Checked in the engine; the shoe stays one shape plus a stool |
 | 0.3.7 | Platforms belong to the equipment (`Equipment.platforms: Vec<Platform>`: floor height above the base, arc from/to in degrees in the item's axes, width, ladder and its angle), for kinds with a round shell (`equipment::shell_radius`: vertical vessel, column, agitated, tank). `platform_shapes` draws grating in 10° segments (open where a ladder comes through), toe plate, two rails as partial tori, posts, brackets and knee braces, and caged ladders from the platform below or grade; drawn as a part of kind "platform" (equip = the item), out of clashes until 0.3.9. Angles kept in degrees in the model are shown with `DegIn` (the unit table's angle is radians; rotation and plant north were shown wrong before) | Platforms move and turn with their item; one card |
 | 0.3.8 | Free-standing platforms are `model::Deck` (named so to keep them apart from equipment platforms; "Platform" in the window) and stairs `model::Stair` (foot to top, the slope follows). Drawn in `structure.rs` as parts "deck" and "stair". The access check `checks::access` (run by Check, not by the joint checks, so routing tests stay quiet) puts a valve's operating point at its handwheel or lever (stem from the item's direction) and measures it from the highest floor under it within 0.6 m in plan: grade, decks, equipment platforms; over 2.0 m is reported. Stairs outside 30°–45° are reported. Examples changed to be in reach: pump discharge valves lower, exchanger PF-1/PF-2 with stairs, rack PF-1/PF-2 with stairs, rack drain valve lower | A plain rule, stated in Help |
+| 0.3.9 | Steel take-off `lists::steel` groups every rolled member (single, rack, deck) by section with count, length, kg/m (area × 7850) and weight, and where it is; CSV kind "steel". Clashes now take in steel, rack, platform (equipment), deck and stair parts against pipes and equipment, skipping structure–structure pairs, supports against structures, and an equipment platform against its own item and nozzles; findings read "Pipe–steel" or "Equipment–steel". The examples' operating platforms were moved clear of skirts and the exchanger's rear head | Steel joins the checks once it has its own take-off |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -199,7 +200,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.3.6 | Supports stand on steel: a stool down to the beam below (within 1.5 m); Check reports a support with nothing under it; the rack example's supports on its bents | ✅ |
 | 0.3.7 | Platforms and ladders on vertical vessels, columns, agitated vessels and tanks (grating, toe plate, handrails, brackets; caged ladders); angles shown in degrees (bug fix) | ✅ |
 | 0.3.8 | Free-standing platforms and stairs; access check (valve handwheels within 2 m of a floor, stairs 30°–45°); the examples' valves in reach | ✅ |
-| 0.3.x The look, and steel | 0.3.0 sections and members ✅; 0.3.1 light and lines ✅; 0.3.2 fittings ✅; 0.3.3 equipment ✅; 0.3.4 steel and supports ✅; 0.3.5 racks ✅; 0.3.6 supports on steel ✅; 0.3.7 platforms and ladders ✅; 0.3.8 stairs and access ✅; 0.3.9 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | 🔜 |
+| 0.3.9 | Steel take-off by section (members, racks, platforms; CSV); clashes of pipes and equipment with steel, racks, platforms and stairs | ✅ |
+| 0.3.x The look, and steel | 0.3.0 sections and members; 0.3.1 light and lines; 0.3.2 fittings; 0.3.3 equipment; 0.3.4 steel and supports as built; 0.3.5 racks; 0.3.6 supports on steel; 0.3.7 platforms and ladders; 0.3.8 stairs and access; 0.3.9 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | ✅ |
 | 0.4.x Routing | Sloped lines; Route Again avoiding clashes; auto-route; nozzles moved in 3D; rack spacing | ⬜ |
 | 0.5.x Catalogue gaps | Valve/cap/gasket/bolt weights; spectacle blinds; control and relief valves; instruments; small bore | ⬜ |
 | 0.6.x Drawings | Plot plan; GA with dimensions; title blocks; nozzle orientations; take-off report and DXF | ⬜ |
@@ -285,6 +287,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - 0.3.7: platforms and caged ladders on vertical items (Platforms tab); V-301 in the rack example has one; fixed angles shown as radians on the card (rotation, plant north); UI check 8i.
 
 - 0.3.8: free-standing platforms and stairs (Parts › Steel › Access, cards, tree), access check in Check; examples made accessible; UI check 8j.
+
+- 0.3.9: steel take-off (Take-off tab, Steel CSV) and clashes with steel; examples clear of their steel; UI check 8k. The 0.3 series is complete.
 
 ## 5. Known limits
 

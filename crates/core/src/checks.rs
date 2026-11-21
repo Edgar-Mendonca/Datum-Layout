@@ -57,7 +57,15 @@ fn label(p: &Project, q: &Part) -> String {
         format!("{n} {what}")
     } else {
         let t = p.equip(q.equip).map(|e| e.tag.clone()).unwrap_or_default();
-        if q.kind == "nozzle" { format!("{t} nozzle {}", q.note) } else { t }
+        match q.kind {
+            "nozzle" => format!("{t} nozzle {}", q.note),
+            "platform" => format!("{t} platform"),
+            "steel" => p.steel.iter().find(|m| m.id == q.item).map(|m| format!("member {} ({})", m.tag, m.section)).unwrap_or_else(|| "member".into()),
+            "rack" => format!("pipe rack {}", q.note),
+            "deck" => format!("platform {}", q.note),
+            "stair" => format!("stair {}", q.note),
+            _ => t,
+        }
     }
 }
 
@@ -370,7 +378,9 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
         }
     }
     // Pairs whose boxes come within the clearance: sweep along east.
-    let mut order: Vec<usize> = (0..b.parts.len()).filter(|&i| !b.parts[i].shapes.is_empty() && !matches!(b.parts[i].kind, "steel" | "rack" | "bolts" | "platform" | "deck" | "stair")).collect();
+    // Steel and access structures take part (0.3.9): against pipes and equipment, not each other.
+    let structure = |q: &Part| matches!(q.kind, "steel" | "rack" | "platform" | "deck" | "stair");
+    let mut order: Vec<usize> = (0..b.parts.len()).filter(|&i| !b.parts[i].shapes.is_empty() && b.parts[i].kind != "bolts").collect();
     order.sort_by(|&x, &y| boxes[x].0[0].total_cmp(&boxes[y].0[0]));
     let mut solid_cache: HashMap<usize, Vec<(P3, P3, Solid)>> = HashMap::new();
     let mut best: HashMap<(u32, u32, i64, u32, u32, i64), (f64, usize, usize)> = HashMap::new();
@@ -378,7 +388,13 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
         for &j in &order[oi + 1..] {
             if boxes[j].0[0] > boxes[i].1[0] + c { break; }
             let (qi, qj) = (&b.parts[i], &b.parts[j]);
-            if qi.line == 0 && qj.line == 0 { continue; }
+            let (si, sj) = (structure(qi), structure(qj));
+            if si && sj { continue; }
+            if qi.line == 0 && qj.line == 0 && !(si || sj) { continue; }
+            // An item's own platform against the item and its nozzles.
+            if (si || sj) && qi.line == 0 && qj.line == 0 && qi.equip != 0 && qi.equip == qj.equip { continue; }
+            // A support bears on the steel under it.
+            if (si && qj.kind == "support") || (sj && qi.kind == "support") { continue; }
             if near[i].contains(&j) { continue; }
             // A support sits on its own line's pipe.
             if (matches!(qi.kind, "support" | "weldolet" | "sockolet") || matches!(qj.kind, "support" | "weldolet" | "sockolet")) && qi.line == qj.line { continue; }
@@ -407,8 +423,9 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
     found.sort_by_key(|a| (a.1, a.2));
     for (d, i, j) in found {
         let (qi, qj) = (&b.parts[i], &b.parts[j]);
-        let (qi, qj) = if qi.line == 0 { (qj, qi) } else { (qi, qj) };
-        let kind = if qj.line == 0 { "Pipe–equipment" } else { "Pipe–pipe" };
+        // The pipe (or the equipment) first, the structure second.
+        let (qi, qj) = if qi.line == 0 && (qj.line != 0 || structure(qi)) { (qj, qi) } else { (qi, qj) };
+        let kind = match (qi.line != 0, structure(qj), qj.line != 0) { (true, true, _) => "Pipe–steel", (false, true, _) => "Equipment–steel", (true, false, false) => "Pipe–equipment", _ => "Pipe–pipe" };
         let (bi, bj) = (boxes[i], boxes[j]);
         let mid = |k: usize| (bi.0[k].max(bj.0[k]) + bi.1[k].min(bj.1[k])) / 2.0;
         let pt = [mid(0), mid(1), mid(2)];
