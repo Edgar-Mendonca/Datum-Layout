@@ -1,5 +1,18 @@
 # What's new in Datum Layout
 
+## 0.3.3 — 2026-11-21
+A better 3D model, part 3: equipment as built.
+
+- **Vessels and columns** stand on a skirt with its base ring and anchor-bolt chairs. They have manways with bolted covers and lifting lugs on the top head.
+- **Horizontal drums, exchangers and kettles** sit on saddles (base plate, web and ribs). Exchangers show their body flanges and channel cover.
+- **Tanks** have a bottom plate, shell courses, the top curb angle, a shell manway and a roof manway.
+- **Pumps** are drawn as they are built: the casing and its cover, bearing frame, coupling guard, and a finned motor with its terminal box and fan cowl, on a baseplate. In-line pumps have a motor stool and an upright motor.
+- **Compressors** have a split casing with bearing housings, a coupling guard and the driver. Reciprocating compressors have distance pieces, flanged cylinders, a flywheel and a motor.
+- **The rest:** spheres stand on legs with crossed tie rods; filters have leg plates and a cover davit; agitated vessels a gearbox, motor stool and motor; heaters corner columns, stack rings and a cap; air coolers braced legs, fan hubs and drive motors; plate exchangers their tie bolts; packages a skid frame and a control panel.
+- Every nozzle stays where it was, so your lines do not move. The proportions are for the picture only.
+
+Next: steel and supports as built (0.3.4).
+
 ## 0.3.2 — 2026-11-20
 A better 3D model, part 2: fittings as they look (after Datum Pipe).
 

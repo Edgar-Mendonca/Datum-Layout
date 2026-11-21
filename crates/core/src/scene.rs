@@ -84,11 +84,11 @@ pub fn meshes(parts: &[Part], lod: u32) -> (Mesh, Vec<(u32, u32)>) {
     for q in parts {
         let t0 = m.triangles() as u32;
         // Studs and nuts are hexagons; equipment is drawn a little finer. At the plainest detail
-        // (large plants) bolts and weld beads are left out of the picture.
+        // (large plants) bolts and weld beads are left out, and equipment is no finer than pipe.
         if lod == 0 && q.kind == "bolts" { ranges.push((t0, t0)); continue; }
         for s in &q.shapes {
             if lod == 0 && matches!(s, Shape::Torus { start, r, angle, .. } if *angle >= std::f64::consts::TAU - 1e-9 && *r < crate::parts::norm(*start) * 0.05) { continue; }
-            m.shape(s, if q.kind == "bolts" { 6 } else if q.kind == "equipment" { seg + 8 } else { seg });
+            m.shape(s, if q.kind == "bolts" { 6 } else if q.kind == "equipment" && lod > 0 { seg + 8 } else { seg });
         }
         ranges.push((t0, m.triangles() as u32));
     }

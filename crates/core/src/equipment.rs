@@ -6,6 +6,7 @@ use crate::catalogue::Catalogue;
 use crate::model::{Dims, EquipKind, Equipment, Nozzle, P3};
 use crate::parts::{add, mul, rot_z, sub, Port, Shape};
 use serde::Serialize;
+use std::f64::consts::TAU;
 
 /// What each size means for a kind: (field key, label). The window shows only these.
 pub fn fields(k: EquipKind) -> Vec<(&'static str, &'static str)> {
@@ -140,155 +141,299 @@ pub fn new(kind: EquipKind, tag: &str) -> Equipment {
     Equipment { kind, tag: tag.into(), dims, nozzles, data: data.into_iter().map(|(a, b)| (a.into(), b.into())).collect(), ..Default::default() }
 }
 
-/// The body of an item (in its own axes): shapes, without nozzles.
+/// Axes turned `a` radians about Z: along the radius, across it, up.
+fn turned(a: f64) -> [P3; 3] { [[a.cos(), a.sin(), 0.0], [-a.sin(), a.cos(), 0.0], [0.0, 0.0, 1.0]] }
+
+/// A skirt to the bottom tangent line, standing on its base ring with anchor-bolt chairs.
+fn skirt(v: &mut Vec<Shape>, r: f64, top: f64) {
+    v.push(Shape::tube([0.0; 3], [0.0, 0.0, 0.03], r + 0.12));
+    v.push(Shape::tube([0.0, 0.0, 0.03], [0.0, 0.0, top], r));
+    let n = if r > 1.0 { 12 } else { 8 };
+    for k in 0..n {
+        let ax = turned((k as f64 + 0.5) * TAU / n as f64);
+        v.push(Shape::Cuboid { centre: add(mul(ax[0], r + 0.05), [0.0, 0.0, 0.15]), axes: ax, half: [0.05, 0.06, 0.12] });
+        v.push(Shape::Cuboid { centre: add(mul(ax[0], r + 0.05), [0.0, 0.0, 0.28]), axes: ax, half: [0.06, 0.08, 0.012] });
+    }
+}
+
+/// A manway: a short neck from `at` along `dir` and its bolted cover.
+fn manway(v: &mut Vec<Shape>, at: P3, dir: P3, rm: f64) {
+    let e = add(at, mul(dir, 0.25));
+    v.push(Shape::tube(at, e, rm));
+    v.push(Shape::tube(e, add(e, mul(dir, 0.06)), rm * 1.3));
+    v.push(Shape::tube(add(e, mul(dir, 0.06)), add(e, mul(dir, 0.1)), rm * 1.3));
+}
+
+/// A saddle at `xs` under a horizontal shell of radius `r` on centreline `cz`: base plate, web
+/// to the shell, and ribs.
+fn saddle(v: &mut Vec<Shape>, xs: f64, cz: f64, r: f64) {
+    let ax = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let top = cz - r * 0.6;
+    v.push(Shape::Cuboid { centre: [xs, 0.0, 0.015], axes: ax, half: [0.14, r * 0.9, 0.015] });
+    v.push(Shape::Cuboid { centre: [xs, 0.0, (0.03 + top) / 2.0], axes: ax, half: [0.008, r * 0.8, ((top - 0.03) / 2.0).max(0.01)] });
+    for y in [-0.75, -0.3, 0.3, 0.75] {
+        let t = cz - r * (1.0f64 - y * y).sqrt();
+        v.push(Shape::Cuboid { centre: [xs, y * r, (0.03 + t) / 2.0], axes: ax, half: [0.13, 0.008, ((t - 0.03) / 2.0).max(0.01)] });
+    }
+}
+
+/// An electric motor along +X from `x0`, shaft at `z`: end bell, finned frame, terminal box, fan
+/// cowl, and feet down to `base`.
+fn motor(v: &mut Vec<Shape>, x0: f64, len: f64, z: f64, r: f64, base: f64) {
+    let ax = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let (b0, b1) = (x0 + len * 0.06, x0 + len * 0.8);
+    v.push(Shape::tube([x0, 0.0, z], [b0, 0.0, z], r * 0.9));
+    v.push(Shape::tube([b0, 0.0, z], [b1, 0.0, z], r));
+    for k in 0..12 {
+        let a = (k as f64 + 0.5) * TAU / 12.0;
+        let (c, sn) = (a.cos(), a.sin());
+        v.push(Shape::Cuboid { centre: [(b0 + b1) / 2.0, r * c, z + r * sn], axes: [[1.0, 0.0, 0.0], [0.0, c, sn], [0.0, -sn, c]], half: [(b1 - b0) / 2.0, r * 0.08, r * 0.025] });
+    }
+    v.push(Shape::Cuboid { centre: [x0 + len * 0.35, 0.0, z + r * 1.12], axes: ax, half: [r * 0.35, r * 0.3, r * 0.2] });
+    v.push(Shape::tube([b1, 0.0, z], [x0 + len * 0.97, 0.0, z], r * 0.96));
+    v.push(Shape::Head { base: [x0 + len * 0.97, 0.0, z], dir: [1.0, 0.0, 0.0], r: r * 0.96, depth: len * 0.03 });
+    let fz = z - r * 0.75;
+    if fz > base + 0.01 {
+        v.push(Shape::Cuboid { centre: [(b0 + b1) / 2.0, 0.0, (base + fz) / 2.0], axes: ax, half: [(b1 - b0) * 0.4, r * 0.8, (fz - base) / 2.0] });
+    }
+}
+
+/// A coupling guard over the shaft from `xa` to `xb` at `z`: a box with a rounded top.
+fn guard(v: &mut Vec<Shape>, xa: f64, xb: f64, z: f64, rg: f64) {
+    let ax = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    v.push(Shape::tube([xa, 0.0, z], [xb, 0.0, z], rg));
+    v.push(Shape::Cuboid { centre: [(xa + xb) / 2.0, 0.0, z - rg / 2.0], axes: ax, half: [(xb - xa) / 2.0, rg, rg / 2.0] });
+}
+
+/// The body of an item (in its own axes): shapes, without nozzles. Drawn as built (0.3.3): skirts
+/// with base rings, saddles with ribs, manways, a pump's casing, bearing frame, coupling guard
+/// and finned motor; the proportions are for the picture only.
 fn body(e: &Equipment) -> Vec<Shape> {
     let d = &e.dims;
     let r = d.d / 2.0;
     let x: P3 = [1.0, 0.0, 0.0];
     let z: P3 = [0.0, 0.0, 1.0];
     let ax = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
-    let saddle = |xs: f64, cz: f64, w: f64| Shape::Cuboid { centre: [xs, 0.0, cz / 2.0], axes: ax, half: [0.1, w / 2.0, cz / 2.0] };
+    let bx = |c: P3, h: P3| Shape::Cuboid { centre: c, axes: ax, half: h };
+    let tx = |x0: f64, x1: f64, zz: f64, rr: f64| Shape::tube([x0, 0.0, zz], [x1, 0.0, zz], rr);
+    let tz = |z0: f64, z1: f64, rr: f64| Shape::tube([0.0, 0.0, z0], [0.0, 0.0, z1], rr);
+    let rm = (r * 0.4).clamp(0.15, 0.3);
+    let mut v = vec![];
     match e.kind {
-        EquipKind::VerticalVessel | EquipKind::Column => vec![
-            Shape::tube([0.0; 3], [0.0, 0.0, d.elev], r),
-            Shape::tube([0.0, 0.0, d.elev], [0.0, 0.0, d.elev + d.h], r),
-            Shape::Head { base: [0.0, 0.0, d.elev + d.h], dir: z, r, depth: d.d / 4.0 },
-            Shape::Head { base: [0.0, 0.0, d.elev], dir: [0.0, 0.0, -1.0], r: r * 0.999, depth: (d.d / 4.0).min(d.elev * 0.9) },
-        ],
-        EquipKind::HorizontalDrum => vec![
-            Shape::tube([-d.l / 2.0, 0.0, d.elev], [d.l / 2.0, 0.0, d.elev], r),
-            Shape::Head { base: [d.l / 2.0, 0.0, d.elev], dir: x, r, depth: d.d / 4.0 },
-            Shape::Head { base: [-d.l / 2.0, 0.0, d.elev], dir: [-1.0, 0.0, 0.0], r, depth: d.d / 4.0 },
-            saddle(-d.l * 0.3, d.elev, d.d * 0.8),
-            saddle(d.l * 0.3, d.elev, d.d * 0.8),
-        ],
-        EquipKind::Tank => vec![
-            Shape::tube([0.0; 3], [0.0, 0.0, d.h], r),
-            Shape::Frustum { a: [0.0, 0.0, d.h], b: [0.0, 0.0, d.h + d.d * 0.08], r1: r, r2: r * 0.05 },
-        ],
+        EquipKind::VerticalVessel | EquipKind::Column => {
+            skirt(&mut v, r, d.elev);
+            v.push(tz(d.elev, d.elev + d.h, r));
+            v.push(Shape::Head { base: [0.0, 0.0, d.elev + d.h], dir: z, r, depth: d.d / 4.0 });
+            v.push(Shape::Head { base: [0.0, 0.0, d.elev], dir: [0.0, 0.0, -1.0], r: r * 0.999, depth: (d.d / 4.0).min(d.elev * 0.9) });
+            let at: Vec<f64> = if e.kind == EquipKind::Column { vec![d.elev + 1.0, d.elev + d.h / 2.0 - 1.0, d.elev + d.h - 1.5] } else { vec![d.elev + d.h * 0.5] };
+            for zm in at { manway(&mut v, [0.0, -r * 0.9, zm], [0.0, -1.0, 0.0], rm); }
+            // A lifting lug each side of the top head.
+            for sx in [-1.0, 1.0] { v.push(bx([0.0, sx * r * 0.55, d.elev + d.h + d.d * 0.2], [0.03, 0.06, 0.1])); }
+        }
+        EquipKind::HorizontalDrum => {
+            v.push(tx(-d.l / 2.0, d.l / 2.0, d.elev, r));
+            v.push(Shape::Head { base: [d.l / 2.0, 0.0, d.elev], dir: x, r, depth: d.d / 4.0 });
+            v.push(Shape::Head { base: [-d.l / 2.0, 0.0, d.elev], dir: [-1.0, 0.0, 0.0], r, depth: d.d / 4.0 });
+            saddle(&mut v, -d.l * 0.3, d.elev, r);
+            saddle(&mut v, d.l * 0.3, d.elev, r);
+            manway(&mut v, [0.0, 0.0, d.elev + r * 0.9], z, rm);
+        }
+        EquipKind::Tank => {
+            v.push(tz(0.0, 0.02, r + 0.06));
+            v.push(tz(0.02, d.h, r));
+            // Shell courses (about 2 m), the top curb angle, and the cone roof.
+            let n = (d.h / 2.0).floor() as i32;
+            for k in 1..n.max(1) { let zc = d.h * k as f64 / n as f64; if zc < d.h - 0.3 { v.push(tz(zc - 0.006, zc + 0.006, r + 0.006)); } }
+            v.push(tz(d.h - 0.08, d.h, r + 0.05));
+            v.push(Shape::Frustum { a: [0.0, 0.0, d.h], b: [0.0, 0.0, d.h + d.d * 0.08], r1: r + 0.05, r2: r * 0.05 });
+            manway(&mut v, [0.0, -(r - 0.05), 0.75], [0.0, -1.0, 0.0], 0.3);
+            manway(&mut v, [-r * 0.5, -r * 0.3, d.h], z, 0.3);
+        }
         EquipKind::Pump => {
+            // End-suction pump: casing, cover, bearing frame, coupling guard, motor, on a baseplate.
+            let bt = 0.15;
+            v.push(bx([0.0, 0.0, 0.06], [d.l / 2.0, d.w / 2.0, 0.06]));
+            v.push(bx([0.0, 0.0, 0.135], [d.l / 2.0 - 0.03, d.w / 2.0 - 0.03, 0.015]));
             let x0 = -d.l / 2.0 + d.d * 0.6;
             let xm = d.l / 2.0 - d.l2 - 0.05;
-            vec![
-                Shape::Cuboid { centre: [0.0, 0.0, 0.075], axes: ax, half: [d.l / 2.0, d.w / 2.0, 0.075] },
-                Shape::tube([x0 - d.d * 0.25, 0.0, d.h], [x0 + d.d * 0.25, 0.0, d.h], r),
-                Shape::Cuboid { centre: [x0, 0.0, (d.h + 0.15) / 2.0], axes: ax, half: [d.d * 0.2, d.d * 0.3, ((d.h - 0.15) / 2.0).max(0.01)] },
-                Shape::tube([x0 + d.d * 0.25, 0.0, d.h], [xm, 0.0, d.h], d.d * 0.18),
-                Shape::tube([xm, 0.0, d.h], [xm + d.l2, 0.0, d.h], d.d2 / 2.0),
-                Shape::Cuboid { centre: [xm + d.l2 / 2.0, 0.0, (d.h - d.d2 / 2.0 + 0.15) / 2.0], axes: ax, half: [d.l2 * 0.35, d.d2 * 0.4, ((d.h - d.d2 / 2.0 - 0.15) / 2.0).max(0.01)] },
-            ]
+            let (c0, c1) = (x0 - d.d * 0.25, x0 + d.d * 0.2);
+            v.push(tx(c0, c1, d.h, r));
+            v.push(tx(c1, c1 + 0.03, d.h, r * 1.06));
+            v.push(Shape::Frustum { a: [c1 + 0.03, 0.0, d.h], b: [c1 + 0.08, 0.0, d.h], r1: r * 0.8, r2: r * 0.5 });
+            v.push(bx([x0, 0.0, (d.h - r * 0.6 + bt) / 2.0], [d.d * 0.16, d.d * 0.32, ((d.h - r * 0.6 - bt) / 2.0).max(0.01)]));
+            let xa = c1 + 0.08;
+            let xb = xa + (xm - xa) * 0.6;
+            v.push(Shape::Frustum { a: [xa, 0.0, d.h], b: [xb, 0.0, d.h], r1: r * 0.5, r2: r * 0.4 });
+            v.push(bx([xb - 0.06, 0.0, (d.h - r * 0.4 + bt) / 2.0], [0.04, r * 0.55, ((d.h - r * 0.4 - bt) / 2.0).max(0.01)]));
+            guard(&mut v, xb, xm, d.h, d.d * 0.2);
+            motor(&mut v, xm, d.l2, d.h, d.d2 / 2.0, bt);
         }
-        EquipKind::Exchanger => vec![
-            Shape::tube([-d.l / 2.0, 0.0, d.elev], [d.l / 2.0, 0.0, d.elev], r),
-            Shape::Head { base: [-d.l / 2.0, 0.0, d.elev], dir: [-1.0, 0.0, 0.0], r, depth: d.d / 4.0 },
-            Shape::tube([d.l / 2.0, 0.0, d.elev], [d.l / 2.0 + 0.06, 0.0, d.elev], r * 1.18),
-            Shape::tube([d.l / 2.0 + 0.06, 0.0, d.elev], [d.l / 2.0 + d.l2, 0.0, d.elev], r),
-            Shape::tube([d.l / 2.0 + d.l2, 0.0, d.elev], [d.l / 2.0 + d.l2 + 0.06, 0.0, d.elev], r * 1.18),
-            saddle(-d.l * 0.3, d.elev, d.d * 0.8),
-            saddle(d.l * 0.3, d.elev, d.d * 0.8),
-        ],
+        EquipKind::Exchanger => {
+            v.push(tx(-d.l / 2.0, d.l / 2.0, d.elev, r));
+            v.push(tx(-d.l / 2.0 - 0.06, -d.l / 2.0, d.elev, r * 1.18));
+            v.push(Shape::Head { base: [-d.l / 2.0 - 0.06, 0.0, d.elev], dir: [-1.0, 0.0, 0.0], r, depth: d.d / 4.0 });
+            v.push(tx(d.l / 2.0, d.l / 2.0 + 0.06, d.elev, r * 1.18));
+            v.push(tx(d.l / 2.0 + 0.06, d.l / 2.0 + d.l2, d.elev, r));
+            v.push(tx(d.l / 2.0 + d.l2, d.l / 2.0 + d.l2 + 0.06, d.elev, r * 1.18));
+            v.push(tx(d.l / 2.0 + d.l2 + 0.06, d.l / 2.0 + d.l2 + 0.1, d.elev, r * 1.18));
+            saddle(&mut v, -d.l * 0.3, d.elev, r);
+            saddle(&mut v, d.l * 0.3, d.elev, r);
+        }
         EquipKind::Sphere => {
             let c = [0.0, 0.0, d.elev];
-            let mut v = vec![Shape::Head { base: c, dir: z, r, depth: r }, Shape::Head { base: c, dir: [0.0, 0.0, -1.0], r, depth: r }];
-            for k in 0..6 { let a = k as f64 * std::f64::consts::TAU / 6.0; let (x0, y0) = (r * a.cos(), r * a.sin()); v.push(Shape::tube([x0, y0, 0.0], [x0, y0, d.elev], d.d * 0.025)); }
-            v
+            v.push(Shape::Head { base: c, dir: z, r, depth: r });
+            v.push(Shape::Head { base: c, dir: [0.0, 0.0, -1.0], r, depth: r });
+            // Legs to the equator, with base plates and crossed tie rods between them.
+            let n = 6;
+            let leg = |k: i32| { let a = k as f64 * TAU / n as f64; [r * a.cos(), r * a.sin()] };
+            for k in 0..n {
+                let [x0, y0] = leg(k);
+                v.push(Shape::tube([x0, y0, 0.0], [x0, y0, d.elev], d.d * 0.025));
+                v.push(bx([x0, y0, 0.02], [d.d * 0.05, d.d * 0.05, 0.02]));
+                let [x1, y1] = leg(k + 1);
+                let (z0, z1) = (0.4, d.elev * 0.62);
+                v.push(Shape::tube([x0, y0, z0], [x1, y1, z1], 0.02));
+                v.push(Shape::tube([x0, y0, z1], [x1, y1, z0], 0.02));
+            }
+            v.push(Shape::tube([0.0, 0.0, d.elev - 0.06], [0.0, 0.0, d.elev + 0.06], r + 0.02));
         }
         EquipKind::Filter => {
-            let mut v = vec![
-                Shape::tube([0.0, 0.0, d.elev], [0.0, 0.0, d.elev + d.h], r),
-                Shape::tube([0.0, 0.0, d.elev + d.h], [0.0, 0.0, d.elev + d.h + 0.08], r * 1.25),
-                Shape::Head { base: [0.0, 0.0, d.elev + d.h + 0.08], dir: z, r, depth: d.d / 4.0 },
-                Shape::Head { base: [0.0, 0.0, d.elev], dir: [0.0, 0.0, -1.0], r, depth: d.d / 4.0 },
-            ];
-            for k in 0..3 { let a = (k as f64 + 0.25) * std::f64::consts::TAU / 3.0; let (x0, y0) = (r * 0.85 * a.cos(), r * 0.85 * a.sin()); v.push(Shape::tube([x0, y0, 0.0], [x0, y0, d.elev + 0.1], 0.03)); }
-            v
+            v.push(tz(d.elev, d.elev + d.h, r));
+            v.push(tz(d.elev + d.h, d.elev + d.h + 0.04, r * 1.25));
+            v.push(tz(d.elev + d.h + 0.04, d.elev + d.h + 0.08, r * 1.25));
+            v.push(Shape::Head { base: [0.0, 0.0, d.elev + d.h + 0.08], dir: z, r, depth: d.d / 4.0 });
+            v.push(Shape::Head { base: [0.0, 0.0, d.elev], dir: [0.0, 0.0, -1.0], r, depth: d.d / 4.0 });
+            // The closure's davit: a post and arm to lift the cover.
+            v.push(Shape::tube([-r * 1.35, -r * 0.2, d.elev + d.h - 0.4], [-r * 1.35, -r * 0.2, d.elev + d.h + 0.4], 0.025));
+            v.push(Shape::tube([-r * 1.35, -r * 0.2, d.elev + d.h + 0.4], [0.0, -r * 0.2, d.elev + d.h + 0.4], 0.02));
+            for k in 0..3 {
+                let a = (k as f64 + 0.25) * TAU / 3.0;
+                let (x0, y0) = (r * 0.85 * a.cos(), r * 0.85 * a.sin());
+                v.push(Shape::tube([x0, y0, 0.02], [x0, y0, d.elev + 0.1], 0.03));
+                v.push(bx([x0, y0, 0.01], [0.07, 0.07, 0.01]));
+            }
         }
         EquipKind::Agitated => {
             let top = d.elev + d.h + d.d / 4.0;
-            vec![
-                Shape::tube([0.0; 3], [0.0, 0.0, d.elev], r),
-                Shape::tube([0.0, 0.0, d.elev], [0.0, 0.0, d.elev + d.h], r),
-                Shape::Head { base: [0.0, 0.0, d.elev + d.h], dir: z, r, depth: d.d / 4.0 },
-                Shape::Head { base: [0.0, 0.0, d.elev], dir: [0.0, 0.0, -1.0], r: r * 0.999, depth: (d.d / 4.0).min(d.elev * 0.9) },
-                Shape::Cuboid { centre: [0.0, 0.0, top + 0.15], axes: ax, half: [d.d2 * 0.7, d.d2 * 0.6, 0.15] },
-                Shape::tube([0.0, 0.0, top + 0.3], [0.0, 0.0, top + 0.3 + d.l2], d.d2 / 2.0),
-            ]
+            skirt(&mut v, r, d.elev);
+            v.push(tz(d.elev, d.elev + d.h, r));
+            v.push(Shape::Head { base: [0.0, 0.0, d.elev + d.h], dir: z, r, depth: d.d / 4.0 });
+            v.push(Shape::Head { base: [0.0, 0.0, d.elev], dir: [0.0, 0.0, -1.0], r: r * 0.999, depth: (d.d / 4.0).min(d.elev * 0.9) });
+            // Mounting flange, gearbox, motor stool and motor.
+            v.push(tz(top - 0.1, top + 0.04, d.d2 * 0.9));
+            v.push(bx([0.0, 0.0, top + 0.17], [d.d2 * 0.7, d.d2 * 0.6, 0.13]));
+            v.push(Shape::Frustum { a: [0.0, 0.0, top + 0.3], b: [0.0, 0.0, top + 0.38], r1: d.d2 * 0.45, r2: d.d2 * 0.55 });
+            v.push(tz(top + 0.38, top + 0.38 + d.l2 * 0.85, d.d2 / 2.0));
+            v.push(tz(top + 0.38 + d.l2 * 0.85, top + 0.38 + d.l2, d.d2 / 2.0 * 0.95));
+            v.push(bx([d.d2 * 0.55, 0.0, top + 0.38 + d.l2 * 0.3], [0.06, 0.07, 0.06]));
+            manway(&mut v, [0.0, -r * 0.5, d.elev + d.h + d.d / 4.0 * 0.8], z, rm.min(0.25));
         }
-        EquipKind::Heater => vec![
-            Shape::Cuboid { centre: [0.0, 0.0, d.h / 2.0], axes: ax, half: [d.l / 2.0, d.w / 2.0, d.h / 2.0] },
-            Shape::Cuboid { centre: [0.0, 0.0, d.h + 1.0], axes: ax, half: [d.l * 0.35, d.w * 0.3, 1.0] },
-            Shape::Frustum { a: [0.0, 0.0, d.h + 2.0], b: [0.0, 0.0, d.h + 2.6], r1: d.w * 0.3, r2: d.d / 2.0 },
-            Shape::tube([0.0, 0.0, d.h + 2.6], [0.0, 0.0, d.h + 2.6 + d.l2], d.d / 2.0),
-        ],
-        EquipKind::InlinePump => vec![
-            Shape::Cuboid { centre: [0.0, 0.0, (d.h - r) / 2.0], axes: ax, half: [d.d * 0.6, d.d * 0.5, ((d.h - r) / 2.0).max(0.02)] },
-            Shape::tube([-d.d, 0.0, d.h], [d.d, 0.0, d.h], r * 0.55),
-            Shape::tube([0.0, 0.0, d.h - r], [0.0, 0.0, d.h + r], r),
-            Shape::tube([0.0, 0.0, d.h + r], [0.0, 0.0, d.h + r + 0.25], d.d * 0.18),
-            Shape::tube([0.0, 0.0, d.h + r + 0.25], [0.0, 0.0, d.h + r + 0.25 + d.l2], d.d2 / 2.0),
-        ],
+        EquipKind::Heater => {
+            // Radiant box with corner columns, convection section, breeching, stack and cap ring.
+            v.push(bx([0.0, 0.0, d.h / 2.0], [d.l / 2.0, d.w / 2.0, d.h / 2.0]));
+            for (sx, sy) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)] { v.push(bx([sx * (d.l / 2.0 + 0.1), sy * (d.w / 2.0 + 0.1), d.h / 2.0], [0.1, 0.1, d.h / 2.0])); }
+            for k in 1..4 { let xk = -d.l / 2.0 + d.l * k as f64 / 4.0; for sy in [-1.0, 1.0] { v.push(bx([xk, sy * (d.w / 2.0 + 0.06), d.h / 2.0], [0.08, 0.06, d.h / 2.0])); } }
+            v.push(bx([0.0, 0.0, d.h + 1.0], [d.l * 0.35, d.w * 0.3, 1.0]));
+            v.push(Shape::Frustum { a: [0.0, 0.0, d.h + 2.0], b: [0.0, 0.0, d.h + 2.6], r1: d.w * 0.3, r2: d.d / 2.0 });
+            v.push(tz(d.h + 2.6, d.h + 2.6 + d.l2, d.d / 2.0));
+            v.push(tz(d.h + 2.6 + d.l2 * 0.7, d.h + 2.6 + d.l2 * 0.7 + 0.08, d.d / 2.0 + 0.08));
+            v.push(tz(d.h + 2.6 + d.l2 - 0.1, d.h + 2.6 + d.l2, d.d / 2.0 + 0.05));
+        }
+        EquipKind::InlinePump => {
+            v.push(bx([0.0, 0.0, (d.h - r) / 2.0], [d.d * 0.6, d.d * 0.5, ((d.h - r) / 2.0).max(0.02)]));
+            v.push(tx(-d.d, d.d, d.h, r * 0.55));
+            v.push(tz(d.h - r, d.h + r, r));
+            v.push(tz(d.h + r, d.h + r + 0.03, r * 1.08));
+            // Motor stool (open lantern) and a vertical motor with its cowl and terminal box.
+            v.push(Shape::Frustum { a: [0.0, 0.0, d.h + r + 0.03], b: [0.0, 0.0, d.h + r + 0.25], r1: r * 0.6, r2: d.d2 * 0.45 });
+            let m0 = d.h + r + 0.25;
+            v.push(tz(m0, m0 + d.l2 * 0.8, d.d2 / 2.0));
+            v.push(tz(m0 + d.l2 * 0.8, m0 + d.l2, d.d2 / 2.0 * 0.95));
+            v.push(Shape::Head { base: [0.0, 0.0, m0 + d.l2], dir: z, r: d.d2 / 2.0 * 0.95, depth: 0.03 });
+            v.push(bx([d.d2 * 0.58, 0.0, m0 + d.l2 * 0.35], [0.06, 0.07, 0.06]));
+        }
         EquipKind::Compressor => {
+            // Horizontally split casing with bearing housings, coupling guard and driver.
+            let bt = 0.3;
+            v.push(bx([0.0, 0.0, 0.15], [d.l / 2.0, d.w / 2.0, 0.15]));
             let xc = -d.l / 2.0 + d.d * 0.9;
             let xm = d.l / 2.0 - d.l2 - 0.1;
-            vec![
-                Shape::Cuboid { centre: [0.0, 0.0, 0.15], axes: ax, half: [d.l / 2.0, d.w / 2.0, 0.15] },
-                Shape::tube([xc - d.d * 0.6, 0.0, d.h], [xc + d.d * 0.6, 0.0, d.h], r),
-                Shape::Cuboid { centre: [xc, 0.0, (d.h + 0.3) / 2.0], axes: ax, half: [d.d * 0.5, d.d * 0.4, ((d.h - 0.3) / 2.0).max(0.02)] },
-                Shape::tube([xc + d.d * 0.6, 0.0, d.h], [xm, 0.0, d.h], d.d * 0.12),
-                Shape::tube([xm, 0.0, d.h], [xm + d.l2, 0.0, d.h], d.d2 / 2.0),
-                Shape::Cuboid { centre: [xm + d.l2 / 2.0, 0.0, (d.h - d.d2 / 2.0 + 0.3) / 2.0], axes: ax, half: [d.l2 * 0.4, d.d2 * 0.4, ((d.h - d.d2 / 2.0 - 0.3) / 2.0).max(0.02)] },
-            ]
+            v.push(tx(xc - d.d * 0.6, xc + d.d * 0.6, d.h, r));
+            v.push(bx([xc, 0.0, d.h], [d.d * 0.62, r * 1.1, 0.03]));
+            v.push(bx([xc, 0.0, (d.h + bt) / 2.0], [d.d * 0.5, d.d * 0.4, ((d.h - bt) / 2.0).max(0.02)]));
+            v.push(tx(xc - d.d * 0.6 - 0.25, xc - d.d * 0.6, d.h, r * 0.35));
+            v.push(tx(xc + d.d * 0.6, xc + d.d * 0.6 + 0.25, d.h, r * 0.35));
+            guard(&mut v, xc + d.d * 0.6 + 0.25, xm, d.h, d.d * 0.15);
+            motor(&mut v, xm, d.l2, d.h, d.d2 / 2.0, bt);
         }
         EquipKind::RecipCompressor => {
             let zc = d.h * 0.75;
-            vec![
-                Shape::Cuboid { centre: [0.0, 0.0, d.h / 2.0], axes: ax, half: [d.l * 0.25, d.w / 2.0, d.h / 2.0] },
-                Shape::tube([0.0, d.w / 2.0, zc], [0.0, d.w / 2.0 + 1.0, zc], d.d / 2.0),
-                Shape::tube([0.0, -d.w / 2.0, zc], [0.0, -(d.w / 2.0 + 1.0), zc], d.d / 2.0),
-                Shape::tube([d.l * 0.25, 0.0, d.h * 0.45], [d.l * 0.25 + d.l2, 0.0, d.h * 0.45], d.d2 / 2.0),
-            ]
+            v.push(bx([0.0, 0.0, d.h / 2.0], [d.l * 0.25, d.w / 2.0, d.h / 2.0]));
+            v.push(bx([0.0, 0.0, d.h + 0.03], [d.l * 0.2, d.w * 0.4, 0.03]));
+            for sy in [-1.0, 1.0] {
+                // Distance piece, the cylinder with its flanged heads, and a valve cap on top.
+                let y = |t: f64| [0.0, sy * (d.w / 2.0 + t), zc];
+                v.push(Shape::tube(y(0.0), y(0.4), d.d * 0.3));
+                v.push(Shape::tube(y(0.4), y(0.45), d.d / 2.0 * 1.12));
+                v.push(Shape::tube(y(0.45), y(0.95), d.d / 2.0));
+                v.push(Shape::tube(y(0.95), y(1.0), d.d / 2.0 * 1.12));
+            }
+            // The flywheel, then the motor.
+            let zm = d.h * 0.45;
+            v.push(tx(d.l * 0.25, d.l * 0.25 + 0.1, zm, (d.d2 * 0.7).min(zm - 0.05)));
+            motor(&mut v, d.l * 0.25 + 0.12, d.l2, zm, d.d2 / 2.0, 0.0);
         }
         EquipKind::Kettle => {
             let ck = d.elev + (d.d2 - d.d) / 2.0;
             let rk = d.d2 / 2.0;
-            vec![
-                Shape::tube([-d.l / 2.0, 0.0, ck], [d.l / 2.0 - 0.9, 0.0, ck], rk),
-                Shape::Head { base: [-d.l / 2.0, 0.0, ck], dir: [-1.0, 0.0, 0.0], r: rk, depth: d.d2 / 4.0 },
-                Shape::Frustum { a: [d.l / 2.0 - 0.9, 0.0, ck], b: [d.l / 2.0 - 0.4, 0.0, d.elev], r1: rk, r2: r },
-                Shape::tube([d.l / 2.0 - 0.4, 0.0, d.elev], [d.l / 2.0, 0.0, d.elev], r),
-                Shape::tube([d.l / 2.0, 0.0, d.elev], [d.l / 2.0 + 0.06, 0.0, d.elev], r * 1.18),
-                Shape::tube([d.l / 2.0 + 0.06, 0.0, d.elev], [d.l / 2.0 + d.l2, 0.0, d.elev], r),
-                saddle(-d.l * 0.3, ck, d.d2 * 0.8),
-                saddle(d.l * 0.25, d.elev, d.d * 0.8),
-            ]
+            v.push(tx(-d.l / 2.0, d.l / 2.0 - 0.9, ck, rk));
+            v.push(Shape::Head { base: [-d.l / 2.0, 0.0, ck], dir: [-1.0, 0.0, 0.0], r: rk, depth: d.d2 / 4.0 });
+            v.push(Shape::Frustum { a: [d.l / 2.0 - 0.9, 0.0, ck], b: [d.l / 2.0 - 0.4, 0.0, d.elev], r1: rk, r2: r });
+            v.push(tx(d.l / 2.0 - 0.4, d.l / 2.0, d.elev, r));
+            v.push(tx(d.l / 2.0, d.l / 2.0 + 0.06, d.elev, r * 1.18));
+            v.push(tx(d.l / 2.0 + 0.06, d.l / 2.0 + d.l2, d.elev, r));
+            v.push(tx(d.l / 2.0 + d.l2, d.l / 2.0 + d.l2 + 0.06, d.elev, r * 1.18));
+            v.push(tx(d.l / 2.0 + d.l2 + 0.06, d.l / 2.0 + d.l2 + 0.1, d.elev, r * 1.18));
+            saddle(&mut v, -d.l * 0.3, ck, rk);
+            saddle(&mut v, d.l * 0.25, d.elev, r);
         }
-        EquipKind::PlateHx => vec![
-            Shape::Cuboid { centre: [-d.l / 2.0 + 0.075, 0.0, d.h / 2.0], axes: ax, half: [0.075, d.w / 2.0, d.h / 2.0] },
-            Shape::Cuboid { centre: [-d.l / 2.0 + 0.15 + d.l * 0.25, 0.0, d.h / 2.0 + 0.05], axes: ax, half: [d.l * 0.25, d.w * 0.4, d.h * 0.42] },
-            Shape::Cuboid { centre: [-d.l / 2.0 + 0.15 + d.l * 0.5 + 0.06, 0.0, d.h / 2.0], axes: ax, half: [0.06, d.w / 2.0, d.h / 2.0] },
-            Shape::tube([-d.l / 2.0, 0.0, d.h - 0.05], [d.l / 2.0, 0.0, d.h - 0.05], 0.04),
-            Shape::tube([-d.l / 2.0, 0.0, 0.1], [d.l / 2.0, 0.0, 0.1], 0.04),
-            Shape::Cuboid { centre: [d.l / 2.0 - 0.06, 0.0, d.h / 2.0], axes: ax, half: [0.06, 0.12, d.h / 2.0] },
-        ],
+        EquipKind::PlateHx => {
+            // Fixed frame plate, the plate pack, pressure plate, guide bars, tie bolts and end post.
+            v.push(bx([-d.l / 2.0 + 0.075, 0.0, d.h / 2.0], [0.075, d.w / 2.0, d.h / 2.0]));
+            v.push(bx([-d.l / 2.0 + 0.15 + d.l * 0.25, 0.0, d.h / 2.0 + 0.05], [d.l * 0.25, d.w * 0.4, d.h * 0.42]));
+            v.push(bx([-d.l / 2.0 + 0.15 + d.l * 0.5 + 0.06, 0.0, d.h / 2.0], [0.06, d.w / 2.0, d.h / 2.0]));
+            v.push(tx(-d.l / 2.0, d.l / 2.0, d.h - 0.05, 0.04));
+            v.push(tx(-d.l / 2.0, d.l / 2.0, 0.1, 0.04));
+            v.push(bx([d.l / 2.0 - 0.06, 0.0, d.h / 2.0], [0.06, 0.12, d.h / 2.0]));
+            let xe = -d.l / 2.0 + 0.15 + d.l * 0.5 + 0.2;
+            for zb in [0.3, 0.7] { for sy in [-1.0, 1.0] { v.push(Shape::tube([-d.l / 2.0 - 0.04, sy * (d.w / 2.0 + 0.03), d.h * zb], [xe, sy * (d.w / 2.0 + 0.03), d.h * zb], 0.018)); } }
+        }
         EquipKind::AirCooler => {
-            let mut v = vec![
-                Shape::Cuboid { centre: [0.0, 0.0, d.h + 0.15], axes: ax, half: [d.l / 2.0, d.w / 2.0, 0.15] },
-                Shape::Cuboid { centre: [-(d.l / 2.0 + 0.15), 0.0, d.h + 0.15], axes: ax, half: [0.15, d.w / 2.0, 0.3] },
-                Shape::Cuboid { centre: [d.l / 2.0 + 0.15, 0.0, d.h + 0.15], axes: ax, half: [0.15, d.w / 2.0, 0.3] },
-            ];
-            for (sx, sy) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)] { v.push(Shape::tube([sx * d.l * 0.45, sy * d.w * 0.45, 0.0], [sx * d.l * 0.45, sy * d.w * 0.45, d.h], 0.08)); }
+            v.push(bx([0.0, 0.0, d.h + 0.15], [d.l / 2.0, d.w / 2.0, 0.15]));
+            v.push(bx([-(d.l / 2.0 + 0.15), 0.0, d.h + 0.15], [0.15, d.w / 2.0, 0.3]));
+            v.push(bx([d.l / 2.0 + 0.15, 0.0, d.h + 0.15], [0.15, d.w / 2.0, 0.3]));
+            // Legs (H sections drawn as boxes) braced along the length.
+            for (sx, sy) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)] { v.push(bx([sx * d.l * 0.45, sy * d.w * 0.45, d.h / 2.0], [0.08, 0.08, d.h / 2.0])); }
+            for sy in [-1.0, 1.0] { v.push(bx([0.0, sy * d.w * 0.45, d.h - 1.1], [d.l * 0.45, 0.05, 0.08])); }
             for sx in [-1.0, 1.0] {
+                // Plenum, fan ring, fan hub and the drive motor below.
                 let x0 = sx * d.l / 4.0;
                 v.push(Shape::Frustum { a: [x0, 0.0, d.h - 0.9], b: [x0, 0.0, d.h], r1: d.d / 2.0 * 0.85, r2: (d.w / 2.0).min(d.d / 2.0) });
                 v.push(Shape::tube([x0, 0.0, d.h - 1.05], [x0, 0.0, d.h - 0.9], d.d / 2.0 * 0.85));
+                v.push(Shape::tube([x0, 0.0, d.h - 1.15], [x0, 0.0, d.h - 1.05], 0.15));
+                v.push(Shape::tube([x0, 0.0, d.h - 1.75], [x0, 0.0, d.h - 1.2], 0.18));
             }
-            v
         }
-        EquipKind::Package => vec![
-            Shape::Cuboid { centre: [0.0, 0.0, 0.1], axes: ax, half: [d.l / 2.0, d.w / 2.0, 0.1] },
-            Shape::Cuboid { centre: [0.0, 0.0, 0.2 + (d.h - 0.2) / 2.0], axes: ax, half: [d.l * 0.42, d.w * 0.42, (d.h - 0.2) / 2.0] },
-        ],
+        EquipKind::Package => {
+            // Skid of two main beams and cross members, the equipment enclosure, a control panel.
+            for sy in [-1.0, 1.0] { v.push(bx([0.0, sy * (d.w / 2.0 - 0.1), 0.1], [d.l / 2.0, 0.1, 0.1])); }
+            for k in 0..5 { let xk = -d.l / 2.0 + 0.05 + (d.l - 0.1) * k as f64 / 4.0; v.push(bx([xk, 0.0, 0.08], [0.05, d.w / 2.0 - 0.2, 0.08])); }
+            v.push(bx([0.0, 0.0, 0.21], [d.l / 2.0, d.w / 2.0, 0.01]));
+            v.push(bx([-d.l * 0.08, 0.0, 0.22 + (d.h - 0.22) / 2.0], [d.l * 0.34, d.w * 0.42, (d.h - 0.22) / 2.0]));
+            v.push(bx([d.l * 0.38, 0.0, 0.22 + (d.h * 0.75 - 0.22) / 2.0], [0.1, d.w * 0.25, (d.h * 0.75 - 0.22) / 2.0]));
+        }
     }
+    v
 }
 
 /// Moves a shape from the item's axes to the plot.
