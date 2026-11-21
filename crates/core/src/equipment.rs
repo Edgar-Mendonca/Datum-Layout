@@ -436,6 +436,82 @@ fn body(e: &Equipment) -> Vec<Shape> {
     v
 }
 
+/// The shell radius platforms are built round, for the kinds that take them.
+pub fn shell_radius(e: &Equipment) -> Option<f64> {
+    match e.kind {
+        EquipKind::VerticalVessel | EquipKind::Column | EquipKind::Agitated | EquipKind::Tank => Some(e.dims.d / 2.0),
+        _ => None,
+    }
+}
+
+/// The platforms and ladders of an item, in its own axes (0.3.7): grating in segments round the
+/// shell (open where a ladder comes through), a toe plate, handrails with posts, brackets with knee
+/// braces back to the shell; and for each platform with a ladder, a caged ladder from the platform
+/// below (or grade) up through it.
+pub fn platform_shapes(e: &Equipment) -> Vec<Shape> {
+    let Some(r) = shell_radius(e) else { return vec![] };
+    let mut v = vec![];
+    let z: P3 = [0.0, 0.0, 1.0];
+    let dir = |a: f64| -> P3 { [a.cos(), a.sin(), 0.0] };
+    let tan = |a: f64| -> P3 { [-a.sin(), a.cos(), 0.0] };
+    let pt = |rad: f64, a: f64, h: f64| -> P3 { [rad * a.cos(), rad * a.sin(), h] };
+    let mut below = 0.0;
+    for pl in &e.platforms {
+        let (r0, r1) = (r + 0.05, r + 0.05 + pl.width);
+        let (a0, a1) = (pl.from.to_radians(), pl.to.to_radians());
+        let span = a1 - a0;
+        let full = span >= TAU - 1e-6;
+        let la = pl.ladder_at.to_radians();
+        let rl = r + 0.3;
+        let open = 0.35 / rl;
+        let ang_off = |a: f64| { let d = (a - la).rem_euclid(TAU); d.min(TAU - d) };
+        // Grating and toe plate, about 10° a segment.
+        let n = ((span / 10f64.to_radians()).ceil() as usize).max(1);
+        let da = span / n as f64;
+        for k in 0..n {
+            let a = a0 + (k as f64 + 0.5) * da;
+            let ax = [dir(a), tan(a), z];
+            if !(pl.ladder && ang_off(a) < open + da / 2.0) {
+                v.push(Shape::Cuboid { centre: pt((r0 + r1) / 2.0, a, pl.el - 0.015), axes: ax, half: [pl.width / 2.0, r1 * (da / 2.0).tan() + 0.005, 0.015] });
+            }
+            v.push(Shape::Cuboid { centre: pt(r1 - 0.004, a, pl.el + 0.05), axes: ax, half: [0.004, r1 * (da / 2.0).tan() + 0.005, 0.05] });
+        }
+        // Handrail (top and knee rails) and posts; brackets and knee braces at the same places.
+        for h in [1.1, 0.55] { v.push(Shape::Torus { centre: [0.0, 0.0, pl.el + h], axis: z, start: mul(dir(a0), r1 - 0.025), angle: span, r: 0.022 }); }
+        let posts = ((span * r1 / 1.6).ceil() as usize).max(1);
+        let m = if full { posts } else { posts + 1 };
+        for k in 0..m {
+            let a = a0 + span * k as f64 / posts as f64;
+            v.push(Shape::tube(pt(r1 - 0.025, a, pl.el), pt(r1 - 0.025, a, pl.el + 1.1), 0.022));
+            v.push(Shape::Cuboid { centre: pt((r0 + r1) / 2.0, a, pl.el - 0.08), axes: [dir(a), tan(a), z], half: [pl.width / 2.0, 0.035, 0.05] });
+            v.push(Shape::tube(pt(r, a, pl.el - 0.13 - pl.width * 0.8), pt(r1 - 0.1, a, pl.el - 0.12), 0.03));
+        }
+        // The caged ladder: two stringers, rungs every 300 mm, hoops and straps from 2.2 m up.
+        if pl.ladder {
+            let (n0, t0) = (dir(la), tan(la));
+            let base = mul(n0, rl);
+            let at = |s: f64, h: f64| add(add(base, mul(t0, s)), [0.0, 0.0, h]);
+            let (z0, z1) = (below, pl.el + 1.1);
+            for s in [-0.23, 0.23] { v.push(Shape::tube(at(s, z0), at(s, z1), 0.03)); }
+            let mut h = z0 + 0.3;
+            while h < pl.el - 0.05 { v.push(Shape::tube(at(-0.23, h), at(0.23, h), 0.012)); h += 0.3; }
+            let c0 = z0 + 2.2;
+            if z1 > c0 + 0.3 {
+                let centre = add(base, mul(n0, 0.36));
+                let mut h = c0;
+                while h <= z1 + 1e-9 { v.push(Shape::Torus { centre: add(centre, [0.0, 0.0, h]), axis: z, start: mul(t0, -0.36), angle: std::f64::consts::PI, r: 0.02 }); h += 0.9; }
+                for k in 0..5 {
+                    let b = std::f64::consts::PI * (k as f64 + 0.5) / 5.0;
+                    let off = add(mul(t0, -0.36 * b.cos()), mul(n0, 0.36 * b.sin()));
+                    v.push(Shape::Cuboid { centre: add(add(centre, off), [0.0, 0.0, (c0 + z1) / 2.0]), axes: [z, n0, t0], half: [(z1 - c0) / 2.0, 0.004, 0.025] });
+                }
+            }
+        }
+        below = pl.el;
+    }
+    v
+}
+
 /// Moves a shape from the item's axes to the plot.
 pub fn place(s: &Shape, pos: P3, rot: f64) -> Shape {
     let p = |v: P3| add(pos, rot_z(v, rot));
@@ -471,6 +547,11 @@ pub fn nozzle(e: &Equipment, n: &Nozzle, cat: &Catalogue) -> PlacedNozzle {
 }
 
 /// The item on the plot: body shapes and nozzles.
+/// The item's platforms and ladders on the plot.
+pub fn platforms(e: &Equipment) -> Vec<Shape> {
+    platform_shapes(e).iter().map(|s| place(s, e.pos, e.rot)).collect()
+}
+
 pub fn shapes(e: &Equipment, cat: &Catalogue) -> (Vec<Shape>, Vec<PlacedNozzle>) {
     let body = body(e).iter().map(|s| place(s, e.pos, e.rot)).collect();
     (body, e.nozzles.iter().map(|n| nozzle(e, n, cat)).collect())
@@ -479,6 +560,30 @@ pub fn shapes(e: &Equipment, cat: &Catalogue) -> (Vec<Shape>, Vec<PlacedNozzle>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn platforms_ring_the_shell_and_ladders_climb_to_them() {
+        let mut e = new(EquipKind::Column, "C-1");
+        let r = e.dims.d / 2.0;
+        e.platforms = vec![
+            crate::model::Platform { el: 6.0, ..Default::default() },
+            crate::model::Platform { el: 12.0, from: 90.0, to: 270.0, width: 1.2, ladder: true, ladder_at: 180.0 },
+        ];
+        let s = platform_shapes(&e);
+        // Bounds of what is drawn (a torus's box is loose).
+        let bounds = |v: &[&Shape]| { let mut m = crate::parts::Mesh::default(); for x in v { m.shape(x, 24); } let (mut lo, mut hi) = ([f64::INFINITY; 3], [f64::NEG_INFINITY; 3]); for c in m.pos.chunks(3) { for i in 0..3 { lo[i] = lo[i].min(c[i] as f64); hi[i] = hi[i].max(c[i] as f64); } } (lo, hi) };
+        let (lo, hi) = bounds(&s.iter().collect::<Vec<_>>());
+        // From grade (the first ladder) to the upper handrail; out to the lower platform's edge.
+        assert!(lo[2] < 0.05 && (hi[2] - 13.12).abs() < 0.01, "{lo:?} {hi:?}");
+        assert!((hi[0] - (r + 1.05)).abs() < 0.02, "{hi:?}");
+        // The upper platform covers the west half only: nothing of it east of the shell.
+        let upper: Vec<&Shape> = s.iter().filter(|x| { let (a, b) = x.aabb(); a[2] > 11.5 && b[2] < 13.3 }).collect();
+        assert!(!upper.is_empty() && bounds(&upper).1[0] < r * 0.2, "the upper platform stays on its arc: {:?}", bounds(&upper));
+        // Kinds without a round shell take none.
+        let mut p = new(EquipKind::Pump, "P-1");
+        p.platforms = vec![crate::model::Platform::default()];
+        assert!(platform_shapes(&p).is_empty());
+    }
     use crate::parts::{dist, dot};
 
     #[test]

@@ -695,6 +695,10 @@ tr.behind td { background: var(--err-bg); }
 .iprow .unit { font: 10.5px var(--mono); color: var(--muted); }
 .iprow input, .iprow select, .iprow textarea { width: 100%; min-width: 0; }
 .iprow .hint { color: var(--muted); font-size: 10.5px; }
+.iprow .pair { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.iprow .pair > * { flex: 1; min-width: 0; }
+.iprow .pair input[type=checkbox] { flex: none; width: auto; }
+.pfcard { border-top: 1px solid var(--line2); padding-top: 8px; margin-top: 4px; }
 .iprow .inline { display: flex; gap: 4px; }
 .iprow .inline select { flex: 1; }
 .iwhat { margin: 0 0 10px; }

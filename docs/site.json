@@ -106,7 +106,8 @@
         "Steel and supports drawn as they are built: base plates, end plates, shoes, guides and stops (0.3.4)",
         "Pipe racks as one object, with lines on their tiers (0.3.5)",
         "Supports standing on the steel, and Check finds one with nothing under it (0.3.6)",
-        "Platforms, ladders and stairs, and an access check",
+        "Platforms and caged ladders on vessels and columns (0.3.7)",
+        "Free-standing platforms and stairs, and an access check",
         "Steel in the take-off and the clash check"
       ]
     },

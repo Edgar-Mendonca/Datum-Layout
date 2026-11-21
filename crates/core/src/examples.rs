@@ -152,7 +152,11 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     let mut b = new_b(cat);
     b.op(Op::AddArea(Area { name: "Pipe rack".into(), unit: "Unit 300".into(), min: [4.0, 9.0, 4.0], max: [24.0, 12.2, 6.5], ..Default::default() }));
     let side4 = Nozzle { tag: "N4".into(), nps: "4".into(), pos: [0.0, 1.0, 4.5], dir: [0.0, 1.0, 0.0], service: "Product out".into(), ..Default::default() };
-    let v1 = b.equip(EquipKind::VerticalVessel, "V-301", [3.0, 10.0, 0.0], |e| e.nozzles.push(side4.clone()));
+    // V-301 has a platform on its south-west side below the top head, with a caged ladder from grade.
+    let v1 = b.equip(EquipKind::VerticalVessel, "V-301", [3.0, 10.0, 0.0], |e| {
+        e.nozzles.push(side4.clone());
+        e.platforms.push(crate::model::Platform { el: 4.8, from: 170.0, to: 280.0, width: 1.0, ladder: true, ladder_at: 225.0 });
+    });
     let v2 = b.equip(EquipKind::VerticalVessel, "V-302", [25.0, 10.0, 0.0], |e| {
         e.nozzles[1].pos = [-1.0, 0.0, 1.9];
         e.nozzles[1].dir = [-1.0, 0.0, 0.0];

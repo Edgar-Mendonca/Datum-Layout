@@ -644,6 +644,26 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.click('.tabs > button:has-text("Home")'); await settle(100);
   if (shots) { await p.click(".v3d .vhome"); await settle(500); await shot("rack"); }
 
+  // 8i. Platforms (0.3.7): a column's card adds a platform with a caged ladder; the ladder can go.
+  await open(null); await settle(300);
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  await p.dblclick('.partsp .cattile[data-kind="column"]'); await settle(600);
+  // (A bug found here: angles kept in degrees were shown as if in radians.)
+  const rotShown = await p.$eval('.insp .iprow:has-text("Rotation") input', el => el.value).catch(() => "?");
+  check("the card shows an item's rotation in degrees (0 shows 0)", rotShown === "0", rotShown);
+  await p.click('.insp .itabs button:has-text("Platforms")'); await settle(200);
+  await p.click(".insp .addpf"); await settle(500);
+  await p.click(".insp .addpf"); await settle(500);
+  st = await state();
+  const pf = st.p.equipment[0].platforms;
+  check("the Platforms tab adds platforms, one above the other, each with a ladder", pf.length === 2 && pf[1].el > pf[0].el && pf.every(x => x.ladder), JSON.stringify(pf));
+  check("platforms are drawn with the item", (await ask("scene")).ok.parts.some(q => q.kind === "platform" && q.equip === st.p.equipment[0].id));
+  await p.click(".insp .pfladder >> nth=1"); await settle(500);
+  check("a platform's ladder can be taken off", (await state()).p.equipment[0].platforms[1].ladder === false);
+  const arcShown = await p.$$eval(".insp .pfcard .numin input", els => els.map(e => e.value)).catch(() => []);
+  check("a platform's arc shows in degrees (0 to 360)", arcShown.includes("360"), JSON.stringify(arcShown));
+  if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("platforms"); }
+
   // 8f. Templates (0.2.14): an item saved as set up, placed again, deleted.
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
   if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }

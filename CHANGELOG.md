@@ -1,5 +1,19 @@
 # What's new in Datum Layout
 
+## 0.3.7 — 2026-11-21
+Platforms and ladders on vessels and columns.
+
+- **Platforms:** on the new Platforms tab of a vertical vessel, column, agitated vessel or tank, **Add a platform**. Each has:
+  - a floor height above the item's base;
+  - an arc (all round, or part of it);
+  - a width out from the shell.
+- **How it is drawn:** grating, a toe plate, handrails with posts, and brackets with knee braces back to the shell. It moves and turns with the item and goes to the glTF.
+- **Caged ladders** climb from the platform below, or from grade, up through the platform. A ladder has rungs every 300 mm, hoops and straps from 2.2 m up, and handholds above the floor. The ladder can go on any part of the arc, or be taken off.
+- **The example "Small pipe rack run"** has a platform with a caged ladder on V-301.
+- **Fixed:** the card showed angles kept in degrees (an item's rotation, plant north) as if they were radians: 90° read as 5157. They now show in degrees.
+
+Next: free-standing platforms and stairs, and an access check (0.3.8).
+
 ## 0.3.6 — 2026-11-21
 Supports stand on the steel.
 

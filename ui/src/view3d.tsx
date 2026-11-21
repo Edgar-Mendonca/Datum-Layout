@@ -20,7 +20,7 @@ const E = (v: THREE.Vector3): V3 => [v.x, -v.z, v.y];
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
 
 const COLOURS: Record<string, string> = {
-  equipment: "#A3AEB9", nozzle: "#8F9BA8", pipe: "#7F8C99", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", steel: "#9E8C5C", rack: "#9E8C5C", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
+  equipment: "#A3AEB9", nozzle: "#8F9BA8", pipe: "#7F8C99", elbow90: "#4F6F8F", elbow45: "#4F6F8F", tee: "#4F6F8F", cross: "#4F6F8F", steel: "#9E8C5C", rack: "#9E8C5C", platform: "#B39B57", weldolet: "#4F6F8F", sockolet: "#4F6F8F", reducer: "#4F6F8F", cap: "#4F6F8F",
   flange: "#6E7A87", blind: "#6E7A87", gasket: "#2E2E2E", bolts: "#3E454D", gate: "#B8742A", globe: "#B8742A", check: "#B8742A", ball: "#B8742A", butterfly: "#B8742A", strainer: "#9C6B3A", support: "#7C8B5A",
 };
 const SELECTED = new THREE.Color("#2F8CFF"), PROBLEM = new THREE.Color("#D64545");

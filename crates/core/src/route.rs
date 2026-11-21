@@ -47,7 +47,7 @@ impl Part {
         Part { kind, line: line.id, equip: 0, item: 0, seg: -1, nps: line.nps.clone(), nps2: String::new(), rating: 0, ports: vec![], shapes: vec![], length: 0.0, corner: None, bolts: None, note: String::new(), insulation: line.insulation }
     }
     pub fn is_pipe_like(&self) -> bool {
-        !matches!(self.kind, "equipment" | "nozzle" | "bolts")
+        !matches!(self.kind, "equipment" | "nozzle" | "bolts" | "platform")
     }
 }
 
@@ -239,6 +239,10 @@ pub fn build(p: &Project, cat: &Catalogue) -> Built {
     for e in &p.equipment {
         let (body, noz) = equipment::shapes(e, cat);
         b.parts.push(Part { kind: "equipment", line: 0, equip: e.id, item: 0, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: body, length: 0.0, corner: None, bolts: None, note: e.tag.clone(), insulation: 0.0 });
+        let pf = equipment::platforms(e);
+        if !pf.is_empty() {
+            b.parts.push(Part { kind: "platform", line: 0, equip: e.id, item: 0, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: pf, length: 0.0, corner: None, bolts: None, note: e.tag.clone(), insulation: 0.0 });
+        }
         for n in noz {
             b.parts.push(Part { kind: "nozzle", line: 0, equip: e.id, item: 0, seg: -1, nps: n.port.nps.clone(), nps2: String::new(), rating: n.port.rating, ports: vec![n.port], shapes: n.shapes, length: 0.0, corner: None, bolts: None, note: n.tag, insulation: 0.0 });
         }

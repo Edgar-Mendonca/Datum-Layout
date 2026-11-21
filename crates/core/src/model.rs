@@ -195,6 +195,19 @@ pub struct Equipment {
     /// Datasheet values: (label, value with unit), as the designer typed them.
     pub data: Vec<(String, String)>,
     pub area: u32,
+    /// Platforms round a vertical vessel, column or tank (0.3.7).
+    pub platforms: Vec<Platform>,
+}
+
+/// A platform round a vertical item (0.3.7): its walking surface's height above the item's base,
+/// the arc it covers (degrees in the item's own axes, anticlockwise from its x axis), its width out
+/// from the shell, and whether a caged ladder comes up to it (from the platform below, or grade)
+/// and where on the arc.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Platform { pub el: f64, pub from: f64, pub to: f64, pub width: f64, pub ladder: bool, pub ladder_at: f64 }
+impl Default for Platform {
+    fn default() -> Self { Self { el: 3.0, from: 0.0, to: 360.0, width: 1.0, ladder: true, ladder_at: 180.0 } }
 }
 
 /// What ends a line at a free point.
@@ -569,6 +582,17 @@ impl Project {
             let d = &mut e.dims;
             for (v, lo, hi, def) in [(&mut d.d, 0.05, 100.0, 1.5), (&mut d.l, 0.05, 200.0, 4.0), (&mut d.h, 0.05, 200.0, 4.0), (&mut d.elev, 0.0, 100.0, 1.0), (&mut d.d2, 0.02, 50.0, 0.5), (&mut d.l2, 0.02, 50.0, 1.0), (&mut d.w, 0.05, 50.0, 1.0)] { fin(v, lo, hi, def); }
             e.nozzles.truncate(200);
+            e.platforms.truncate(20);
+            for pl in &mut e.platforms {
+                fin(&mut pl.el, 0.3, 200.0, 3.0);
+                fin(&mut pl.width, 0.6, 3.0, 1.0);
+                fin(&mut pl.from, -720.0, 720.0, 0.0);
+                fin(&mut pl.to, -720.0, 1080.0, 360.0);
+                fin(&mut pl.ladder_at, -720.0, 720.0, 180.0);
+                while pl.to <= pl.from { pl.to += 360.0; }
+                if pl.to - pl.from > 360.0 { pl.to = pl.from + 360.0; }
+            }
+            e.platforms.sort_by(|a, b| a.el.total_cmp(&b.el));
             let mut tags = std::collections::HashSet::new();
             for (i, n) in e.nozzles.iter_mut().enumerate() {
                 p3(&mut n.pos);

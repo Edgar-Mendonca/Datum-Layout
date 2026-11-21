@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { STEEL, RACK, Rack, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { STEEL, RACK, Rack, Platform, PLATFORM_KINDS, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, openDialog, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help, helpCard } from "./help";
@@ -104,6 +104,8 @@ export const PartsPanel = () => {
 
 // ------------------------------------------------------------ the Inspector
 /** A number with its unit, typed in display units (values with units are understood). */
+/** An angle kept in degrees in the model (rotations, plant north, platform arcs); the unit table's angle is in radians. */
+export const DegIn = (p: { v: number; set: (deg: number) => void; title?: string }) => <NumIn q="angle" v={p.v * Math.PI / 180} title={p.title} set={r => p.set(r * 180 / Math.PI)} />;
 export const NumIn = (p: { q: Q; v: number; set: (si: number) => void; min?: number; title?: string }) => (
   <span class="numin"><input class="mono" value={+toU(p.q, p.v).toFixed(4)} title={p.title}
     onChange={e => { const r = parseQ(e.currentTarget.value, p.q); if (typeof r === "string") { toast(r); e.currentTarget.value = String(+toU(p.q, p.v).toFixed(4)); return; } const si = fromU(p.q, r); if (p.min !== undefined && si < p.min) { toast("That value is too small."); return; } p.set(si); }} />
@@ -130,13 +132,21 @@ const saveTemplate = (e: Equipment) => {
   ));
 };
 /** The equipment card's tab (kept while moving between items). */
-const [eqTab, setEqTab] = createSignal<"general" | "nozzles" | "datasheet">("general");
+const [eqTab, setEqTab] = createSignal<"general" | "nozzles" | "platforms" | "datasheet">("general");
 let lastEq = 0;
 const EquipInsp = (p: { e: Equipment }) => {
   const fields = () => catalogue()?.fields.find(f => f[0] === p.e.kind)?.[2] ?? [];
   const set = (e: Partial<Equipment>) => act({ SetEquipment: { ...p.e, ...e } });
   const setN = (i: number, n: Partial<Nozzle>) => set({ nozzles: p.e.nozzles.map((x, j) => j === i ? { ...x, ...n } : x) });
   const addN = () => { let k = p.e.nozzles.length + 1; while (p.e.nozzles.some(n => n.tag === `N${k}`)) k++; set({ nozzles: [...p.e.nozzles, { tag: `N${k}`, nps: "2", rating: 150, facing: "RF", pos: [0, 0, 1], dir: [1, 0, 0], proj: 0.2, service: "" }] }); };
+  const setP = (i: number, x: Partial<Platform>) => set({ platforms: (p.e.platforms ?? []).map((y, j) => j === i ? { ...y, ...x } : y) });
+  const addP = () => {
+    const ps = p.e.platforms ?? [], d = p.e.dims;
+    const top = p.e.kind === "tank" ? d.h : d.elev + d.h - 1.0;
+    // The first a few metres up (a tank's at its roof), each next one 4 m higher, to the top.
+    const el = ps.length ? Math.min(top, ps[ps.length - 1].el + 4) : p.e.kind === "tank" ? top : Math.min(top, d.elev + 3);
+    set({ platforms: [...ps, { el, from: 0, to: 360, width: 1.0, ladder: true, ladder_at: 180 }] });
+  };
   const dirs: [string, V3][] = [["East (+E)", [1, 0, 0]], ["West (−E)", [-1, 0, 0]], ["North (+N)", [0, 1, 0]], ["South (−N)", [0, -1, 0]], ["Up", [0, 0, 1]], ["Down", [0, 0, -1]]];
   const dirKey = (d: V3) => dirs.find(x => x[1].every((v, i) => Math.abs(v - d[i]) < 1e-6))?.[0] ?? "Other";
   // A picked nozzle opens the Nozzles tab.
@@ -144,13 +154,13 @@ const EquipInsp = (p: { e: Equipment }) => {
   // Another item opens on General.
   createEffect(on(() => p.e.id, id => { if (id !== lastEq && sel()?.kind !== "nozzle") setEqTab("general"); lastEq = id; }));
   return (<>
-    <nav class="itabs" role="tablist"><For each={[["general", "General"], ["nozzles", `Nozzles · ${p.e.nozzles.length}`], ["datasheet", "Datasheet"]] as [typeof eqTab extends () => infer T ? T : never, string][]}>{([k, l]) => <button role="tab" classList={{ on: eqTab() === k }} onClick={() => setEqTab(k)}>{l}</button>}</For></nav>
+    <nav class="itabs" role="tablist"><For each={[["general", "General"], ["nozzles", `Nozzles · ${p.e.nozzles.length}`], ...(PLATFORM_KINDS.includes(p.e.kind) ? [["platforms", `Platforms · ${(p.e.platforms ?? []).length}`]] : []), ["datasheet", "Datasheet"]] as [typeof eqTab extends () => infer T ? T : never, string][]}>{([k, l]) => <button role="tab" classList={{ on: eqTab() === k }} onClick={() => setEqTab(k)}>{l}</button>}</For></nav>
     <Show when={eqTab() === "general"}>
     <Row l="Tag"><input value={p.e.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
     <p class="muted iwhat">{EQUIP.find(x => x[0] === p.e.kind)?.[1]} · DEXPI class {DEXPI[p.e.kind]}</p>
     <h4>Position <Help k="move" /></h4>
     <V3In v={p.e.pos} set={v => set({ pos: v })} />
-    <Row l="Rotation"><NumIn q="angle" v={p.e.rot} set={v => set({ rot: v })} /></Row>
+    <Row l="Rotation"><DegIn v={p.e.rot} set={v => set({ rot: v })} /></Row>
     <h4>Sizes <Help k="equipment" /></h4>
     <For each={fields()}>{([k, l]) => <Row l={l}><NumIn q="coord" v={(p.e.dims as any)[k]} min={0.01} set={v => set({ dims: { ...p.e.dims, [k]: v } })} /></Row>}</For>
     <p class="ibtns"><button class="btn sm" title="Keep this item (type, sizes, nozzles, datasheet) as a template to place again in any plant, from Parts › My templates" onClick={() => saveTemplate(p.e)}>Save as a template…</button></p>
@@ -175,6 +185,18 @@ const EquipInsp = (p: { e: Equipment }) => {
       </>}</For>
     </tbody></table>
     <button class="btn sm" onClick={addN}>Add a nozzle</button>
+    </Show>
+    <Show when={eqTab() === "platforms" && PLATFORM_KINDS.includes(p.e.kind)}>
+    <h4>Platforms <Help k="platforms" /></h4>
+    <For each={p.e.platforms ?? []}>{(pl, i) => <div class="pfcard">
+      <Row l="Floor height"><NumIn q="coord" v={pl.el} min={0.3} set={v => setP(i(), { el: v })} /></Row>
+      <Row l="Arc (from, to)"><span class="pair"><DegIn v={pl.from} set={v => setP(i(), { from: v })} /><DegIn v={pl.to} set={v => setP(i(), { to: v })} /></span></Row>
+      <Row l="Width"><NumIn q="len" v={pl.width} min={0.6} set={v => setP(i(), { width: v })} /></Row>
+      <Row l="Ladder, at"><span class="pair"><input type="checkbox" class="pfladder" checked={pl.ladder} onChange={e => setP(i(), { ladder: e.currentTarget.checked })} /><Show when={pl.ladder}><DegIn v={pl.ladder_at} title="Where on the arc the ladder comes up" set={v => setP(i(), { ladder_at: v })} /></Show></span></Row>
+      <p class="ibtns"><button class="btn sm" onClick={() => set({ platforms: p.e.platforms.filter((_, j) => j !== i()) })}>Remove this platform</button></p>
+    </div>}</For>
+    <p class="muted iwhat">Floor height above the item's base; width out from the shell. Angles are in the item's own axes, anticlockwise from its X axis (east when it is not turned). A caged ladder climbs from the platform below, or from grade.</p>
+    <button class="btn sm addpf" onClick={addP}>Add a platform</button>
     </Show>
     <Show when={eqTab() === "datasheet"}>
     <h4>Datasheet</h4>
@@ -298,7 +320,7 @@ const PlotInsp = () => {
     <Row l="Grid spacing"><NumIn q="coord" v={p().plot.grid} min={0.001} set={v => set({ grid: v })} /></Row>
     <Row l="East from–to"><div class="two"><NumIn q="coord" v={p().plot.e[0]} set={v => set({ e: [v, p().plot.e[1]] })} /><NumIn q="coord" v={p().plot.e[1]} set={v => set({ e: [p().plot.e[0], v] })} /></div></Row>
     <Row l="North from–to"><div class="two"><NumIn q="coord" v={p().plot.n[0]} set={v => set({ n: [v, p().plot.n[1]] })} /><NumIn q="coord" v={p().plot.n[1]} set={v => set({ n: [p().plot.n[0], v] })} /></div></Row>
-    <Row l="Plant north (clockwise from grid north)"><NumIn q="angle" v={p().plot.north} set={v => set({ north: v })} /></Row>
+    <Row l="Plant north (clockwise from grid north)"><DegIn v={p().plot.north} set={v => set({ north: v })} /></Row>
     <Row l="Ground elevation"><NumIn q="coord" v={p().plot.ground} set={v => set({ ground: v })} /></Row>
     <h4>Checks</h4>
     <Row l="Clash clearance" h="clearance"><NumIn q="clear" v={p().settings.clearance} min={0} set={v => act({ SetSettings: { ...p().settings, clearance: v } })} /></Row>

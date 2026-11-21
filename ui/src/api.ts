@@ -14,7 +14,11 @@ export interface Area { id: number; uid: string; name: string; unit: string; min
 export type EquipKind = "vertical_vessel" | "horizontal_drum" | "tank" | "column" | "pump" | "exchanger" | "sphere" | "filter" | "agitated" | "heater" | "inline_pump" | "compressor" | "recip_compressor" | "kettle" | "plate_hx" | "air_cooler" | "package";
 export interface Nozzle { tag: string; nps: string; rating: number; facing: string; pos: V3; dir: V3; proj: number; service: string }
 export interface Dims { d: number; l: number; h: number; elev: number; d2: number; l2: number; w: number }
-export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number }
+export interface Equipment { id: number; uid: string; tag: string; kind: EquipKind; pos: V3; rot: number; dims: Dims; nozzles: Nozzle[]; data: [string, string][]; area: number; platforms: Platform[] }
+/** A platform round a vertical item (0.3.7): height of its floor above the item's base, its arc (degrees from the item's x axis, anticlockwise), width, and a caged ladder. */
+export interface Platform { el: number; from: number; to: number; width: number; ladder: boolean; ladder_at: number }
+/** The kinds that take platforms (a round shell). */
+export const PLATFORM_KINDS: EquipKind[] = ["vertical_vessel", "column", "agitated", "tank"];
 export type Term = "open" | "cap" | "blind";
 export type End = { kind: "point"; term: Term } | { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number; port?: number };
 export type ItemKind = "gate" | "globe" | "check" | "ball" | "butterfly" | "strainer" | "flange_pair" | "tee" | "reducer" | "cross" | "weldolet" | "sockolet" | "support";

@@ -331,7 +331,7 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
         }
     }
     // Pairs whose boxes come within the clearance: sweep along east.
-    let mut order: Vec<usize> = (0..b.parts.len()).filter(|&i| !b.parts[i].shapes.is_empty() && !matches!(b.parts[i].kind, "steel" | "rack" | "bolts")).collect();
+    let mut order: Vec<usize> = (0..b.parts.len()).filter(|&i| !b.parts[i].shapes.is_empty() && !matches!(b.parts[i].kind, "steel" | "rack" | "bolts" | "platform")).collect();
     order.sort_by(|&x, &y| boxes[x].0[0].total_cmp(&boxes[y].0[0]));
     let mut solid_cache: HashMap<usize, Vec<(P3, P3, Solid)>> = HashMap::new();
     let mut best: HashMap<(u32, u32, i64, u32, u32, i64), (f64, usize, usize)> = HashMap::new();
