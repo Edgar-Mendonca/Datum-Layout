@@ -307,7 +307,8 @@ fn every_check_has_a_failing_and_a_passing_case() {
     q.lines[0].number.clear();
     assert!(kinds(&q).iter().any(|k| k.0 == "number"));
     // Class rule: a 16" ball valve is not in CS1 (ball valves to 12"); a gate valve is.
-    let mut r = line("16", vec![[0.0, 0.0, 3.0], [8.0, 0.0, 3.0]], vec![item(5, ItemKind::Ball, 0, 4.0)]);
+    // (Low enough that a gate valve's handwheel is in reach from grade.)
+    let mut r = line("16", vec![[0.0, 0.0, 0.9], [8.0, 0.0, 0.9]], vec![item(5, ItemKind::Ball, 0, 4.0)]);
     r.lines[0].from = End::Point { term: Term::Blind };
     r.lines[0].to = End::Point { term: Term::Blind };
     assert!(kinds(&r).iter().any(|k| k.0 == "class" && k.1.contains("16\" ball")), "{:?}", kinds(&r));

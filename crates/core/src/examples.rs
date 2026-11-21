@@ -111,8 +111,9 @@ fn pumps(cat: &Catalogue) -> Project {
         let top = b.port(br(h, tee));
         let d = b.port(noz(pump, "D"));
         let l = b.line(&format!("4\"-P-{n}-CS1"), "4", br(h, tee), noz(pump, "D"), vec![top, d]);
-        b.drop(l, ItemKind::Gate, [13.4, y, 3.1], [1.0, 0.0, 0.0]);
-        b.drop(l, ItemKind::Check, [13.4, y, 2.0], [1.0, 0.0, 0.0]);
+        // Low on the riser, where an operator at grade reaches the handwheel.
+        b.drop(l, ItemKind::Gate, [13.4, y, 1.95], [1.0, 0.0, 0.0]);
+        b.drop(l, ItemKind::Check, [13.4, y, 1.45], [1.0, 0.0, 0.0]);
     }
     b.done("Pump suction and discharge", "Example 1. A tank feeds a duty and standby pump pair through 8\" suction lines with strainers; each pump discharges through a check valve and a gate valve to a 6\" header.")
 }
@@ -143,6 +144,12 @@ fn exchanger(cat: &Catalogue) -> Project {
     b.drop(cws, ItemKind::Gate, [n3[0], 7.0, 3.5], [1.0, 0.0, 0.0]);
     let cwr = b.line("4\"-CW-2005-CS1", "4", noz(e, "N4"), blind(), vec![n4, [n4[0], 10.0, 0.5], [n4[0], 5.0, 0.5]]);
     b.drop(cwr, ItemKind::Gate, [n4[0], 7.0, 0.5], [1.0, 0.0, 0.0]);
+    // Operating platforms with stairs, so the valves at 3 m are within reach: PF-1 along the
+    // exchanger's north side (the inlet gate and the bypass globe), PF-2 by the cooling water gate.
+    b.op(Op::AddDeck { a: [5.8, 10.4, 0.0], b: [11.5, 11.3, 0.0], el: 1.6 });
+    b.op(Op::AddStair { a: [3.4, 10.85, 0.0], b: [5.8, 10.85, 1.6] });
+    b.op(Op::AddDeck { a: [13.2, 6.4, 0.0], b: [14.6, 7.6, 0.0], el: 1.6 });
+    b.op(Op::AddStair { a: [13.9, 4.0, 0.0], b: [13.9, 6.4, 1.6] });
     b.done("Exchanger hook-up", "Example 2. A shell-and-tube exchanger: the process side enters and leaves through gate valves, with a bypass through a globe valve between two tees; cooling water comes in and out from the south.")
 }
 
@@ -168,7 +175,7 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     let a1 = b.port(noz(v2, "N2"));
     // Line A, 6": up from V-301 to the rack at 5 m, along it, and down into V-302.
     let la = b.line("6\"-P-3001-CS1", "6", noz(v1, "N2"), noz(v2, "N2"), vec![a0, [4.6, 10.0, a0[2]], [4.6, 10.0, 5.0], [23.4, 10.0, 5.0], [23.4, 10.0, a1[2]], a1]);
-    b.drop(la, ItemKind::Gate, [4.6, 10.0, 3.2], [1.0, 0.0, 0.0]);
+    b.drop(la, ItemKind::Gate, [4.6, 10.0, 2.5], [0.0, -1.0, 0.0]);
     // Line B, 4": from V-301's north side up to the rack's upper level at 6 m, and down to V-302.
     let b0 = b.port(noz(v1, "N4"));
     let b1 = b.port(noz(v2, "N4"));
@@ -180,7 +187,7 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     let tp = b.port(br(la, t));
     let low = if planted { 0.01 } else { 1.0 };
     let lc = b.line("3\"-D-3003-CS1", "3", br(la, t), blind(), vec![tp, [14.0, 9.2, 5.0], [14.0, 9.2, low]]);
-    b.drop(lc, ItemKind::Gate, [14.0, 9.2, 2.5], [1.0, 0.0, 0.0]);
+    b.drop(lc, ItemKind::Gate, [14.0, 9.2, 1.6], [1.0, 0.0, 0.0]);
     // The rack: bents every 6 m from x 5 to 23, 2.6 m wide; tier 1 under line A, tier 2 under line B.
     {
         let t1 = crate::rack::tier_under(5.0, cat.od("6"), 0.0);
@@ -189,6 +196,12 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
         let r = b.d.p.racks.iter().find(|r| r.id == id).cloned().expect("the rack just added");
         b.op(Op::SetRack(crate::model::Rack { width: 2.6, tiers: vec![t1, t2], ..r }));
     }
+    // Operating platforms with stairs, so the valves on the risers are within reach: PF-1 by line
+    // A's gate valve, PF-2 by line B's globe valve.
+    b.op(Op::AddDeck { a: [3.9, 8.7, 0.0], b: [4.8, 9.7, 0.0], el: 0.9 });
+    b.op(Op::AddStair { a: [4.35, 7.5, 0.0], b: [4.35, 8.7, 0.9] });
+    b.op(Op::AddDeck { a: [25.3, 11.0, 0.0], b: [26.8, 12.4, 0.0], el: 2.8 });
+    b.op(Op::AddStair { a: [29.8, 11.7, 0.0], b: [26.8, 11.7, 2.8] });
     // Supports on the rack's bents (one every 6 m): guides at the ends, a rest, an anchor.
     {
         use crate::model::SupportKind as S;

@@ -20,6 +20,7 @@ pub mod rack;
 pub mod route;
 pub mod scene;
 pub mod steel;
+pub mod structure;
 pub mod units;
 #[cfg(test)]
 mod geometry_tests;

@@ -84,6 +84,12 @@ pub enum Op {
     AddRack { a: P3, b: P3 },
     /// Changes a pipe rack (its members are made again).
     SetRack(crate::model::Rack),
+    /// A free-standing platform between two plan corners at grade, its floor at `el`.
+    AddDeck { a: P3, b: P3, el: f64 },
+    SetDeck(crate::model::Deck),
+    /// A stair from its foot `a` up to its top `b`.
+    AddStair { a: P3, b: P3 },
+    SetStair(crate::model::Stair),
     /// A new equipment item made from a template (its type, sizes, nozzles and datasheet), with
     /// the next free tag, its base at `pos`.
     AddFromTemplate { equip: Equipment, pos: P3 },
@@ -230,6 +236,19 @@ fn group(p: &mut Project, ids: &[u32], pt: impl Fn(P3) -> P3, dir: impl Fn(P3) -
     for m in p.steel.iter_mut().filter(|m| set.contains(&m.id)) {
         m.a = pt(m.a);
         m.b = pt(m.b);
+        any = true;
+    }
+    for d in p.decks.iter_mut().filter(|d| set.contains(&d.id)) {
+        let a = pt(d.a);
+        d.el += a[2] - d.a[2];
+        d.a = a;
+        d.b = pt(d.b);
+        d.b[2] = a[2];
+        any = true;
+    }
+    for s in p.stairs.iter_mut().filter(|s| set.contains(&s.id)) {
+        s.a = pt(s.a);
+        s.b = pt(s.b);
         any = true;
     }
     for r in p.racks.iter_mut().filter(|r| set.contains(&r.id)) {
@@ -511,6 +530,42 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             let name = |s: &str| cat.steel_section(s).map(|x| x.name.clone()).unwrap_or(s.to_string());
             let x = p.racks.iter_mut().find(|x| x.id == r.id).ok_or("That pipe rack no longer exists.")?;
             *x = crate::model::Rack { column: name(&r.column), beam: name(&r.beam), strut: name(&r.strut), brace: name(&r.brace), ..r };
+        }
+        Op::AddDeck { a, b, el } => {
+            if (b[0] - a[0]).abs() < 0.5 || (b[1] - a[1]).abs() < 0.5 { return Err("A platform needs to be at least 0.5 m each way.".into()); }
+            if el < a[2] + 0.3 { return Err("A platform's floor needs to be at least 0.3 m above where it stands.".into()); }
+            let mut k = p.decks.len() + 1;
+            while p.decks.iter().any(|d| d.tag == format!("PF-{k}")) { k += 1; }
+            let id = p.id();
+            p.decks.push(crate::model::Deck { id, tag: format!("PF-{k}"), a, b: [b[0], b[1], a[2]], el, ..Default::default() });
+            created.push(id);
+        }
+        Op::SetDeck(d) => {
+            if d.tag.trim().is_empty() { return Err("A platform needs a tag (for example PF-1).".into()); }
+            if p.decks.iter().any(|x| x.id != d.id && x.tag == d.tag) { return Err(format!("{} is already used by another platform.", d.tag)); }
+            if (d.b[0] - d.a[0]).abs() < 0.5 || (d.b[1] - d.a[1]).abs() < 0.5 { return Err("A platform needs to be at least 0.5 m each way.".into()); }
+            if d.el < d.a[2] + 0.3 { return Err("A platform's floor needs to be at least 0.3 m above where it stands.".into()); }
+            for (what, s) in [("leg", &d.leg), ("beam", &d.beam)] { if cat.steel_section(s).is_none() { return Err(format!("The {what} section {s} is not in the steel table.")); } }
+            let name = |s: &str| cat.steel_section(s).map(|x| x.name.clone()).unwrap_or(s.to_string());
+            let x = p.decks.iter_mut().find(|x| x.id == d.id).ok_or("That platform no longer exists.")?;
+            *x = crate::model::Deck { leg: name(&d.leg), beam: name(&d.beam), b: [d.b[0], d.b[1], d.a[2]], ..d };
+        }
+        Op::AddStair { a, b } => {
+            if b[2] - a[2] < 0.2 { return Err("A stair's top needs to be at least 0.2 m above its foot.".into()); }
+            if (b[0] - a[0]).hypot(b[1] - a[1]) < 0.2 { return Err("A stair needs a run: put its top away from its foot.".into()); }
+            let mut k = p.stairs.len() + 1;
+            while p.stairs.iter().any(|s| s.tag == format!("ST-{k}")) { k += 1; }
+            let id = p.id();
+            p.stairs.push(crate::model::Stair { id, tag: format!("ST-{k}"), a, b, ..Default::default() });
+            created.push(id);
+        }
+        Op::SetStair(s) => {
+            if s.tag.trim().is_empty() { return Err("A stair needs a tag (for example ST-1).".into()); }
+            if p.stairs.iter().any(|x| x.id != s.id && x.tag == s.tag) { return Err(format!("{} is already used by another stair.", s.tag)); }
+            if s.b[2] - s.a[2] < 0.2 { return Err("A stair's top needs to be at least 0.2 m above its foot.".into()); }
+            if (s.b[0] - s.a[0]).hypot(s.b[1] - s.a[1]) < 0.2 { return Err("A stair needs a run: put its top away from its foot.".into()); }
+            let x = p.stairs.iter_mut().find(|x| x.id == s.id).ok_or("That stair no longer exists.")?;
+            *x = s;
         }
         Op::AddFromTemplate { equip, pos } => {
             let mut e = equip;
@@ -914,6 +969,8 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             p.equipment.retain(|e| !ids.contains(&e.id));
             p.steel.retain(|m| !ids.contains(&m.id));
             p.racks.retain(|r| !ids.contains(&r.id));
+            p.decks.retain(|d| !ids.contains(&d.id));
+            p.stairs.retain(|s| !ids.contains(&s.id));
             p.lines.retain(|l| !ids.contains(&l.id));
             p.areas.retain(|a| !ids.contains(&a.id));
             for e in &mut p.equipment { if ids.contains(&e.area) { e.area = 0; } }

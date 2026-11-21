@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { STEEL, RACK, Rack, Platform, PLATFORM_KINDS, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { STEEL, RACK, ACCESS, Deck, Stair, Rack, Platform, PLATFORM_KINDS, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, openDialog, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help, helpCard } from "./help";
@@ -39,13 +39,13 @@ const freeSpot = (kind: string): V3 => {
 export const PartsPanel = () => {
   const [q, setQ] = createSignal("");
   const templates = () => (catalogue()?.cat.templates ?? []).filter(t => { const w = q().trim().toLowerCase(); return !w || `${t.name} ${t.equip.kind.replace("_", " ")} template`.toLowerCase().includes(w); });
-  const all = (): [string, string, string, "equip" | "item" | "steel"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"]), ...[...STEEL, RACK].map(([k, l, i]) => [k, l, i, "steel"] as [string, string, string, "steel"])];
+  const all = (): [string, string, string, "equip" | "item" | "steel"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"]), ...[...STEEL, RACK, ...ACCESS].map(([k, l, i]) => [k, l, i, "steel"] as [string, string, string, "steel"])];
   const part = (k: string) => all().find(x => x[0] === k);
   const words = (k: string, g = "", sub = "") => `${part(k)?.[1] ?? k} ${PART_WORDS[k] ?? ""} ${g} ${sub}`.toLowerCase();
   const has = (k: string, g = "", sub = "") => { const t = q().trim().toLowerCase(); return !t || t.split(/\s+/).every(w => words(k, g, sub).includes(w)); };
   const use = (k: string) => {
     const x = part(k); if (!x) return; useRecent(k);
-    if (x[3] === "equip") C.place(k as EquipKind); else if (x[3] === "steel") C.steel(roleOf(k) as "column" | "beam" | "brace" | "rack"); else C.dropOnSelected(k as ItemKind);
+    if (x[3] === "equip") C.place(k as EquipKind); else if (x[3] === "steel") C.steel(roleOf(k) as "column" | "beam" | "brace" | "rack" | "deck" | "stair"); else C.dropOnSelected(k as ItemKind);
   };
   const Tile = (t: { k: string }) => {
     const x = () => part(t.k)!;
@@ -53,9 +53,9 @@ export const PartsPanel = () => {
     return <Show when={part(t.k)}>
       <button class="cattile" data-kind={t.k} draggable="true" onDragStart={e => { useRecent(t.k); dragStart(x()[3] as "item" | "equip", t.k)(e); }} onDragEnd={() => { (window as any).__drag = undefined; }}
         onClick={() => use(t.k)} onDblClick={() => { if (x()[3] === "equip" && project()) { C.cancelTool(); act({ AddEquipment: { kind: t.k, pos: freeSpot(t.k) } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[0] })); } }}
-        title={x()[3] === "steel" ? `${x()[1]}: click, then click the plot (${x()[0] === "steel_column" ? "one click a column, grade to the working elevation" : x()[0] === "steel_rack" ? "its two ends at grade, along its length" : "its two ends; they snap to member ends"}); or drag it in` : x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
+        title={x()[3] === "steel" ? `${x()[1]}: click, then click the plot (${x()[0] === "steel_column" ? "one click a column, grade to the working elevation" : x()[0] === "steel_rack" ? "its two ends at grade, along its length" : x()[0] === "steel_deck" ? "two opposite corners; its floor at the working elevation" : x()[0] === "steel_stair" ? "its foot at grade, then its top (on a platform, at its floor)" : "its two ends; they snap to member ends"}); or drag it in` : x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
         <Icon n={x()[2]} size={22} /><span>{x()[1].replace(/ \(.*\)$/, "")}</span>
-        <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (x()[3] === "steel") import("./library").then(k => k.library("steel")); else if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
+        <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (x()[0] === "steel_deck" || x()[0] === "steel_stair") helpCard("access"); else if (x()[3] === "steel") import("./library").then(k => k.library("steel")); else if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
       </button></Show>;
   };
   const addPack = async () => { const w = await call<string[] | null>("add_pack"); if (w) { refetchCatalogue(); toast(w.length ? `Pack added with ${w.length} warning(s): ${w[0]}` : "Pack added to the catalogue.", !w.length); } };
@@ -253,6 +253,40 @@ const RackInsp = (p: { r: Rack }) => {
   </>);
 };
 
+/** A free-standing platform's card (0.3.8). */
+const DeckInsp = (p: { d: Deck }) => {
+  const set = (d: Partial<Deck>) => act({ SetDeck: { ...p.d, ...d } });
+  const rows = () => catalogue()?.cat.steel ?? [];
+  const Sec = (q: { k: "leg" | "beam"; l: string }) => <Row l={q.l} h="steel"><select onChange={e => set({ [q.k]: e.currentTarget.value } as Partial<Deck>)}>
+    <For each={[...new Set(rows().map(r => r.family))]}>{f => <optgroup label={f}><For each={rows().filter(r => r.family === f)}>{r => <option value={r.name} selected={r.name === p.d[q.k]}>{r.name}</option>}</For></optgroup>}</For>
+  </select></Row>;
+  const w = () => Math.abs(p.d.b[0] - p.d.a[0]), l = () => Math.abs(p.d.b[1] - p.d.a[1]);
+  return (<>
+    <Row l="Tag" h="access"><input value={p.d.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
+    <Row l="Floor elevation"><NumIn q="coord" v={p.d.el} set={v => set({ el: v })} /></Row>
+    <Row l="Corner (E, N, grade)"><V3In v={p.d.a} set={v => set({ a: v, el: p.d.el + v[2] - p.d.a[2] })} /></Row>
+    <Row l="Opposite corner (E, N)"><V3In v={p.d.b} set={v => set({ b: [v[0], v[1], p.d.a[2]] })} /></Row>
+    <Sec k="leg" l="Legs" /><Sec k="beam" l="Beams and joists" />
+    <p class="muted iwhat">{fmt("len", w())} × {fmt("len", l())} · floor {fmt("coord", p.d.el)}, {fmt("len", p.d.el - p.d.a[2])} above grade. Valves within {fmt("len", 0.6)} of its edge are reached from it.</p>
+    <p class="ibtns"><button class="btn sm" onClick={() => act({ Delete: { ids: [p.d.id] } }).then(o => o && setSel(null))}>Delete</button></p>
+  </>);
+};
+
+/** A stair's card (0.3.8): foot, top, width; its rise, run and slope. */
+const StairInsp = (p: { s: Stair }) => {
+  const set = (s: Partial<Stair>) => act({ SetStair: { ...p.s, ...s } });
+  const run = () => Math.hypot(p.s.b[0] - p.s.a[0], p.s.b[1] - p.s.a[1]), rise = () => p.s.b[2] - p.s.a[2];
+  const deg = () => Math.atan2(rise(), run()) * 180 / Math.PI;
+  return (<>
+    <Row l="Tag" h="access"><input value={p.s.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
+    <Row l="Foot (E, N, EL)"><V3In v={p.s.a} set={v => set({ a: v })} /></Row>
+    <Row l="Top (E, N, EL)"><V3In v={p.s.b} set={v => set({ b: v })} /></Row>
+    <Row l="Width"><NumIn q="len" v={p.s.width} min={0.5} set={v => set({ width: v })} /></Row>
+    <p class="muted iwhat" classList={{ bad: deg() < 30 || deg() > 45 }}>Rise {fmt("len", rise())} over {fmt("len", run())} · {deg().toFixed(0)}° {deg() > 45 ? "(steeper than 45°: move its foot further out)" : deg() < 30 ? "(shallower than 30°: move its foot nearer)" : "(within 30° to 45°)"}</p>
+    <p class="ibtns"><button class="btn sm" onClick={() => act({ Delete: { ids: [p.s.id] } }).then(o => o && setSel(null))}>Delete</button></p>
+  </>);
+};
+
 const LineInsp = (p: { l: Line }) => {
   const set = (l: Partial<Line>) => act({ SetLine: { ...p.l, ...l } });
   const len = () => (out()?.paths.find(x => x[0] === p.l.id)?.[1] ?? []).reduce((s, q, i, a) => i ? s + Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1], q[2] - a[i - 1][2]) : 0, 0);
@@ -344,7 +378,7 @@ const AreaInsp = (p: { id: number }) => {
 };
 
 export const Inspector = () => {
-  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "steel") { const m = project()?.steel?.find(x => x.id === s.id); return m ? `${m.tag} · ${m.section}` : "Member"; } if (s.kind === "rack") { const r = project()?.racks?.find(x => x.id === s.id); return r ? `${r.tag} · pipe rack` : "Pipe rack"; } if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
+  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "steel") { const m = project()?.steel?.find(x => x.id === s.id); return m ? `${m.tag} · ${m.section}` : "Member"; } if (s.kind === "rack") { const r = project()?.racks?.find(x => x.id === s.id); return r ? `${r.tag} · pipe rack` : "Pipe rack"; } if (s.kind === "deck") { const d = project()?.decks?.find(x => x.id === s.id); return d ? `${d.tag} · platform` : "Platform"; } if (s.kind === "stair") { const x = project()?.stairs?.find(y => y.id === s.id); return x ? `${x.tag} · stair` : "Stair"; } if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
   return (
     <aside class="insp">
       <header><b>{title()}</b><Help k="inspector" /><button class="x" title="Close (Esc)" onClick={() => { setSel(null); setPicked([]); }}>×</button></header>
@@ -362,6 +396,8 @@ export const Inspector = () => {
           <Show when={sel()?.kind === "area"}><AreaInsp id={(sel() as any).id} /></Show>
           <Show when={sel()?.kind === "steel" && project()?.steel?.find(m => m.id === (sel() as any).id)} keyed>{m => <SteelInsp m={m} />}</Show>
           <Show when={sel()?.kind === "rack" && project()?.racks?.find(r => r.id === (sel() as any).id)} keyed>{r => <RackInsp r={r} />}</Show>
+          <Show when={sel()?.kind === "deck" && project()?.decks?.find(d => d.id === (sel() as any).id)} keyed>{d => <DeckInsp d={d} />}</Show>
+          <Show when={sel()?.kind === "stair" && project()?.stairs?.find(s => s.id === (sel() as any).id)} keyed>{s => <StairInsp s={s} />}</Show>
           <Show when={!sel() || sel()!.kind === "plot"}><PlotInsp /></Show>
         </Show>
       </div>

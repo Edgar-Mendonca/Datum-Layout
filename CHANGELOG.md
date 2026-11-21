@@ -1,5 +1,20 @@
 # What's new in Datum Layout
 
+## 0.3.8 — 2026-11-21
+Free-standing platforms, stairs and an access check.
+
+- **Platform** (Parts › Steel › Access): click two opposite corners. The floor goes at the working elevation. It stands on legs, at most 6 m apart, with edge beams and joists at most 1.5 m apart. It has grating, toe plates and handrails. Its card changes the floor, the corners and the sections.
+- **Stair:** click its foot, then its top. Over a platform, it lands at the platform's floor. It has stringers, treads about 180 mm apart, and handrails. Its card shows the rise, the run and the slope.
+- **Access check:**
+  - Check (F5) reports a valve whose handwheel or lever is more than 2 m above the floor under it, and gives the height. The floor can be grade, a platform, or a platform on equipment, reaching 0.6 m beyond its edge.
+  - Check also reports a stair steeper than 45° or shallower than 30°.
+- **The examples are in reach:**
+  - The pump discharge valves sit lower on their risers.
+  - The exchanger and the pipe rack runs each have two operating platforms with stairs.
+  - The rack's drain valve is lower.
+
+Next: steel in the take-off with weights, and in the clash check (0.3.9).
+
 ## 0.3.7 — 2026-11-21
 Platforms and ladders on vessels and columns.
 

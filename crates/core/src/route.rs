@@ -236,6 +236,13 @@ pub fn build(p: &Project, cat: &Catalogue) -> Built {
         let shapes = ms.iter().flat_map(|m| crate::steel::shapes(m, &ms, cat)).collect();
         b.parts.push(Part { kind: "rack", line: 0, equip: 0, item: r.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes, length: ms.iter().map(crate::steel::length).sum(), corner: None, bolts: None, note: r.tag.clone(), insulation: 0.0 });
     }
+    // Free-standing platforms and stairs, one part each.
+    for d in &p.decks {
+        b.parts.push(Part { kind: "deck", line: 0, equip: 0, item: d.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: crate::structure::deck_shapes(d, cat), length: 0.0, corner: None, bolts: None, note: d.tag.clone(), insulation: 0.0 });
+    }
+    for s in &p.stairs {
+        b.parts.push(Part { kind: "stair", line: 0, equip: 0, item: s.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: crate::structure::stair_shapes(s), length: 0.0, corner: None, bolts: None, note: s.tag.clone(), insulation: 0.0 });
+    }
     for e in &p.equipment {
         let (body, noz) = equipment::shapes(e, cat);
         b.parts.push(Part { kind: "equipment", line: 0, equip: e.id, item: 0, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: body, length: 0.0, corner: None, bolts: None, note: e.tag.clone(), insulation: 0.0 });

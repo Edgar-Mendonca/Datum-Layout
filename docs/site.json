@@ -107,7 +107,7 @@
         "Pipe racks as one object, with lines on their tiers (0.3.5)",
         "Supports standing on the steel, and Check finds one with nothing under it (0.3.6)",
         "Platforms and caged ladders on vessels and columns (0.3.7)",
-        "Free-standing platforms and stairs, and an access check",
+        "Free-standing platforms and stairs, and an access check (0.3.8)",
         "Steel in the take-off and the clash check"
       ]
     },

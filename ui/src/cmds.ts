@@ -55,7 +55,7 @@ export const C = {
   pick: (id: number) => {
     let g = picked();
     const s = sel();
-    if (!g.length && s && (s.kind === "equip" || s.kind === "line" || s.kind === "nozzle" || s.kind === "steel" || s.kind === "rack")) g = [s.id];
+    if (!g.length && s && (s.kind === "equip" || s.kind === "line" || s.kind === "nozzle" || s.kind === "steel" || s.kind === "rack" || s.kind === "deck" || s.kind === "stair")) g = [s.id];
     setPicked(g.includes(id) ? g.filter(x => x !== id) : [...g, id]);
     setSel(null);
   },
@@ -210,7 +210,7 @@ export const C = {
   route: () => { setPlacing(null); setRoute({ from: null, start: null, via: [], nps: project()?.settings.nps ?? "6" }); setMode("route"); },
   cancelTool: () => { setRoute(null); setPlacing(null); setSteelTool(null); setMode("select"); },
   /** Places steel: a column with one click (grade to the working elevation), a beam or brace with two. */
-  steel: (role: "column" | "beam" | "brace" | "rack") => { setRoute(null); setPlacing(null); setSel(null); setSteelTool({ role, first: null }); setMode("steel"); },
+  steel: (role: "column" | "beam" | "brace" | "rack" | "deck" | "stair") => { setRoute(null); setPlacing(null); setSel(null); setSteelTool({ role, first: null }); setMode("steel"); },
   measure: () => { setRoute(null); setPlacing(null); setMode(mode() === "measure" ? "select" : "measure"); },
   /** Drops a component onto a line near a point: the engine snaps it to the nearest free place. */
   drop: async (line: number, kind: ItemKind, at: V3, support?: SupportKind) => {

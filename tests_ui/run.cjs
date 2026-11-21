@@ -664,6 +664,32 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   check("a platform's arc shows in degrees (0 to 360)", arcShown.includes("360"), JSON.stringify(arcShown));
   if (shots) { await p.keyboard.press("Escape"); await p.keyboard.press("f"); await settle(500); await shot("platforms"); }
 
+  // 8j. Free-standing platforms, stairs and the access check (0.3.8).
+  await open(null); await settle(300);
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  await p.keyboard.press("2"); await settle(400);
+  const d0 = await screenOf([10, 10, 0]), d1 = await screenOf([14, 12, 0]);
+  await p.click('.partsp .cattile[data-kind="steel_deck"]'); await settle(150);
+  await p.mouse.click(d0.x, d0.y); await settle(300); await p.mouse.click(d1.x, d1.y); await settle(600);
+  await p.keyboard.press("Escape"); await settle(200);
+  st = await state();
+  const dk = st.p.decks?.[0];
+  check("Platform, then two corners, places a platform with its floor at the working elevation", st.p.decks?.length === 1 && Math.abs(dk.el - 3) < 1e-9 && Math.abs(Math.min(dk.a[0], dk.b[0]) - 10) < 1e-6 && Math.abs(Math.max(dk.a[1], dk.b[1]) - 12) < 1e-6, JSON.stringify(dk));
+  const f0 = await screenOf([12, 5.5, 0]), f1 = await screenOf([12, 10.1, 3]);
+  await p.click('.partsp .cattile[data-kind="steel_stair"]'); await settle(150);
+  await p.mouse.click(f0.x, f0.y); await settle(300); await p.mouse.click(f1.x, f1.y); await settle(600);
+  await p.keyboard.press("Escape"); await settle(200);
+  st = await state();
+  const sr = st.p.stairs?.[0];
+  check("Stair, foot then top, lands on the platform's floor", st.p.stairs?.length === 1 && Math.abs(sr.a[2]) < 1e-9 && Math.abs(sr.b[2] - dk.el) < 1e-9, JSON.stringify(sr));
+  check("platforms and stairs are drawn and listed under Steel", (await ask("scene")).ok.parts.filter(q => q.kind === "deck" || q.kind === "stair").length === 2 && (await p.textContent(".tree")).includes("PF-1") && (await p.textContent(".tree")).includes("ST-1"));
+  if (shots) { await p.keyboard.press("3"); await settle(400); await p.click(".v3d .vhome"); await settle(500); await shot("access"); }
+  await open("exchanger"); await settle(300);
+  const reach0 = (await ask("check")).ok.filter(i => i.text.includes("out of reach")).length;
+  await p.click('.tree .ti:has-text("PF-1")'); await settle(300); await p.keyboard.press("Delete"); await settle(600);
+  const reach1 = (await ask("check")).ok.filter(i => i.text.includes("out of reach"));
+  check("Check finds valves out of reach once their platform is gone (and none before)", reach0 === 0 && reach1.length === 2, `${reach0} ${JSON.stringify(reach1.map(i => i.text))}`);
+
   // 8f. Templates (0.2.14): an item saved as set up, placed again, deleted.
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
   if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }

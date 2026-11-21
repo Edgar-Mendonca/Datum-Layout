@@ -56,6 +56,24 @@ impl Default for Rack {
     fn default() -> Self { Self { id: 0, uid: String::new(), tag: String::new(), a: [0.0; 3], b: [18.0, 0.0, 0.0], width: 6.0, spacing: 6.0, tiers: vec![5.0, 6.5], column: "HEB 300".into(), beam: "IPE 300".into(), strut: "IPE 200".into(), brace: "HEA 100".into(), braced: true, area: 0 } }
 }
 
+/// A free-standing platform (0.3.8): a rectangle between two plan corners standing at grade
+/// (`a`'s height), its floor (top of grating) at `el`, on legs of `leg` with edge beams and joists
+/// of `beam`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Deck { pub id: u32, pub uid: String, pub tag: String, pub a: P3, pub b: P3, pub el: f64, pub leg: String, pub beam: String, pub area: u32 }
+impl Default for Deck {
+    fn default() -> Self { Self { id: 0, uid: String::new(), tag: String::new(), a: [0.0; 3], b: [3.0, 2.0, 0.0], el: 2.0, leg: "HEA 160".into(), beam: "IPE 200".into(), area: 0 } }
+}
+
+/// A straight stair (0.3.8) from its foot `a` up to its top `b` (where it lands), `width` wide.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Stair { pub id: u32, pub uid: String, pub tag: String, pub a: P3, pub b: P3, pub width: f64, pub area: u32 }
+impl Default for Stair {
+    fn default() -> Self { Self { id: 0, uid: String::new(), tag: String::new(), a: [0.0; 3], b: [2.4, 0.0, 2.0], width: 0.9, area: 0 } }
+}
+
 /// An area of the plot (a box), the level below the plant in the hierarchy plant › unit › area.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default)]
@@ -471,10 +489,13 @@ pub struct Project {
     pub steel: Vec<Member>,
     /// Pipe racks (0.3.5).
     pub racks: Vec<Rack>,
+    /// Free-standing platforms and stairs (0.3.8).
+    pub decks: Vec<Deck>,
+    pub stairs: Vec<Stair>,
 }
 impl Default for Project {
     fn default() -> Self {
-        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![], steel: vec![], racks: vec![] }
+        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![], steel: vec![], racks: vec![], decks: vec![], stairs: vec![] }
     }
 }
 
@@ -500,7 +521,7 @@ impl Project {
         self.lines.iter().find(|l| l.id == id)
     }
     pub fn max_id(&self) -> u32 {
-        let ids = self.equipment.iter().map(|e| e.id).chain(self.steel.iter().map(|m| m.id)).chain(self.racks.iter().map(|r| r.id)).chain(self.areas.iter().map(|a| a.id)).chain(self.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id))));
+        let ids = self.equipment.iter().map(|e| e.id).chain(self.steel.iter().map(|m| m.id)).chain(self.racks.iter().map(|r| r.id)).chain(self.decks.iter().map(|d| d.id)).chain(self.stairs.iter().map(|s| s.id)).chain(self.areas.iter().map(|a| a.id)).chain(self.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id))));
         ids.max().unwrap_or(0)
     }
     /// A fresh id.
@@ -574,6 +595,22 @@ impl Project {
             if t.is_empty() { t.push(z0 + 5.0); }
             r.tiers = t;
             for s in [&mut r.column, &mut r.beam, &mut r.strut, &mut r.brace] { *s = s.trim().chars().take(40).collect(); }
+        }
+        self.decks.truncate(10_000);
+        for d in &mut self.decks {
+            fresh(&mut d.id, &mut d.uid, &mut seen, &mut w, &format!("Platform {}", d.tag));
+            p3(&mut d.a); p3(&mut d.b);
+            d.b[2] = d.a[2];
+            if (d.b[0] - d.a[0]).abs() < 0.5 || (d.b[1] - d.a[1]).abs() < 0.5 { d.b = [d.a[0] + 3.0, d.a[1] + 2.0, d.a[2]]; w.push(format!("Platform {} was too small; it was made 3 m × 2 m.", d.tag)); }
+            fin(&mut d.el, d.a[2] + 0.3, d.a[2] + 100.0, d.a[2] + 2.0);
+            for s in [&mut d.leg, &mut d.beam] { *s = s.trim().chars().take(40).collect(); }
+        }
+        self.stairs.truncate(10_000);
+        for s in &mut self.stairs {
+            fresh(&mut s.id, &mut s.uid, &mut seen, &mut w, &format!("Stair {}", s.tag));
+            p3(&mut s.a); p3(&mut s.b);
+            fin(&mut s.width, 0.5, 3.0, 0.9);
+            if s.b[2] - s.a[2] < 0.2 || (s.b[0] - s.a[0]).hypot(s.b[1] - s.a[1]) < 0.2 { s.b = [s.a[0] + 2.4, s.a[1], s.a[2] + 2.0]; w.push(format!("Stair {} had no rise or run; it was made 2 m high.", s.tag)); }
         }
         for e in &mut self.equipment {
             fresh(&mut e.id, &mut e.uid, &mut seen, &mut w, &format!("Equipment {}", e.tag));

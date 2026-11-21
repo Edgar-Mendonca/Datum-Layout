@@ -28,12 +28,20 @@ export type Flat = "none" | "top" | "bottom";
 export interface Item { id: number; uid: string; kind: ItemKind; seg: number; at: number; nps2: string; dir: V3; tag: string; support: SupportKind; flat: Flat }
 export interface Line { id: number; uid: string; number: string; nps: string; class: string; rating: number; fluid: string; insulation: number; radius: "long" | "short"; from: End; to: End; pts: V3[]; items: Item[]; area: number }
 export interface Settings { clearance: number; nps: string; class: string; rating: number }
-export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[]; steel: Member[]; racks: Rack[] }
+export interface Project { format: number; app: string; name: string; notes: string; plant: string; unit: string; units: "SI" | "US"; plot: Plot; areas: Area[]; equipment: Equipment[]; lines: Line[]; settings: Settings; next: number; views: SavedView[]; line_list: ListedLine[]; steel: Member[]; racks: Rack[]; decks: Deck[]; stairs: Stair[] }
 export type MemberRole = "column" | "beam" | "brace";
 export interface Member { id: number; uid: string; tag: string; role: MemberRole; section: string; a: V3; b: V3; roll: number; area: number }
 export interface SteelRow { name: string; family: string; h: number; b: number; tw: number; tf: number; r: number; area: number; source: string }
 /** A pipe rack (0.3.5): axis a→b at grade, width, bay spacing, tiers (top of steel), sections. */
 export interface Rack { id: number; uid: string; tag: string; a: V3; b: V3; width: number; spacing: number; tiers: number[]; column: string; beam: string; strut: string; brace: string; braced: boolean; area: number }
+/** A free-standing platform (0.3.8): plan corners a, b at grade, floor (top of grating) at el. */
+export interface Deck { id: number; uid: string; tag: string; a: V3; b: V3; el: number; leg: string; beam: string; area: number }
+/** A straight stair (0.3.8) from its foot a up to its top b. */
+export interface Stair { id: number; uid: string; tag: string; a: V3; b: V3; width: number; area: number }
+/** Access parts (0.3.8): key, label, icon. */
+export const ACCESS: [string, string, string, string][] = [["steel_deck", "Platform", "sdeck", ""], ["steel_stair", "Stair", "sstair", ""]];
+/** Structures picked and shown as one: part kind → the selection kind. */
+export const STRUCT = ["steel", "rack", "deck", "stair"];
 /** The pipe rack's part: key, label, icon, default column section. */
 export const RACK: [string, string, string, string] = ["steel_rack", "Pipe rack", "srack", "HEB 300"];
 /** The steel parts (0.3.0): part key ("steel_" + role), label, icon, default section. */
@@ -90,7 +98,7 @@ export const PART_GROUPS: { g: string; subs: [string, string[]][] }[] = [
   { g: "Equipment", subs: [["Vessels and tanks", ["vertical_vessel", "horizontal_drum", "tank", "sphere", "filter", "agitated"]], ["Columns and heaters", ["column", "heater"]], ["Pumps and compressors", ["pump", "inline_pump", "compressor", "recip_compressor"]], ["Heat exchangers", ["exchanger", "kettle", "plate_hx", "air_cooler"]], ["Packages", ["package"]]] },
   { g: "Valves", subs: [["Isolation", ["gate", "ball", "butterfly"]], ["Regulating", ["globe"]], ["Non-return", ["check"]], ["Strainers", ["strainer"]]] },
   { g: "Fittings", subs: [["In-line", ["flange_pair", "reducer"]], ["Branches", ["tee", "cross", "weldolet", "sockolet"]], ["Supports", ["support"]]] },
-  { g: "Steel", subs: [["Members", ["steel_column", "steel_beam", "steel_brace"]], ["Racks", ["steel_rack"]]] },
+  { g: "Steel", subs: [["Members", ["steel_column", "steel_beam", "steel_brace"]], ["Racks", ["steel_rack"]], ["Access", ["steel_deck", "steel_stair"]]] },
 ];
 /** More words each part is found by in the Parts search. */
 export const PART_WORDS: Record<string, string> = {
@@ -100,7 +108,7 @@ export const PART_WORDS: Record<string, string> = {
   inline_pump: "vertical centrifugal rotating machine", compressor: "centrifugal gas rotating machine blower", recip_compressor: "piston gas rotating machine",
   kettle: "reboiler heat exchanger", plate_hx: "gasketed heat exchanger", air_cooler: "fin fan heat exchanger cooler condenser", package: "skid vendor unit dosing injection",
   gate: "isolation block on off valve", ball: "isolation quarter turn valve", butterfly: "isolation quarter turn valve", globe: "regulating throttling control valve", check: "non-return nrv swing valve", strainer: "filter y-strainer",
-  steel_column: "steel structure post upright member", steel_beam: "steel structure girder member", steel_brace: "steel structure diagonal bracing member", steel_rack: "pipe rack pipeway bents tiers sleeper steel structure",
+  steel_column: "steel structure post upright member", steel_beam: "steel structure girder member", steel_brace: "steel structure diagonal bracing member", steel_rack: "pipe rack pipeway bents tiers sleeper steel structure", steel_deck: "platform operating access walkway grating deck", steel_stair: "stair stairs steps access",
   flange_pair: "flange joint spool break", reducer: "concentric eccentric size change", tee: "branch equal reducing", cross: "branch four-way", weldolet: "branch olet outlet", sockolet: "branch olet outlet small bore", support: "rest guide anchor line stop shoe",
 };
 export const EQUIP: [EquipKind, string, string][] = [

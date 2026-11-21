@@ -69,6 +69,7 @@ pub fn run(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
     let mut out = b.issues.clone();
     out.extend(connection_issues(p, cat, b));
     out.extend(clashes(p, b));
+    out.extend(access(p, cat, b));
     out
 }
 
@@ -179,6 +180,44 @@ pub fn design_rules(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
             }
             "pipe" if q.length >= 0.006 && q.length < 0.05 => {
                 out.push(iss(format!("Line {}: a pipe piece only {:.0} mm long between fittings is too short to weld well (weld fittings straight together, or keep at least 50 mm of pipe); move the fitting or the corner.", name(q.line), q.length * 1000.0)));
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The access check (0.3.8): every valve's handwheel or lever within reach of a floor under it
+/// (grade, a platform, a platform on equipment), and every stair between 30° and 45°.
+pub fn access(p: &Project, cat: &Catalogue, b: &Built) -> Vec<Issue> {
+    let mut out = vec![];
+    let name = |id: u32| p.line(id).map(|l| if l.number.is_empty() { "(no number)".to_string() } else { l.number.clone() }).unwrap_or_default();
+    for q in &b.parts {
+        match q.kind {
+            "gate" | "globe" | "ball" | "butterfly" if q.item != 0 => {
+                let mid = crate::parts::mul(crate::parts::add(q.ports[0].p, q.ports[1].p), 0.5);
+                let it = p.line(q.line).and_then(|l| l.items.iter().find(|i| i.id == q.item));
+                if q.ports.len() >= 2 {
+                    let u = crate::parts::unit(crate::parts::sub(q.ports[1].p, q.ports[0].p));
+                    let want = it.map(|i| i.dir).filter(|d| crate::parts::norm(*d) > 0.0).unwrap_or([0.0, 0.0, 1.0]);
+                    let stem = crate::route::branch_dir(u, want);
+                    let r = cat.od(&q.nps) / 2.0;
+                    let ext = match q.kind { "gate" | "globe" => (r * 4.6).max(0.18) * 1.08, "ball" => r * 1.8, _ => (r * 2.2).max(0.12) + r * 0.35 };
+                    let op = crate::parts::add(mid, crate::parts::mul(stem, ext));
+                    let h = crate::structure::above_floor(p, op);
+                    if h > crate::structure::REACH_UP + 1e-9 && h.is_finite() {
+                        let what = if q.kind == "ball" { "lever" } else { "handwheel" };
+                        out.push(Issue { kind: "rule", text: format!("Line {}: the {} valve's {what} is {:.1} m above the floor under it, out of reach (up to {:.1} m). Put a platform beside it, turn its stem towards one, or move it lower.", name(q.line), q.kind, h, crate::structure::REACH_UP), at: op, line: q.line, item: q.item, equip: 0, ..Default::default() });
+                    }
+                }
+            }
+            "stair" => {
+                if let Some(s) = p.stairs.iter().find(|s| s.id == q.item) {
+                    let (_, _, _, deg) = crate::structure::stair_geom(s);
+                    if !(30.0 - 1e-9..=45.0 + 1e-9).contains(&deg) {
+                        out.push(Issue { kind: "rule", text: format!("Stair {} rises at {deg:.0}°: keep a stair between 30° and 45° (move its foot nearer or further).", s.tag), at: s.a, line: 0, item: s.id, equip: 0, ..Default::default() });
+                    }
+                }
             }
             _ => {}
         }
@@ -331,7 +370,7 @@ pub fn clashes(p: &Project, b: &Built) -> Vec<Issue> {
         }
     }
     // Pairs whose boxes come within the clearance: sweep along east.
-    let mut order: Vec<usize> = (0..b.parts.len()).filter(|&i| !b.parts[i].shapes.is_empty() && !matches!(b.parts[i].kind, "steel" | "rack" | "bolts" | "platform")).collect();
+    let mut order: Vec<usize> = (0..b.parts.len()).filter(|&i| !b.parts[i].shapes.is_empty() && !matches!(b.parts[i].kind, "steel" | "rack" | "bolts" | "platform" | "deck" | "stair")).collect();
     order.sort_by(|&x, &y| boxes[x].0[0].total_cmp(&boxes[y].0[0]));
     let mut solid_cache: HashMap<usize, Vec<(P3, P3, Solid)>> = HashMap::new();
     let mut best: HashMap<(u32, u32, i64, u32, u32, i64), (f64, usize, usize)> = HashMap::new();
