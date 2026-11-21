@@ -71,7 +71,7 @@ export const [hintSlot, setHintSlot] = createSignal<HTMLElement>();
 /** What is selected: equipment, one of its nozzles, a line, one straight run of it, a component on it, an area, or the plot. */
 export type Sel =
   | { kind: "equip"; id: number } | { kind: "nozzle"; id: number; tag: string } | { kind: "line"; id: number }
-  | { kind: "run"; id: number; seg: number } | { kind: "corner"; id: number; v: number } | { kind: "item"; id: number; line: number } | { kind: "area"; id: number } | { kind: "plot"; id: 0 } | { kind: "steel"; id: number };
+  | { kind: "run"; id: number; seg: number } | { kind: "corner"; id: number; v: number } | { kind: "item"; id: number; line: number } | { kind: "area"; id: number } | { kind: "plot"; id: 0 } | { kind: "steel"; id: number } | { kind: "rack"; id: number };
 export const [sel, setSel] = createSignal<Sel | null>(null);
 /** A group of equipment and line ids picked with Ctrl+click (or Ctrl+A); empty when none. */
 export const [picked, setPicked] = createSignal<number[]>([]);
@@ -96,7 +96,7 @@ export const [section, setSection] = createSignal<{ lo: V3; hi: V3 } | null>(nul
 export type RouteFrom = { kind: "nozzle"; equip: number; nozzle: string } | { kind: "branch"; line: number; item: number; port?: number } | { kind: "point"; p: V3 };
 export const [mode, setMode] = createSignal<"select" | "route" | "place" | "measure" | "steel">("select");
 /** The steel tool (0.3.0): the member being placed and its first end, once clicked. */
-export const [steelTool, setSteelTool] = createSignal<{ role: "column" | "beam" | "brace"; first: [number, number, number] | null } | null>(null);
+export const [steelTool, setSteelTool] = createSignal<{ role: "column" | "beam" | "brace" | "rack"; first: [number, number, number] | null } | null>(null);
 /** The measure tool's points (plant axes). */
 export const [measure, setMeasure] = createSignal<V3[]>([]);
 export const [route, setRoute] = createSignal<{ from: RouteFrom | null; start: V3 | null; via: V3[]; nps: string } | null>(null);

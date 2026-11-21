@@ -6,7 +6,7 @@
 | | |
 | --- | --- |
 | **Product** | Datum Layout: 3D plant layout and piping (place equipment from datasheet sizes, route lines between nozzles with spec elbows, reducers and flanges, drop fittings that snap, check clashes, list lines and materials, hand each line to Datum Pipe) |
-| **Current version** | 0.3.4 (2026-11-21) |
+| **Current version** | 0.3.5 (2026-11-21) |
 | **Repo** | `Edgar-Mendonca/Datum-Layout` · branch `claude/hopeful-edison-d99owj` (the first branch pushed, so the default branch) |
 | **Stack** | Rust engine (`crates/core`, parry3d for clashes), Tauri 2, SolidJS + strict TypeScript, three.js for the 3D view; no Python |
 | **Identifier** | `com.edgarmendonca.datumlayout` · files `.dlayout` (JSON, `format` 1) · installer `DatumLayout-x.y.z-setup.exe` + `SHA256SUMS.txt` · publisher "Datum" |
@@ -49,7 +49,8 @@ Coordinates: metres, X east, Y north, Z up, in the engine, the file and PCF; the
 | `ui/src/view3d.tsx` | The 3D view: plot (ground, grid, coordinates, plant north), areas, parts from one buffer with colours per part, picking, selection colours, labels, ports and the route preview, snap marker while dragging, axis arrows (gizmo), standard views and fit, the orbit speed check |
 | `catalogue/tees_reducing.csv`, `reducers.csv`, `olets.csv`, `weights.csv` | Researched tables (Texas Flange, Bonney Forge, Wermac) with sources on every row |
 | `ui/src/classedit.tsx` | The pipe class editor inside the Library (draft in a Solid store; saved with `Op::SetClass`) |
-| `crates/core/src/steel.rs`, `catalogue/steel.csv` | Steel members: frame, shapes (web and flanges), length and weight; the sections table |
+| `crates/core/src/steel.rs`, `catalogue/steel.csv` | Steel members: frame, section (web, flanges, fillets), shapes as built (setbacks at column faces, end, base and cap plates), length and weight; the sections table |
+| `crates/core/src/rack.rs` | Pipe racks (0.3.5): members made from a rack, bays, shoe depth, tier elevations for a pipe, snapping a route onto a tier |
 | `crates/core/src/package.rs`, `docs/formats/` | The plant package (P&ID → layout): read, import (place/update equipment, list lines), route listed lines; the format document and a worked example |
 | `ui/src/library.tsx` | The Library: pipe classes and parts tables with sources |
 | `ui/src/shell.tsx` | The workspace after Datum Mesh: steps bar (`Flow`), plant tree (`Tree`: steps, branches, counts, marks, eyes, filter, menus), context bar (`CtxBar`), tool strip (`ToolStrip`), pane grips and the properties card |
@@ -148,6 +149,7 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.3.2 | Fittings drawn as built in the engine (glTF gets them): flange = raised face + plate + hub; the joint's "bolts" part now has shapes (stud + 2 hex nuts per bolt on PCD = (raised face + OD)/4, drawn at 6 segments) and stays out of the clash check; large plants (over 600 parts) leave bolts and beads out of the picture, and from 0.3.3 draw equipment at pipe fineness; weld beads are thin full tori added in a post-pass at every BW port of elbows, tees, crosses, reducers, caps, olets and flanges; thin tori use 6 sides round the tube; valves after Pipe 0.7.4 (gate body/bonnet/yoke/stem/wheel, globe and ball spheres, ball lever, check cover, butterfly gearbox and wheel, strainer leg and cap). No new part kinds, so take-off, PCF and exchange counts are unchanged | Same look as Pipe, without new parts |
 | 0.3.3 | Equipment drawn as built in `equipment::body` with helpers `skirt` (base ring, 8 or 12 anchor chairs), `saddle` (base plate, web to 0.6 r below the centreline, 4 ribs cut to the shell), `manway` (neck, cover pair), `motor` (end bell, 12 fins, terminal box, cowl, feet), `guard` (coupling guard). Nozzle positions and every size field unchanged, so lines and examples do not move; the nozzle test still proves every face clear of every body shape | Look as built without changing the model |
 | 0.3.4 | Steel as built in `steel::shapes(m, all, cat)`: `section()` draws web, flanges and four fillet blocks on the open side of each corner (never outside the section's box); a beam or brace end lying on a column's axis (or a brace's on a beam's) stands back by that section's half size along the member, with a 15 mm end plate; columns get a 20 mm base plate (75 mm wider each way), four anchor bolts with nuts, and a cap plate. Supports `support_shapes(c, u, rp, ri, kind)`: shoe (3-plate cradle, web or two webs, base plate; depth clears insulation + 50 mm, min 100 mm), guide angles, stop plates, anchor stiffeners; riser clamp with paired lugs, bolts, anchor gussets. Weights stay the section's. The window has a test hook `__focus(at, r)` beside `__screen` | As built after Pipe 0.7.5; framing kept honest without a rack (0.3.5) |
+| 0.3.5 | A pipe rack is one object (`model::Rack`: axis a→b at grade, width, spacing, tiers as top-of-steel elevations, four sections, braced). Its members are derived in `rack::members` (never stored), drawn as one part of kind "rack" (item = rack id) through `steel::shapes` so setbacks, plates and fillets apply; bays = round(length / spacing). Tier snapping lives in the engine: `Op::Route` puts each via corner and free end over a rack within 0.75 m of a tier on `rack::on_tier` (top of steel + shoe depth + OD/2; `rack::shoe_depth` is shared with the support drawing). Racks are left out of clashes until 0.3.9 | One object, so editing a rack never leaves loose members; the rule in the engine |
 | 0.1.4 (2026-11-08) | **Parked: a shared "Datum Library"** (data only: tables with sources, checks, a browsable web page; no generator, no installer). The tables keep being built now in Layout's catalogue, in the plug-in-pack format, so they can move there unchanged. Build the library repo when a second app needs the same table (Schema's pipe classes, Pipe's flange and valve weights, Mesh's fasteners); each app then copies a fixed version into its own build (fully offline). An in-app download and update channel only if the data grows large (vendor models) | The user, after weighing it: today the overlap is mostly pipe sizes, apps release often enough to carry data updates, and the download channel is the costly part. Generators stay in each app (each needs its own form: ports, solids, elements) |
 | 0.1.0 | Everything built for 0.1 shipped in 0.1.0, because the engine came together in one piece; 0.1.1–0.1.4 polish and prove each part of the plan in its order | Releasing a deliberately cut-down 0.1.0 would only hide working code |
 
@@ -189,7 +191,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 | 0.3.2 | Fittings as they look (after Pipe 0.7.4): raised faces and hubs, bolt studs and nuts, valve bodies with bonnets, yokes, handwheels and levers, tee shoulders, weld beads | ✅ |
 | 0.3.3 | Equipment as built: skirts with base rings and chairs, saddles with ribs, manways, tank courses, pump casing, bearing frame, coupling guard and finned motor, and the rest of the 17 types | ✅ |
 | 0.3.4 | Steel and supports as built: root fillets, base plates with anchor bolts, cap and end plates, beams stopped at column faces; shoes with cradle, web and base plate, guide angles, stop plates, anchor stiffeners, riser clamps | ✅ |
-| 0.3.x The look, and steel | 0.3.0 sections and members ✅; 0.3.1 light and lines ✅; 0.3.2 fittings ✅; 0.3.3 equipment ✅; 0.3.4 steel and supports ✅; 0.3.5 racks; 0.3.6 supports on steel; 0.3.7 platforms and ladders; 0.3.8 stairs and access; 0.3.9 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | 🔜 |
+| 0.3.5 | Pipe rack as one object: bents, tiers, struts and end bracing made from its axis, width, spacing, tiers and sections; lines routed over it go onto the tiers | ✅ |
+| 0.3.x The look, and steel | 0.3.0 sections and members ✅; 0.3.1 light and lines ✅; 0.3.2 fittings ✅; 0.3.3 equipment ✅; 0.3.4 steel and supports ✅; 0.3.5 racks ✅; 0.3.6 supports on steel; 0.3.7 platforms and ladders; 0.3.8 stairs and access; 0.3.9 steel take-off and clashes (`docs/PLAN-0.3-ON.md`) | 🔜 |
 | 0.4.x Routing | Sloped lines; Route Again avoiding clashes; auto-route; nozzles moved in 3D; rack spacing | ⬜ |
 | 0.5.x Catalogue gaps | Valve/cap/gasket/bolt weights; spectacle blinds; control and relief valves; instruments; small bore | ⬜ |
 | 0.6.x Drawings | Plot plan; GA with dimensions; title blocks; nozzle orientations; take-off report and DXF | ⬜ |
@@ -267,6 +270,8 @@ Bump both Cargo.toml versions, add the CHANGELOG section, keep `docs/site.json` 
 - 0.3.3: equipment as built (skirts, saddles, manways, tank courses, pump and compressor trains with finned motors, sphere legs and tie rods, and the rest); a gallery of all 17 types compared before and after.
 
 - 0.3.4: steel and supports as built (fillets, base, cap and end plates, beams stopped at column faces; shoes, guides, stops, anchors, riser clamps); close-ups compared before and after.
+
+- 0.3.5: pipe rack as one object (Parts › Steel › Racks, card, tree), lines snap onto its tiers in the engine; the rack example stands on a rack; UI check 8h.
 
 ## 5. Known limits
 

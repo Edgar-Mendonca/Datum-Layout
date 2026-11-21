@@ -16,6 +16,7 @@ pub mod model;
 pub mod package;
 pub mod parts;
 pub mod pcf;
+pub mod rack;
 pub mod route;
 pub mod scene;
 pub mod steel;

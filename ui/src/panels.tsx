@@ -2,7 +2,7 @@
 // Inspector on the right (whatever is selected), and the bottom tabs (Lines, Equipment, Clashes,
 // Checks), each issue clickable.
 import { For, Show, createSignal, createResource, createMemo, createEffect, on, JSX } from "solid-js";
-import { STEEL, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
+import { STEEL, RACK, Rack, roleOf, MemberRole, Member, SUPPORTS, SupportKind, CatalogueOut, DEXPI, EQUIP, ITEMS, PART_GROUPS, PART_WORDS, ItemKind, NPS, RATINGS, inch, Equipment, Nozzle, Line, V3, Lists, Issue, EquipKind } from "./api";
 import { picked, setPicked, call, project, out, sel, setSel, selLine, selEquip, selItem, act, toast, openDialog, setPartsOpen, recent, useRecent, bottom, setBottom, bottomOpen, setBottomOpen, BottomTab, checked, checkStale, setFocus } from "./store";
 import { C } from "./cmds";
 import { Help, helpCard } from "./help";
@@ -39,13 +39,13 @@ const freeSpot = (kind: string): V3 => {
 export const PartsPanel = () => {
   const [q, setQ] = createSignal("");
   const templates = () => (catalogue()?.cat.templates ?? []).filter(t => { const w = q().trim().toLowerCase(); return !w || `${t.name} ${t.equip.kind.replace("_", " ")} template`.toLowerCase().includes(w); });
-  const all = (): [string, string, string, "equip" | "item" | "steel"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"]), ...STEEL.map(([k, l, i]) => [k, l, i, "steel"] as [string, string, string, "steel"])];
+  const all = (): [string, string, string, "equip" | "item" | "steel"][] => [...EQUIP.map(([k, l, i]) => [k, l, i, "equip"] as [string, string, string, "equip"]), ...ITEMS.map(([k, l, i]) => [k, l, i, "item"] as [string, string, string, "item"]), ...[...STEEL, RACK].map(([k, l, i]) => [k, l, i, "steel"] as [string, string, string, "steel"])];
   const part = (k: string) => all().find(x => x[0] === k);
   const words = (k: string, g = "", sub = "") => `${part(k)?.[1] ?? k} ${PART_WORDS[k] ?? ""} ${g} ${sub}`.toLowerCase();
   const has = (k: string, g = "", sub = "") => { const t = q().trim().toLowerCase(); return !t || t.split(/\s+/).every(w => words(k, g, sub).includes(w)); };
   const use = (k: string) => {
     const x = part(k); if (!x) return; useRecent(k);
-    if (x[3] === "equip") C.place(k as EquipKind); else if (x[3] === "steel") C.steel(roleOf(k)); else C.dropOnSelected(k as ItemKind);
+    if (x[3] === "equip") C.place(k as EquipKind); else if (x[3] === "steel") C.steel(roleOf(k) as "column" | "beam" | "brace" | "rack"); else C.dropOnSelected(k as ItemKind);
   };
   const Tile = (t: { k: string }) => {
     const x = () => part(t.k)!;
@@ -53,7 +53,7 @@ export const PartsPanel = () => {
     return <Show when={part(t.k)}>
       <button class="cattile" data-kind={t.k} draggable="true" onDragStart={e => { useRecent(t.k); dragStart(x()[3] as "item" | "equip", t.k)(e); }} onDragEnd={() => { (window as any).__drag = undefined; }}
         onClick={() => use(t.k)} onDblClick={() => { if (x()[3] === "equip" && project()) { C.cancelTool(); act({ AddEquipment: { kind: t.k, pos: freeSpot(t.k) } }).then(o => o?.created.length && setSel({ kind: "equip", id: o.created[0] })); } }}
-        title={x()[3] === "steel" ? `${x()[1]}: click, then click the plot (${x()[0] === "steel_column" ? "one click a column, grade to the working elevation" : "its two ends; they snap to member ends"}); or drag it in` : x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
+        title={x()[3] === "steel" ? `${x()[1]}: click, then click the plot (${x()[0] === "steel_column" ? "one click a column, grade to the working elevation" : x()[0] === "steel_rack" ? "its two ends at grade, along its length" : "its two ends; they snap to member ends"}); or drag it in` : x()[3] === "equip" ? `${x()[1]}: drag onto the plot, click then click the plot, or double-click to place it now` : `${x()[1]}: drag onto a pipe (it snaps and takes the line's size and class), or select a line and click`}>
         <Icon n={x()[2]} size={22} /><span>{x()[1].replace(/ \(.*\)$/, "")}</span>
         <i class="cinfo" role="button" title={lib() ? "Its dimensions in the Library" : "How it is drawn"} onClick={e => { e.stopPropagation(); if (x()[3] === "steel") import("./library").then(k => k.library("steel")); else if (lib()) import("./library").then(k => k.library(lib())); else helpCard(x()[3] === "equip" ? "equipment" : "fittings"); }}>i</i>
       </button></Show>;
@@ -205,6 +205,32 @@ const SteelInsp = (p: { m: Member }) => {
   </>);
 };
 
+/** A pipe rack's card (0.3.5): its axis, width, bays, tiers and sections; the members are made from these. */
+const RackInsp = (p: { r: Rack }) => {
+  const set = (r: Partial<Rack>) => act({ SetRack: { ...p.r, ...r } });
+  const rows = () => catalogue()?.cat.steel ?? [];
+  const len = () => Math.hypot(p.r.b[0] - p.r.a[0], p.r.b[1] - p.r.a[1]);
+  const bays = () => Math.max(1, Math.round(len() / Math.max(0.5, p.r.spacing)));
+  const Sec = (q: { k: "column" | "beam" | "strut" | "brace"; l: string }) => <Row l={q.l} h="steel"><select onChange={e => set({ [q.k]: e.currentTarget.value } as Partial<Rack>)}>
+    <For each={[...new Set(rows().map(r => r.family))]}>{f => <optgroup label={f}><For each={rows().filter(r => r.family === f)}>{r => <option value={r.name} selected={r.name === p.r[q.k]}>{r.name}</option>}</For></optgroup>}</For>
+  </select></Row>;
+  const tiers = () => p.r.tiers.map(t => fmt("coord", t)).join(", ");
+  return (<>
+    <Row l="Tag" h="rack"><input value={p.r.tag} onChange={e => set({ tag: e.currentTarget.value })} /></Row>
+    <Row l="Width (column to column)"><NumIn q="len" v={p.r.width} min={0.5} set={v => set({ width: v })} /></Row>
+    <Row l="Bay spacing"><NumIn q="len" v={p.r.spacing} min={1} set={v => set({ spacing: v })} /></Row>
+    <Row l="Tiers (top of steel)"><input class="tiers" value={tiers()} title="Elevations of the top of steel, separated by commas" onChange={e => { const v = e.currentTarget.value.split(/[,;]/).map(x => parseQ(x.trim(), "coord")).filter((x): x is number => typeof x === "number" && isFinite(x)).map(x => fromU("coord", x)); if (v.length) set({ tiers: v }); else e.currentTarget.value = tiers(); }} /></Row>
+    <h4>Sections</h4>
+    <Sec k="column" l="Columns" /><Sec k="beam" l="Tier beams" /><Sec k="strut" l="Struts along" /><Sec k="brace" l="Braces" />
+    <Row l="End bays braced"><input type="checkbox" checked={p.r.braced} onChange={e => set({ braced: e.currentTarget.checked })} /></Row>
+    <h4>Axis (at grade)</h4>
+    <Row l="Start (E, N, EL)"><V3In v={p.r.a} set={v => set({ a: v, b: [p.r.b[0], p.r.b[1], v[2]], tiers: p.r.tiers.map(t => t + v[2] - p.r.a[2]) })} /></Row>
+    <Row l="End (E, N)"><V3In v={p.r.b} set={v => set({ b: [v[0], v[1], p.r.a[2]] })} /></Row>
+    <p class="muted iwhat">Length {fmt("len", len())} · {bays()} bay{bays() === 1 ? "" : "s"} of {fmt("len", len() / bays())} · {bays() + 1} bents · {p.r.tiers.length} tier{p.r.tiers.length === 1 ? "" : "s"}. A line routed over the rack within 0.75 m of a tier goes onto it, its shoe on the beam.</p>
+    <p class="ibtns"><button class="btn sm" onClick={() => act({ Delete: { ids: [p.r.id] } }).then(o => o && setSel(null))}>Delete</button></p>
+  </>);
+};
+
 const LineInsp = (p: { l: Line }) => {
   const set = (l: Partial<Line>) => act({ SetLine: { ...p.l, ...l } });
   const len = () => (out()?.paths.find(x => x[0] === p.l.id)?.[1] ?? []).reduce((s, q, i, a) => i ? s + Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1], q[2] - a[i - 1][2]) : 0, 0);
@@ -296,7 +322,7 @@ const AreaInsp = (p: { id: number }) => {
 };
 
 export const Inspector = () => {
-  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "steel") { const m = project()?.steel?.find(x => x.id === s.id); return m ? `${m.tag} · ${m.section}` : "Member"; } if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
+  const title = () => { if (picked().length) return `${picked().length} items`; const s = sel(); if (!s || s.kind === "plot") return project()?.name ?? "Plant"; if (s.kind === "equip" || s.kind === "nozzle") return selEquip()?.tag ?? ""; if (s.kind === "area") return project()?.areas.find(a => a.id === s.id)?.name ?? "Area"; if (s.kind === "steel") { const m = project()?.steel?.find(x => x.id === s.id); return m ? `${m.tag} · ${m.section}` : "Member"; } if (s.kind === "rack") { const r = project()?.racks?.find(x => x.id === s.id); return r ? `${r.tag} · pipe rack` : "Pipe rack"; } if (s.kind === "item") return selItem() ? ITEMS.find(x => x[0] === selItem()!.kind)?.[1] ?? "" : ""; return selLine()?.number || "Line"; };
   return (
     <aside class="insp">
       <header><b>{title()}</b><Help k="inspector" /><button class="x" title="Close (Esc)" onClick={() => { setSel(null); setPicked([]); }}>×</button></header>
@@ -313,6 +339,7 @@ export const Inspector = () => {
           <Show when={sel()?.kind === "item" && selLine()} keyed>{l => <ItemInsp l={l} id={(sel() as any).id} />}</Show>
           <Show when={sel()?.kind === "area"}><AreaInsp id={(sel() as any).id} /></Show>
           <Show when={sel()?.kind === "steel" && project()?.steel?.find(m => m.id === (sel() as any).id)} keyed>{m => <SteelInsp m={m} />}</Show>
+          <Show when={sel()?.kind === "rack" && project()?.racks?.find(r => r.id === (sel() as any).id)} keyed>{r => <RackInsp r={r} />}</Show>
           <Show when={!sel() || sel()!.kind === "plot"}><PlotInsp /></Show>
         </Show>
       </div>

@@ -80,6 +80,10 @@ pub enum Op {
     AddMember { role: crate::model::MemberRole, section: String, a: P3, b: P3 },
     /// Changes a member (its section, ends, roll or tag).
     SetMember(crate::model::Member),
+    /// A new pipe rack along `a` to `b` at grade, with the default width, spacing, tiers and sections.
+    AddRack { a: P3, b: P3 },
+    /// Changes a pipe rack (its members are made again).
+    SetRack(crate::model::Rack),
     /// A new equipment item made from a template (its type, sizes, nozzles and datasheet), with
     /// the next free tag, its base at `pos`.
     AddFromTemplate { equip: Equipment, pos: P3 },
@@ -226,6 +230,15 @@ fn group(p: &mut Project, ids: &[u32], pt: impl Fn(P3) -> P3, dir: impl Fn(P3) -
     for m in p.steel.iter_mut().filter(|m| set.contains(&m.id)) {
         m.a = pt(m.a);
         m.b = pt(m.b);
+        any = true;
+    }
+    for r in p.racks.iter_mut().filter(|r| set.contains(&r.id)) {
+        let a = pt(r.a);
+        let dz = a[2] - r.a[2];
+        r.a = a;
+        r.b = pt(r.b);
+        r.b[2] = a[2];
+        for t in &mut r.tiers { *t += dz; }
         any = true;
     }
     if !any { return Err("Select equipment, lines or steel first.".into()); }
@@ -479,6 +492,26 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             let x = p.steel.iter_mut().find(|x| x.id == m.id).ok_or("That member no longer exists.")?;
             *x = crate::model::Member { section: cat.steel_section(&m.section).map(|s| s.name.clone()).unwrap_or(m.section.clone()), ..m };
         }
+        Op::AddRack { a, b } => {
+            if norm(sub([b[0], b[1], 0.0], [a[0], a[1], 0.0])) < 0.5 { return Err("A pipe rack needs two ends at least 0.5 m apart.".into()); }
+            let mut k = p.racks.len() + 1;
+            while p.racks.iter().any(|r| r.tag == format!("PR-{k}")) { k += 1; }
+            let id = p.id();
+            let z0 = a[2];
+            p.racks.push(crate::model::Rack { id, tag: format!("PR-{k}"), a, b: [b[0], b[1], z0], tiers: vec![z0 + 5.0, z0 + 6.5], ..Default::default() });
+            created.push(id);
+        }
+        Op::SetRack(r) => {
+            if r.tag.trim().is_empty() { return Err("A pipe rack needs a tag (for example PR-1).".into()); }
+            if p.racks.iter().any(|x| x.id != r.id && x.tag == r.tag) { return Err(format!("{} is already used by another rack.", r.tag)); }
+            if r.tiers.is_empty() { return Err("A pipe rack needs at least one tier.".into()); }
+            for (what, s) in [("column", &r.column), ("beam", &r.beam), ("strut", &r.strut), ("brace", &r.brace)] {
+                if cat.steel_section(s).is_none() { return Err(format!("The {what} section {s} is not in the steel table.")); }
+            }
+            let name = |s: &str| cat.steel_section(s).map(|x| x.name.clone()).unwrap_or(s.to_string());
+            let x = p.racks.iter_mut().find(|x| x.id == r.id).ok_or("That pipe rack no longer exists.")?;
+            *x = crate::model::Rack { column: name(&r.column), beam: name(&r.beam), strut: name(&r.strut), brace: name(&r.brace), ..r };
+        }
         Op::AddFromTemplate { equip, pos } => {
             let mut e = equip;
             e.id = p.id();
@@ -525,7 +558,12 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
         Op::Route { from, via, to, nps } => {
             let end = |e: &RouteEnd| -> Result<(End, P3, Option<P3>, Option<String>), String> {
                 match e {
-                    RouteEnd::Point { p: q } => Ok((End::Point { term: Term::Open }, *q, None, None)),
+                    // A free end over a pipe rack near a tier goes onto it, as corners do.
+                    RouteEnd::Point { p: q } => {
+                        let od = cat.od(nps.as_deref().unwrap_or(&p.settings.nps));
+                        let z = crate::rack::snap(&p.racks, *q, od, 0.0).unwrap_or(q[2]);
+                        Ok((End::Point { term: Term::Open }, [q[0], q[1], z], None, None))
+                    }
                     RouteEnd::Nozzle { equip, nozzle } => {
                         let me = End::Nozzle { equip: *equip, nozzle: nozzle.clone() };
                         let port = route::end_port(p, cat, &me).ok_or("That nozzle no longer exists.")?;
@@ -549,6 +587,8 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             // Leave each nozzle far enough for its flange, a reducer and an elbow.
             let lead = |d: Option<P3>| d.map(|_| lead_for(cat, &nps, p.settings.rating)).unwrap_or(0.0);
             let l0 = lead(fd).max(lead(td));
+            // A corner over a pipe rack near one of its tiers goes onto the tier.
+            let via: Vec<P3> = via.iter().map(|v| match crate::rack::snap(&p.racks, *v, cat.od(&nps), 0.0) { Some(z) => [v[0], v[1], z], None => *v }).collect();
             let pts = route::orthogonal((fp, fd), &via, (tp, td), l0);
             if pts.len() < 2 { return Err("The route has no length.".into()); }
             // A branch from a tee becomes the fitting the header's class gives for its sizes.
@@ -873,6 +913,7 @@ fn apply(p: &mut Project, op: Op, cat: &Catalogue, created: &mut Vec<u32>) -> Re
             }
             p.equipment.retain(|e| !ids.contains(&e.id));
             p.steel.retain(|m| !ids.contains(&m.id));
+            p.racks.retain(|r| !ids.contains(&r.id));
             p.lines.retain(|l| !ids.contains(&l.id));
             p.areas.retain(|a| !ids.contains(&a.id));
             for e in &mut p.equipment { if ids.contains(&e.area) { e.area = 0; } }

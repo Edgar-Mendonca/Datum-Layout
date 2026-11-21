@@ -230,6 +230,12 @@ pub fn build(p: &Project, cat: &Catalogue) -> Built {
     for m in &p.steel {
         b.parts.push(Part { kind: "steel", line: 0, equip: 0, item: m.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: crate::steel::shapes(m, &p.steel, cat), length: crate::steel::length(m), corner: None, bolts: None, note: m.section.clone(), insulation: 0.0 });
     }
+    // A pipe rack is one part (its members made from it), so it is picked and shown as one.
+    for r in &p.racks {
+        let ms = crate::rack::members(r, cat);
+        let shapes = ms.iter().flat_map(|m| crate::steel::shapes(m, &ms, cat)).collect();
+        b.parts.push(Part { kind: "rack", line: 0, equip: 0, item: r.id, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes, length: ms.iter().map(crate::steel::length).sum(), corner: None, bolts: None, note: r.tag.clone(), insulation: 0.0 });
+    }
     for e in &p.equipment {
         let (body, noz) = equipment::shapes(e, cat);
         b.parts.push(Part { kind: "equipment", line: 0, equip: e.id, item: 0, seg: -1, nps: String::new(), nps2: String::new(), rating: 0, ports: vec![], shapes: body, length: 0.0, corner: None, bolts: None, note: e.tag.clone(), insulation: 0.0 });
@@ -691,7 +697,7 @@ pub fn support_shapes(c: P3, u: P3, rp: f64, ri: f64, k: crate::model::SupportKi
     }
     let side = unit(cross(z, u));
     let len = 0.3;
-    let hs = (ri - rp + 0.05).max(0.1);
+    let hs = crate::rack::shoe_depth(rp, ri);
     let (tb, tw) = (0.012, 0.01);
     let zb = -(rp + hs);
     let bw = (rp * 1.2).max(0.1);

@@ -619,6 +619,28 @@ const ask = (cmd, args) => (chain = chain.then(() => new Promise(ok => { waiting
   await p.keyboard.press("Delete"); await settle(400);
   check("Delete removes the selected member", (await state()).p.steel.length === 2);
 
+  // 8h. Pipe rack (0.3.5): two clicks place one; its card changes the tiers; a line routed along
+  // it lands on a tier, its shoe on the beam.
+  await open(null); await settle(300);
+  if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }
+  await p.keyboard.press("2"); await settle(400);
+  const r0 = await screenOf([10, 10, 0]), r1 = await screenOf([22, 10, 0]);
+  await p.click('.partsp .cattile[data-kind="steel_rack"]'); await settle(150);
+  await p.mouse.click(r0.x, r0.y); await settle(300); await p.mouse.click(r1.x, r1.y); await settle(700);
+  await p.keyboard.press("Escape"); await settle(200);
+  st = await state();
+  const rk = st.p.racks?.[0];
+  check("Pipe rack, then two clicks, places a rack between them at grade", st.p.racks?.length === 1 && Math.hypot(rk.a[0] - 10, rk.a[1] - 10, rk.a[2]) < 1e-6 && Math.hypot(rk.b[0] - 22, rk.b[1] - 10, rk.b[2]) < 1e-6, JSON.stringify(rk));
+  check("the rack is drawn as one part and its card shows its bays", (await ask("scene")).ok.parts.filter(q => q.kind === "rack").length === 1 && (await p.textContent(".insp")).includes("PR-1") && (await p.textContent(".insp")).includes("2 bays"), await p.textContent(".insp"));
+  await p.$eval(".insp input.tiers", el => { el.value = "4.5, 6"; el.dispatchEvent(new Event("change", { bubbles: true })); }); await settle(500);
+  check("the card's tiers change the rack", JSON.stringify((await state()).p.racks[0].tiers) === "[4.5,6]", JSON.stringify((await state()).p.racks[0].tiers));
+  const rr = (await ask("apply", { op: { Route: { from: { kind: "point", p: [11, 9, 4.8] }, via: [], to: { kind: "point", p: [21, 9, 4.8] }, nps: "6" } } })).ok;
+  const zs = rr ? rr.p.lines[0].pts.map(q => q[2]) : [];
+  const od6 = 0.1683;
+  check("a line routed along the rack near a tier lands on it (shoe on the beam)", zs.length >= 2 && zs.every(z => Math.abs(z - (4.5 + 0.1 + od6 / 2)) < 1e-4), JSON.stringify(zs));
+  await p.click('.tabs > button:has-text("Home")'); await settle(100);
+  if (shots) { await p.click(".v3d .vhome"); await settle(500); await shot("rack"); }
+
   // 8f. Templates (0.2.14): an item saved as set up, placed again, deleted.
   await open("pumps"); await p.keyboard.press("Escape"); await settle(300);
   if (!(await p.$(".partsp"))) { await p.click('.flow button[data-tool="parts"]'); await settle(200); }

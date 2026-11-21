@@ -177,6 +177,14 @@ fn rack(cat: &Catalogue, planted: bool) -> Project {
     let low = if planted { 0.01 } else { 1.0 };
     let lc = b.line("3\"-D-3003-CS1", "3", br(la, t), blind(), vec![tp, [14.0, 9.2, 5.0], [14.0, 9.2, low]]);
     b.drop(lc, ItemKind::Gate, [14.0, 9.2, 2.5], [1.0, 0.0, 0.0]);
+    // The rack: bents every 6 m from x 5 to 23, 2.6 m wide; tier 1 under line A, tier 2 under line B.
+    {
+        let t1 = crate::rack::tier_under(5.0, cat.od("6"), 0.0);
+        let t2 = crate::rack::tier_under(6.0, cat.od("4"), 0.0);
+        let id = b.op(Op::AddRack { a: [5.0, 10.9, 0.0], b: [23.0, 10.9, 0.0] })[0];
+        let r = b.d.p.racks.iter().find(|r| r.id == id).cloned().expect("the rack just added");
+        b.op(Op::SetRack(crate::model::Rack { width: 2.6, tiers: vec![t1, t2], ..r }));
+    }
     // Supports on the rack: rests every 4 m or so, guides near the ends, an anchor in the middle.
     {
         use crate::model::SupportKind as S;

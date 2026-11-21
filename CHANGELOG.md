@@ -1,5 +1,19 @@
 # What's new in Datum Layout
 
+## 0.3.5 — 2026-11-21
+The pipe rack as one object.
+
+- **Pipe rack** (Parts › Steel › Racks): click where it starts and where it ends. The rack has:
+  - bents of two columns with a beam at each tier;
+  - struts along both sides at each tier;
+  - bracing in the end bays.
+- **Its card** sets the width, the bay spacing (evened out over the length), the tiers as elevations of the top of steel, the sections of the columns, beams, struts and braces, and whether the end bays are braced. The rack is made again at once. Bays, bents and tiers are listed on the card.
+- **Lines go onto the tiers.** Route a line over a rack, and a corner or free end within 0.75 m of a tier goes onto that tier, so the pipe's shoe stands on the beam. The shoe's depth clears the insulation.
+- **The example "Small pipe rack run"** now stands on a real rack. Its two lines rest on its two tiers.
+- A rack is picked, hidden, moved, copied in a group and deleted as one item. It appears under Steel in the plant tree.
+
+Next: supports standing on the steel, with Check reporting a support with nothing under it (0.3.6).
+
 ## 0.3.4 — 2026-11-21
 A better 3D model, part 4: steel and supports as built (after Datum Pipe).
 

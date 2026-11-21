@@ -45,6 +45,17 @@ impl Default for Member {
     fn default() -> Self { Self { id: 0, uid: String::new(), tag: String::new(), role: MemberRole::Column, section: "HEB 200".into(), a: [0.0; 3], b: [0.0, 0.0, 4.0], roll: 0.0, area: 0 } }
 }
 
+/// A pipe rack (0.3.5): its axis from `a` to `b` at grade, its width (column to column), the bay
+/// spacing asked for (evened out over the length), the tiers (elevations of the top of steel), the
+/// sections of its columns, tier beams, struts and braces, and whether its end bays are braced.
+/// Its members are made from these (`rack::members`).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Rack { pub id: u32, pub uid: String, pub tag: String, pub a: P3, pub b: P3, pub width: f64, pub spacing: f64, pub tiers: Vec<f64>, pub column: String, pub beam: String, pub strut: String, pub brace: String, pub braced: bool, pub area: u32 }
+impl Default for Rack {
+    fn default() -> Self { Self { id: 0, uid: String::new(), tag: String::new(), a: [0.0; 3], b: [18.0, 0.0, 0.0], width: 6.0, spacing: 6.0, tiers: vec![5.0, 6.5], column: "HEB 300".into(), beam: "IPE 300".into(), strut: "IPE 200".into(), brace: "HEA 100".into(), braced: true, area: 0 } }
+}
+
 /// An area of the plot (a box), the level below the plant in the hierarchy plant › unit › area.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default)]
@@ -445,10 +456,12 @@ pub struct Project {
     pub classes: Vec<crate::catalogue::PipeClass>,
     /// Structural steel: columns, beams and braces.
     pub steel: Vec<Member>,
+    /// Pipe racks (0.3.5).
+    pub racks: Vec<Rack>,
 }
 impl Default for Project {
     fn default() -> Self {
-        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![], steel: vec![] }
+        Self { format: FORMAT, app: "Datum Layout".into(), name: "Plant1".into(), notes: String::new(), plant: "Plant".into(), unit: "Unit 100".into(), units: "SI".into(), plot: Plot::default(), areas: vec![], equipment: vec![], lines: vec![], settings: Settings::default(), next: 1, views: vec![], line_list: vec![], classes: vec![], steel: vec![], racks: vec![] }
     }
 }
 
@@ -474,7 +487,7 @@ impl Project {
         self.lines.iter().find(|l| l.id == id)
     }
     pub fn max_id(&self) -> u32 {
-        let ids = self.equipment.iter().map(|e| e.id).chain(self.steel.iter().map(|m| m.id)).chain(self.areas.iter().map(|a| a.id)).chain(self.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id))));
+        let ids = self.equipment.iter().map(|e| e.id).chain(self.steel.iter().map(|m| m.id)).chain(self.racks.iter().map(|r| r.id)).chain(self.areas.iter().map(|a| a.id)).chain(self.lines.iter().flat_map(|l| std::iter::once(l.id).chain(l.items.iter().map(|i| i.id))));
         ids.max().unwrap_or(0)
     }
     /// A fresh id.
@@ -531,6 +544,23 @@ impl Project {
             fin(&mut m.roll, -360.0, 360.0, 0.0);
             if crate::parts::norm(crate::parts::sub(m.b, m.a)) < 0.01 { m.b = [m.a[0], m.a[1], m.a[2] + 1.0]; w.push(format!("Member {} had no length; it was made 1 m tall.", m.tag)); }
             m.section = m.section.trim().chars().take(40).collect();
+        }
+        self.racks.truncate(10_000);
+        for r in &mut self.racks {
+            fresh(&mut r.id, &mut r.uid, &mut seen, &mut w, &format!("Pipe rack {}", r.tag));
+            p3(&mut r.a); p3(&mut r.b);
+            r.b[2] = r.a[2];
+            fin(&mut r.width, 0.5, 40.0, 6.0);
+            fin(&mut r.spacing, 1.0, 40.0, 6.0);
+            if crate::parts::norm(crate::parts::sub(r.b, r.a)) < 0.5 { r.b = [r.a[0] + 6.0, r.a[1], r.a[2]]; w.push(format!("Pipe rack {} had no length; it was made 6 m long.", r.tag)); }
+            let z0 = r.a[2];
+            let mut t: Vec<f64> = r.tiers.iter().filter(|v| v.is_finite()).map(|v| v.clamp(z0 + 0.5, z0 + 100.0)).collect();
+            t.sort_by(|a, b| a.total_cmp(b));
+            t.dedup_by(|a, b| (*a - *b).abs() < 0.2);
+            t.truncate(10);
+            if t.is_empty() { t.push(z0 + 5.0); }
+            r.tiers = t;
+            for s in [&mut r.column, &mut r.beam, &mut r.strut, &mut r.brace] { *s = s.trim().chars().take(40).collect(); }
         }
         for e in &mut self.equipment {
             fresh(&mut e.id, &mut e.uid, &mut seen, &mut w, &format!("Equipment {}", e.tag));

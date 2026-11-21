@@ -10,7 +10,7 @@ use serde_json::json;
 fn colour(kind: &str) -> [f64; 4] {
     match kind {
         "equipment" => [0.60, 0.66, 0.72, 1.0],
-        "steel" => [0.62, 0.55, 0.36, 1.0],
+        "steel" | "rack" => [0.62, 0.55, 0.36, 1.0],
         "nozzle" => [0.48, 0.54, 0.60, 1.0],
         "pipe" | "elbow90" | "elbow45" | "tee" | "reducer" | "cap" => [0.23, 0.35, 0.47, 1.0],
         "flange" | "blind" | "gasket" => [0.42, 0.47, 0.52, 1.0],
